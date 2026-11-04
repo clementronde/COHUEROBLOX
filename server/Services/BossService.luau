@@ -390,7 +390,10 @@ local function step()
 	-- Phase
 	local hp = enemies._getHp(b.entity) or 0
 	local frac = hp / b.maxHp
-	local phase = if frac <= Bosses.PhaseAt[2] then 3 elseif frac <= Bosses.PhaseAt[1] then 2 else 1
+	local phase = if not Bosses.PhaseEnabled then 1
+		elseif frac <= Bosses.PhaseAt[2] then 3
+		elseif frac <= Bosses.PhaseAt[1] then 2
+		else 1
 	if phase > b.phase then
 		b.phase = phase
 		b.dirty = true
@@ -481,8 +484,11 @@ function BossService.spawnBoss(bossId: string, centre: Vector3, stage: number, t
 		return false
 	end
 	BossService.despawn()
+	-- `stage` = index du monde dans la run (Run.WorldScaling) ; `tier` n'est plus utilisé (v2).
+	local _ = tier
+	local scaling = Run.WorldScaling[math.clamp(stage, 1, #Run.WorldScaling)]
 	local hp = def.hp
-		* Run.TierHp[math.clamp(tier, 1, 3)]
+		* scaling.bossHp
 		* (1 + Bosses.HpPerExtraPlayer * (math.max(1, nPlayers) - 1))
 		* (if enraged then Bosses.EnragedHpMult else 1)
 	local entity = enemies._spawnBoss(def.kind, centre.X, centre.Z, hp)

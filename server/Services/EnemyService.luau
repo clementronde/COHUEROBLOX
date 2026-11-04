@@ -6,6 +6,9 @@
 -- over an UnreliableRemoteEvent. Enemy projectiles are simulated here as points and sent once
 -- at creation (closed-form replay on the client, vault "Projectiles and Ballistics").
 -- Bosses are entities here too (so weapons hit them) but BossService drives them ("external").
+-- Run v2 (A04-02) : la force vient de Config/Run.WorldScaling (index du monde = director.stage) et
+-- du directeur réglé par RunManager (Overtime : densité, PV, dégâts, part d'élites). Au-delà du
+-- plafond technique Balance.MaxEnemies, l'excès de densité devient des PV (Run.Overtime.OverflowToHp).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -95,12 +98,14 @@ local director = {
 	active = false,
 	worldId = Run.DefaultWorld,
 	tier = 1,
-	stage = 1,
+	stage = 1, -- index du monde dans la run (1..Run.WorldsPerRun)
 	stageStart = 0,
-	densityMult = 1, -- phase, wave boost, survival
-	hpMult = 1, -- final wave ramp, survival
-	damageMult = 1, -- survival
-	finalWave = false,
+	densityMult = 1, -- phase, vague, Overtime, Rune Cursed
+	hpMult = 1, -- Overtime, Rune Cursed
+	damageMult = 1, -- Overtime
+	eliteShare = Run.EliteChance, -- part d'élites parmi les apparitions
+	eliteMaxAlive = Run.EliteMaxAlive, -- math.huge en Overtime
+	overflowMult = 1, -- densité voulue / plafond quand le plafond est atteint (>= 1)
 	familyUnlockScale = 1,
 	nextEliteAt = math.huge,
 	burstLeft = 0,
@@ -165,17 +170,18 @@ local function nPlayers(): number
 	return math.max(1, #Players:GetPlayers())
 end
 
+local function worldScale(): { hp: number, damage: number, speed: number, density: number, bossHp: number }
+	local list = Run.WorldScaling
+	return list[math.clamp(director.stage, 1, #list)]
+end
+
 local function scaledHp(): number
-	local tier = math.clamp(director.tier, 1, 3)
-	return Run.TierHp[tier]
-		* (1 + Run.StageHpPer * (director.stage - 1))
-		* (1 + Balance.HpPerExtraPlayer * (nPlayers() - 1))
-		* director.hpMult
+	local overflow = if Run.Overtime.OverflowToHp then director.overflowMult else 1
+	return worldScale().hp * (1 + Balance.HpPerExtraPlayer * (nPlayers() - 1)) * director.hpMult * overflow
 end
 
 local function scaledDamage(): number
-	local tier = math.clamp(director.tier, 1, 3)
-	return Run.TierDamage[tier] * (1 + Run.StageDamagePer * (director.stage - 1)) * director.damageMult
+	return worldScale().damage * director.damageMult
 end
 
 local function clampToMap(x: number, z: number): (number, number)
@@ -299,19 +305,19 @@ local function curveAt(elapsed: number): number
 	return base
 end
 
+-- Ennemis vivants voulus. Met aussi à jour director.overflowMult : la part de densité qui ne
+-- tient pas sous le plafond technique (le joueur voit des ennemis plus forts, pas plus nombreux).
 local function desiredAlive(elapsed: number, n: number): number
 	local forced = Balance.Debug.ForceAlive
 	if forced then
+		director.overflowMult = 1
 		return math.min(forced, Balance.MaxEnemies)
 	end
-	if director.finalWave then
-		return Balance.MaxEnemies
-	end
-	local tier = math.clamp(director.tier, 1, 3)
 	local scaled = curveAt(elapsed)
-		* Run.TierDensity[tier]
+		* worldScale().density
 		* director.densityMult
 		* (1 + Balance.DensityPerExtraPlayer * (n - 1))
+	director.overflowMult = math.max(1, scaled / Balance.MaxEnemies)
 	return math.min(math.floor(scaled), Balance.MaxEnemies)
 end
 
@@ -552,10 +558,11 @@ local function spawnTick(targets: { Target }, now: number)
 		local t = targets[(simTick + s) % n + 1] -- round robin: ~equal share per player
 		local x, z = ringPoint(t)
 		local elite = false
-		if now >= director.nextEliteAt and eliteCount() < Run.EliteMaxAlive then
+		local underCap = director.eliteMaxAlive == math.huge or eliteCount() < director.eliteMaxAlive
+		if now >= director.nextEliteAt and underCap then
 			elite = true
 			director.nextEliteAt = now + Run.EliteEvery
-		elseif elapsed >= Run.EliteFirstAt and math.random() < Run.EliteChance and eliteCount() < Run.EliteMaxAlive then
+		elseif elapsed >= Run.EliteFirstAt and math.random() < director.eliteShare and underCap then
 			elite = true
 		end
 		local kind = pickKind(elapsed)
@@ -640,8 +647,7 @@ local function step(targets: { Target }, now: number)
 		end
 
 		local speed = def.speed * (if slowUntil[i] > now then slowMult[i] else 1)
-		local tier = math.clamp(director.tier, 1, 3)
-		speed *= Run.TierSpeed[tier]
+		speed *= worldScale().speed
 		local d = math.sqrt(d2)
 		local family = def.family
 		local walk = true
@@ -950,21 +956,28 @@ function EnemyService.beginStage(worldId: string, tier: number, stage: number)
 	director.densityMult = 1
 	director.hpMult = 1
 	director.damageMult = 1
-	director.finalWave = false
+	director.eliteShare = Run.EliteChance
+	director.eliteMaxAlive = Run.EliteMaxAlive
+	director.overflowMult = 1
 	director.nextEliteAt = os.clock() + Run.EliteFirstAt
 	director.burstLeft = 0
 end
 
-function EnemyService.setDirector(opts: { active: boolean?, densityMult: number?, hpMult: number?, damageMult: number?, finalWave: boolean?, eliteEvery: number? })
+-- Réglé par RunManager. Les champs absents gardent leur valeur.
+function EnemyService.setDirector(opts: { active: boolean?, densityMult: number?, hpMult: number?, damageMult: number?, eliteShare: number?, eliteMaxAlive: number? })
 	if opts.active ~= nil then
 		director.active = opts.active
 	end
 	director.densityMult = opts.densityMult or director.densityMult
 	director.hpMult = opts.hpMult or director.hpMult
 	director.damageMult = opts.damageMult or director.damageMult
-	if opts.finalWave ~= nil then
-		director.finalWave = opts.finalWave
-	end
+	director.eliteShare = opts.eliteShare or director.eliteShare
+	director.eliteMaxAlive = opts.eliteMaxAlive or director.eliteMaxAlive
+end
+
+-- Lecture du directeur (debug, HUD de test) : multiplicateur d'excès au plafond.
+function EnemyService.getOverflowMult(): number
+	return director.overflowMult
 end
 
 -- Wave: `size` extra enemies spread over `seconds` (still under the 300 cap).

@@ -61,9 +61,12 @@ export type Boss = {
 
 local Bosses = {
 	HpPerExtraPlayer = 0.8, -- doc 5.2
-	PhaseAt = { 0.66, 0.33 }, -- hp fraction thresholds -> phase 2, 3
+	-- Décisions v2 section 6 : boss simples, 2 à 3 attaques annoncées 1 s avant, pas de phase
+	-- d'escalade. PhaseEnabled = false : le boss reste en phase 1 (attaques minPhase 1 seulement).
+	PhaseEnabled = false,
+	PhaseAt = { 0.66, 0.33 }, -- hp fraction thresholds -> phase 2, 3 (si PhaseEnabled)
 	PhaseCooldownMult = { 1, 0.85, 0.7 },
-	MinTelegraph = 0.6,
+	MinTelegraph = 1.0,
 	LockBefore = 0.5, -- following markers stop following this long before the hit
 	JumpClear = 4, -- feet this high above the ground dodge a Ring
 	EnragedHpMult = 1.6, -- stage 2 of T2/T3
@@ -91,7 +94,7 @@ Bosses.List.GrandCheneRonchon = {
 	attacks = {
 		{ id = "RacinesSismiques", label = { fr = "Racines sismiques", en = "Quake Roots" }, kind = "TargetCircle", minPhase = 1, windup = 1.0, cooldown = 5, damage = 25, radius = 8, whileRooted = true },
 		{ id = "PluieDeGlands", label = { fr = "Pluie de glands", en = "Acorn Rain" }, kind = "MultiCircle", minPhase = 1, windup = 1.2, cooldown = 8, damage = 18, radius = 5, count = 5 },
-		{ id = "OndeEcorce", label = { fr = "Onde d'écorce", en = "Bark Wave" }, kind = "Ring", minPhase = 2, windup = 1.5, cooldown = 10, damage = 30, inner = 10, radius = 30 },
+		{ id = "OndeEcorce", label = { fr = "Onde d'écorce", en = "Bark Wave" }, kind = "Ring", minPhase = 1, windup = 1.5, cooldown = 10, damage = 30, inner = 10, radius = 30 },
 		{ id = "Rejetons", label = { fr = "Rejetons", en = "Saplings" }, kind = "Summon", minPhase = 2, windup = 1.0, cooldown = 15, radius = 6, count = 6, summonKind = 1 },
 	},
 	weakness = {
