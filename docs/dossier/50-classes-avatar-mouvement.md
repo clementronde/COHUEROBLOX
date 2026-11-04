@@ -3,7 +3,7 @@
 Ce dossier détaille les sections 3, 7 et 10 de `01-decisions-v2.md` (qui prime sur `00-vision.md`). Ids en anglais, texte joueur en anglais.
 
 **Deux propriétaires.** Les sections 2 et 3 (classes, équipement, trait) appartiennent à A04 (gameplay) et datent de la v1 : A04 les réécrit pour les 8 classes v2. Les sections 1, 4 à 9 (mouvement, caméra, contrôles, anti-triche) appartiennent à A06 et sont à jour au 4 nov. 2026.
-Fichiers A06 : `shared/Config/Movement.luau`, `shared/NetDefs/Avatar.luau`, `server/Services/MovementGuard.luau`, `client/Controllers/{CameraController,InputController,MovementController}.luau`.
+Fichiers A06 : `shared/Config/Movement.luau`, `shared/NetDefs/Avatar.luau`, `server/Services/MovementGuard.luau`, `client/Controllers/{CameraController,InputController,MovementController,PlayerAnimator}.luau`.
 
 ## 1. Décisions (mouvement et caméra)
 
@@ -145,6 +145,18 @@ Les passifs liés au mouvement (Shadowstep du Rogue : 0,5 s d'invulnérabilité 
 | Dégâts de chute | Aucun | `FallingDown` et `Ragdoll` désactivés côté client |
 | Onde d'atterrissage | Chute ≥ **18** studs | Anneau Neon local (0 → 12 studs en 0,35 s), secousse légère ; 3 anneaux en pool |
 
+### 4.5 Poses du joueur (`PlayerAnimator`, A06-06 partiel)
+
+Poses procédurales posées par-dessus l'Animator (Transform des articulations en PreSimulation, Motor6D ou AnimationConstraint), visibles par tous les joueurs, sans asset à publier :
+
+| Pose | Déclencheur | Forme |
+| --- | --- | --- |
+| Glissade | `isSliding()` en local, attribut serveur `Sliding` pour les autres | Buste penché de 62° en arrière, bassin abaissé de 1,35 stud, jambes devant, bras écartés |
+| Charge (Barbarian) | `Sliding` + `SlideCharge` | Penché de 24° vers l'avant, accroupi |
+| Atterrissage lourd | Local à l'atterrissage, `HeavyLandAt` pour les autres | Accroupi bref (0,32 s) |
+
+Pas encore faits : les 5 gestes d'attaque (taille, tir à l'arc, sort, lancer, frappe au sol) et le geste de capture. Ils demandent des clips keyframés (skill `make-anim`, à publier par Clément) et un signal client « telle arme tire pour tel joueur » côté A04.
+
 **Signaux au serveur** (remote `MoveEvent`, C→S, 10/s) : `SlideStart`, `SlideEnd`, `Hop`, `HopReset`. Le serveur les valide et pose des attributs **serveur** sur le Player (lecture seule ailleurs) : `Sliding` (expire seul après 2,5 s), `SlideCharge`, `HopChain`, `Airborne` (rayon serveur à 4 Hz), `HeavyLandAt` (`GetServerTimeNow` du dernier atterrissage lourd). MovementGuard compte aussi `ProgressionService.recordStat(player, "Hops", 1)`.
 
 ## 5. Caméra 3e personne (client, `CameraController`)
@@ -195,14 +207,15 @@ API : `onAction(name, fn)`, `isDown(name)`, `bindButton(name, button)` (méthode
 | Contrôle | Règle |
 | --- | --- |
 | Marche | marche(classe) × (1 + MoveSpeed serveur) |
-| Bunny-hop | +3 % par `Hop` reçu pendant que le serveur voit le joueur en l'air (≤ 0,7 + 0,5 s), au plus un hop par **0,4 s** ; perdu après 0,7 s au sol ou sur `HopReset` |
-| Glissade | Vitesse suivie : départ = vitesse permise × boost de classe × 1,1 ; gain de pente seulement si le rayon serveur voit une pente (gain × 1,5) ; frottement × 0,5 au plat ; plafond de classe. Fin de glissade : crédite le bonus d'entrée + la part gagnée en pente + un hop. `SlideStart` accepté au sol, au plus toutes les 0,5 s |
+| Bunny-hop | +3 % par `Hop` reçu pendant que le serveur voit le joueur en l'air (≤ 0,7 + 0,5 s), au plus un hop par **0,4 s** ; perdu après 0,7 s au sol ou sur `HopReset`. `HopChain` et la stat `Hops` ne comptent que ces hops validés |
+| Glissade | Vitesse suivie : départ = vitesse permise × boost de classe × 1,1 ; gain de pente seulement si le rayon serveur voit une pente (gain × 1,5) ; frottement × 0,5 au plat ; plafond de classe. Fin de glissade : crédite le bonus d'entrée + la part gagnée en pente (le hop du saut arrive par `Hop`). `SlideStart` accepté au sol, au plus toutes les 0,5 s et 0,21 s après la fin de la précédente. Une glissade ne garde la chaîne de hops que si elle part juste après un saut, et au plus `maxFlatTime` + 0,3 s : enchaîner des glissades au sol ne la prolonge pas |
 | Seau percé | permis = vitesse × **1,06** × temps + **0,6** stud + vitesse × ping × 0,25 ; excès cumulé − **1,5** stud/s ; au-delà de **20** studs → recalage |
-| Gel réseau | Si le serveur ne voit plus bouger le joueur (< 0,2 stud), le temps gelé (≤ 1,5 s) s'ajoute au pas suivant : le rattrapage n'est pas puni |
+| Gel réseau | Si le serveur ne voit plus bouger le joueur (< 0,2 stud) alors que sa vitesse répliquée dépasse 2 studs/s, le temps gelé (≤ 1,5 s) s'ajoute au pas suivant : le rattrapage n'est pas puni, mais rester immobile ne donne pas de crédit de distance |
+| Tremplins | 2,5 s de vitesse relevée à 30 studs/s près d'un tremplin du plan ; pas une exemption : téléport et seau restent contrôlés |
 | Téléport | Un pas > max(**45**, vitesse max possible × (temps + ping) × 2,5) → recalage immédiat |
 | Vol | Mode ombre (log seul) : 3,5 s en l'air avec moins de 2 studs d'amplitude, ou monté de plus que les sauts de la classe + 8 studs |
 | Recalage | `PivotTo` de la dernière position valide au sol, vitesse annulée, 0,6 s + ping de grâce. Jamais de kick |
-| Exemptions | `MovementGuard.exempt(player, s, raison?)` ou attribut `MoveExemptUntil` ; automatiques : 3 s après l'apparition, tremplins, assis, ancré, à-coup serveur (dt > 0,75 s) |
+| Exemptions | `MovementGuard.exempt(player, s, raison?)` ou attribut `MoveExemptUntil` (mouvement causé par le serveur) ; automatiques : 3 s après l'apparition, assis, ancré, à-coup serveur (dt > 0,75 s). La position valide n'avance pas pendant une exemption |
 
 **Mesures en jeu (Studio, 4 nov.)**
 
@@ -216,6 +229,9 @@ API : `onAction(name, fn)`, `isDown(name)`, `bindButton(name, button)` (méthode
 | `SlideStart` envoyé en boucle + hack +15 au plat | Recalé (2 fois en 7 s) |
 | Hack ×1,5 au sol (24 studs/s) | Recalé en ~6 s |
 | Téléport de 70 studs | Recalé immédiatement |
+| `SlideEnd` + `SlideStart` toutes les 0,5 s + hack +15 au plat (après correctifs) | Recalé 2 fois en 10 s |
+| Immobile 2 s puis clignement de 30 studs (après correctifs) | Recalé (seau 24,7 / 20) |
+| 22 hops légitimes après correctifs | 0 recalage, seau 0 |
 
 Limite connue : un tricheur qui reste sous ≈ +25 % de la vitesse permise n'est pas recalé (c'est la marge qui protège les joueurs légitimes sur réseau mobile). Mesuré en Studio sans latence : à revalider sur téléphone en 4G (A11-06).
 
