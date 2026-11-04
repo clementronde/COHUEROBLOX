@@ -390,11 +390,14 @@ local function step()
 	-- Phase
 	local hp = enemies._getHp(b.entity) or 0
 	local frac = hp / b.maxHp
-	local phase = if frac <= Bosses.PhaseAt[2] then 3 elseif frac <= Bosses.PhaseAt[1] then 2 else 1
+	local phase = if not Bosses.PhaseEnabled then 1
+		elseif frac <= Bosses.PhaseAt[2] then 3
+		elseif frac <= Bosses.PhaseAt[1] then 2
+		else 1
 	if phase > b.phase then
 		b.phase = phase
 		b.dirty = true
-		announce("BossPhase", { fr = `{b.name.fr} : phase {phase} !`, en = `{b.name.en}: phase {phase}!` }, 2.5)
+		announce("BossPhase", { en = `{b.name.en}: phase {phase}!`, fr = `{b.name.en}: phase {phase}!` }, 2.5)
 		if b.def.weakness.kind == "Height" and phase == b.def.weakness.minPhase then
 			b.nextRootAt = now + 3
 		end
@@ -481,8 +484,11 @@ function BossService.spawnBoss(bossId: string, centre: Vector3, stage: number, t
 		return false
 	end
 	BossService.despawn()
+	-- `stage` = index du monde dans la run (Run.WorldScaling) ; `tier` n'est plus utilisé (v2).
+	local _ = tier
+	local scaling = Run.WorldScaling[math.clamp(stage, 1, #Run.WorldScaling)]
 	local hp = def.hp
-		* Run.TierHp[math.clamp(tier, 1, 3)]
+		* scaling.bossHp
 		* (1 + Bosses.HpPerExtraPlayer * (math.max(1, nPlayers) - 1))
 		* (if enraged then Bosses.EnragedHpMult else 1)
 	local entity = enemies._spawnBoss(def.kind, centre.X, centre.Z, hp)
@@ -534,6 +540,11 @@ function BossService.despawn()
 		enemies._remove(b.entity)
 	end
 	stateRemote:FireAllClients({ bossId = b.bossId, hpFrac = 0, phase = b.phase, defeated = false, removed = true, telegraphs = {} })
+end
+
+-- Run-domain internal (commandes de test de RunManager) : id d'entité EnemyService du boss.
+function BossService._entityId(): number?
+	return if boss then boss.entity else nil
 end
 
 function BossService.isActive(): boolean
@@ -602,7 +613,7 @@ local function onEnemyKilled(id: number, _kind: number, _x: number, _z: number)
 			end
 		end
 	end
-	announce("BossDefeated", { fr = `{b.name.fr} est vaincu !`, en = `{b.name.en} is defeated!` }, 3)
+	announce("BossDefeated", { en = `{b.name.en} is defeated!`, fr = `{b.name.en} is defeated!` }, 3)
 	Bus.BossDefeated:fire(b.bossId, b.stage)
 end
 

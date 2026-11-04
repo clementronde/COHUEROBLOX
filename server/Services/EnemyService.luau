@@ -6,6 +6,9 @@
 -- over an UnreliableRemoteEvent. Enemy projectiles are simulated here as points and sent once
 -- at creation (closed-form replay on the client, vault "Projectiles and Ballistics").
 -- Bosses are entities here too (so weapons hit them) but BossService drives them ("external").
+-- Run v2 (A04-02) : la force vient de Config/Run.WorldScaling (index du monde = director.stage) et
+-- du directeur réglé par RunManager (Overtime : densité, PV, dégâts, part d'élites). Au-delà du
+-- plafond technique Balance.MaxEnemies, l'excès de densité devient des PV (Run.Overtime.OverflowToHp).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -52,6 +55,10 @@ local targetOf: { [number]: Player } = {}
 local dmgMult: { number } = {}
 local sizeMult: { number } = {}
 local external: { boolean } = {}
+-- Élite « à butin » (coffre chez LootService). En Overtime, les élites en plus du plafond classique
+-- Run.EliteMaxAlive gardent PV, taille et couronne mais sortent sans coffre : sinon la part d'élites
+-- sans plafond ferait pleuvoir les coffres. Bus.EnemyKilled porte isElite = élite à butin.
+local lootElite: { boolean } = {}
 -- Family AI
 local actPhase: { number } = {} -- 0 idle/walk, 1 windup, 2 airborne
 local actT: { number } = {}
@@ -75,13 +82,14 @@ local kbVZ: { number } = {}
 local kbUntil: { number } = {}
 
 local columns: { { any } } = {
-	ids, xs, zs, hps, kinds, states, targetOf :: any, dmgMult, sizeMult, external,
+	ids, xs, zs, hps, kinds, states, targetOf :: any, dmgMult, sizeMult, external, lootElite,
 	actPhase, actT, actX, actZ, actOX, actOZ,
 	burnDps, burnUntil, burnSrc :: any, poisonDps, poisonUntil, poisonSrc :: any, dotNext,
 	slowMult, slowUntil, stopUntil, kbVX, kbVZ, kbUntil,
 }
 
 local indexOf: { [number]: number } = {} -- id -> index
+local lootEliteAlive = 0 -- élites à butin vivantes, hors mini-boss (plafond Run.EliteMaxAlive)
 local coinTimes: { [number]: number } = {}
 
 local nextId = 1
@@ -95,12 +103,14 @@ local director = {
 	active = false,
 	worldId = Run.DefaultWorld,
 	tier = 1,
-	stage = 1,
+	stage = 1, -- index du monde dans la run (1..Run.WorldsPerRun)
 	stageStart = 0,
-	densityMult = 1, -- phase, wave boost, survival
-	hpMult = 1, -- final wave ramp, survival
-	damageMult = 1, -- survival
-	finalWave = false,
+	densityMult = 1, -- phase, vague, Overtime, Rune Cursed
+	hpMult = 1, -- Overtime, Rune Cursed
+	damageMult = 1, -- Overtime
+	eliteShare = Run.EliteChance, -- part d'élites parmi les apparitions
+	eliteMaxAlive = Run.EliteMaxAlive, -- math.huge en Overtime
+	overflowMult = 1, -- densité voulue / plafond quand le plafond est atteint (>= 1)
 	familyUnlockScale = 1,
 	nextEliteAt = math.huge,
 	burstLeft = 0,
@@ -154,7 +164,9 @@ local function radiusOf(i: number): number
 	return Enemies[kinds[i]].radius * sizeMult[i]
 end
 
-local function nPlayers(): number
+local cachedPlayers = 1 -- joueurs de la run, relu une fois par tick (pas une copie de liste par apparition)
+
+local function countRunPlayers(): number
 	local run = Registry.find("RunManager")
 	if run then
 		local ok, list = pcall(run.getRunPlayers)
@@ -165,17 +177,18 @@ local function nPlayers(): number
 	return math.max(1, #Players:GetPlayers())
 end
 
+local function worldScale(): { hp: number, damage: number, speed: number, density: number, bossHp: number }
+	local list = Run.WorldScaling
+	return list[math.clamp(director.stage, 1, #list)]
+end
+
 local function scaledHp(): number
-	local tier = math.clamp(director.tier, 1, 3)
-	return Run.TierHp[tier]
-		* (1 + Run.StageHpPer * (director.stage - 1))
-		* (1 + Balance.HpPerExtraPlayer * (nPlayers() - 1))
-		* director.hpMult
+	local overflow = if Run.Overtime.OverflowToHp then director.overflowMult else 1
+	return worldScale().hp * (1 + Balance.HpPerExtraPlayer * (cachedPlayers - 1)) * director.hpMult * overflow
 end
 
 local function scaledDamage(): number
-	local tier = math.clamp(director.tier, 1, 3)
-	return Run.TierDamage[tier] * (1 + Run.StageDamagePer * (director.stage - 1)) * director.damageMult
+	return worldScale().damage * director.damageMult
 end
 
 local function clampToMap(x: number, z: number): (number, number)
@@ -183,7 +196,11 @@ local function clampToMap(x: number, z: number): (number, number)
 	return math.clamp(x, -h, h), math.clamp(z, -h, h)
 end
 
-local function insertEnemy(kind: number, x: number, z: number, hp: number, dmg: number, elite: boolean, isExternal: boolean): number?
+local function countsTowardEliteCap(i: number): boolean
+	return lootElite[i] and Enemies[kinds[i]].family ~= "MiniBoss"
+end
+
+local function insertEnemy(kind: number, x: number, z: number, hp: number, dmg: number, elite: boolean, isExternal: boolean, noLoot: boolean?): number?
 	if count >= Balance.MaxEnemies and not isExternal then
 		return nil
 	end
@@ -208,6 +225,10 @@ local function insertEnemy(kind: number, x: number, z: number, hp: number, dmg: 
 	dmgMult[i] = dmg
 	sizeMult[i] = if elite and def.family ~= "MiniBoss" then Run.EliteSizeMult else 1
 	external[i] = isExternal
+	lootElite[i] = elite and not isExternal and noLoot ~= true
+	if countsTowardEliteCap(i) then
+		lootEliteAlive += 1
+	end
 	actPhase[i] = 0
 	actT[i] = os.clock() + math.random() * 2
 	actX[i], actZ[i], actOX[i], actOZ[i] = 0, 0, 0, 0
@@ -221,6 +242,9 @@ local function insertEnemy(kind: number, x: number, z: number, hp: number, dmg: 
 end
 
 local function removeAt(i: number)
+	if countsTowardEliteCap(i) then
+		lootEliteAlive -= 1
+	end
 	indexOf[ids[i]] = nil
 	coinTimes[ids[i]] = nil
 	local last = count
@@ -299,30 +323,20 @@ local function curveAt(elapsed: number): number
 	return base
 end
 
+-- Ennemis vivants voulus. Met aussi à jour director.overflowMult : la part de densité qui ne
+-- tient pas sous le plafond technique (le joueur voit des ennemis plus forts, pas plus nombreux).
 local function desiredAlive(elapsed: number, n: number): number
 	local forced = Balance.Debug.ForceAlive
 	if forced then
+		director.overflowMult = 1
 		return math.min(forced, Balance.MaxEnemies)
 	end
-	if director.finalWave then
-		return Balance.MaxEnemies
-	end
-	local tier = math.clamp(director.tier, 1, 3)
 	local scaled = curveAt(elapsed)
-		* Run.TierDensity[tier]
+		* worldScale().density
 		* director.densityMult
 		* (1 + Balance.DensityPerExtraPlayer * (n - 1))
+	director.overflowMult = math.max(1, scaled / Balance.MaxEnemies)
 	return math.min(math.floor(scaled), Balance.MaxEnemies)
-end
-
-local function eliteCount(): number
-	local n = 0
-	for i = 1, count do
-		if bit32.band(states[i], BIT_ELITE) ~= 0 and Enemies[kinds[i]].family ~= "MiniBoss" and not external[i] then
-			n += 1
-		end
-	end
-	return n
 end
 
 local function pickKind(elapsed: number): number
@@ -342,7 +356,7 @@ local function pickKind(elapsed: number): number
 	return options[math.random(#options)]
 end
 
-local function spawnScaled(kind: number, x: number, z: number, elite: boolean, hpMult: number): number?
+local function spawnScaled(kind: number, x: number, z: number, elite: boolean, hpMult: number, noLoot: boolean?): number?
 	local def = Enemies[kind]
 	if not def then
 		return nil
@@ -352,7 +366,7 @@ local function spawnScaled(kind: number, x: number, z: number, elite: boolean, h
 		hp *= Run.EliteHpMult
 	end
 	local dmg = scaledDamage() * (if elite then Run.Player.EliteDamageMult else 1)
-	return insertEnemy(kind, x, z, hp, dmg, elite, false)
+	return insertEnemy(kind, x, z, hp, dmg, elite, false, noLoot)
 end
 
 -- Projectiles ----------------------------------------------------------------------------------
@@ -545,24 +559,28 @@ local function spawnTick(targets: { Target }, now: number)
 	local toSpawn = math.min(want, Balance.MaxSpawnsPerTick)
 	if director.burstLeft > 0 then
 		local extra = math.min(director.burstLeft, math.max(director.burstPerTick, 1), Balance.MaxEnemies - count)
-		director.burstLeft -= math.max(extra, 1)
-		toSpawn = math.max(toSpawn, 0) + math.max(extra, 0)
+		if extra > 0 then -- au plafond, la vague attend qu'une place se libère
+			director.burstLeft -= extra
+			toSpawn = math.max(toSpawn, 0) + extra
+		end
 	end
 	for s = 1, toSpawn do
 		local t = targets[(simTick + s) % n + 1] -- round robin: ~equal share per player
 		local x, z = ringPoint(t)
 		local elite = false
-		if now >= director.nextEliteAt and eliteCount() < Run.EliteMaxAlive then
+		local classicRoom = lootEliteAlive < Run.EliteMaxAlive
+		local underCap = director.eliteMaxAlive == math.huge or lootEliteAlive < director.eliteMaxAlive
+		if now >= director.nextEliteAt and underCap then
 			elite = true
 			director.nextEliteAt = now + Run.EliteEvery
-		elseif elapsed >= Run.EliteFirstAt and math.random() < Run.EliteChance and eliteCount() < Run.EliteMaxAlive then
+		elseif elapsed >= Run.EliteFirstAt and math.random() < director.eliteShare and underCap then
 			elite = true
 		end
 		local kind = pickKind(elapsed)
 		if elite and kind == (Worlds[director.worldId] or Worlds[Run.DefaultWorld]).roster.Swarm and math.random() < 0.5 then
 			kind = pickKind(math.huge)
 		end
-		spawnScaled(kind, x, z, elite, 1)
+		spawnScaled(kind, x, z, elite, 1, elite and not classicRoom)
 	end
 end
 
@@ -640,8 +658,7 @@ local function step(targets: { Target }, now: number)
 		end
 
 		local speed = def.speed * (if slowUntil[i] > now then slowMult[i] else 1)
-		local tier = math.clamp(director.tier, 1, 3)
-		speed *= Run.TierSpeed[tier]
+		speed *= worldScale().speed
 		local d = math.sqrt(d2)
 		local family = def.family
 		local walk = true
@@ -787,9 +804,13 @@ function EnemyService.damage(id: number, amount: number, source: Player?): boole
 	hps[i] -= amount
 	if hps[i] <= 0 then
 		local kind, x, z = kinds[i], xs[i], zs[i]
-		local isElite = bit32.band(states[i], BIT_ELITE) ~= 0
+		-- isElite = élite à butin (coffre). hordeElite = élite de l'Overtime au-delà du plafond
+		-- classique : PV, taille et couronne d'élite, XP et quêtes d'élite côté domaines qui le lisent,
+		-- mais pas de coffre (contract request loot : XP / pièces d'élite pour isElite or hordeElite).
+		local isElite = lootElite[i]
+		local hordeElite = not isElite and bit32.band(states[i], BIT_ELITE) ~= 0 and not external[i]
 		removeAt(i)
-		Bus.EnemyKilled:fire(id, kind, x, z, source, isElite)
+		Bus.EnemyKilled:fire(id, kind, x, z, source, isElite, hordeElite)
 		return true
 	end
 	return false
@@ -844,7 +865,49 @@ function EnemyService.getCount(): number
 	return count
 end
 
+-- Au plafond technique, retire l'ennemi ordinaire (ni élite, ni boss) le plus loin de tout joueur,
+-- sans butin ni KO, pour laisser passer une apparition voulue (mini-boss, invocation, autel).
+local function makeRoom(): boolean
+	if count < Balance.MaxEnemies then
+		return true
+	end
+	local px: { number }, pz: { number } = {}, {}
+	for _, player in Players:GetPlayers() do
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if root and root:IsA("BasePart") then
+			table.insert(px, root.Position.X)
+			table.insert(pz, root.Position.Z)
+		end
+	end
+	-- 1er choix : ennemi ordinaire ; sinon (Overtime très avancé) une élite sans butin.
+	local best, bestD2, bestRank = 0, -1, 0
+	for i = 1, count do
+		if external[i] or lootElite[i] then
+			continue
+		end
+		local rank = if bit32.band(states[i], BIT_ELITE) == 0 then 2 else 1
+		if rank < bestRank then
+			continue
+		end
+		local nearest2 = math.huge
+		for k = 1, #px do
+			local dx, dz = xs[i] - px[k], zs[i] - pz[k]
+			nearest2 = math.min(nearest2, dx * dx + dz * dz)
+		end
+		if rank > bestRank or nearest2 > bestD2 then
+			best, bestD2, bestRank = i, nearest2, rank
+		end
+	end
+	if best == 0 then
+		return false
+	end
+	removeAt(best)
+	return true
+end
+
 -- Spawns one enemy with the run's tier/stage/coop scaling. opts.hpMult multiplies on top.
+-- Apparition voulue : jamais perdue au plafond technique (makeRoom).
 function EnemyService.spawnAt(kind: number, x: number, z: number, opts: { elite: boolean?, hpMult: number? }?): number?
 	if type(kind) ~= "number" or not Enemies[kind] or Enemies[kind].isBoss then
 		return nil
@@ -854,6 +917,9 @@ function EnemyService.spawnAt(kind: number, x: number, z: number, opts: { elite:
 	end
 	local elite = opts ~= nil and opts.elite == true
 	local hpMult = if opts and type(opts.hpMult) == "number" and opts.hpMult > 0 then opts.hpMult else 1
+	if not makeRoom() then
+		return nil
+	end
 	return spawnScaled(kind, x, z, elite, hpMult)
 end
 
@@ -950,21 +1016,28 @@ function EnemyService.beginStage(worldId: string, tier: number, stage: number)
 	director.densityMult = 1
 	director.hpMult = 1
 	director.damageMult = 1
-	director.finalWave = false
+	director.eliteShare = Run.EliteChance
+	director.eliteMaxAlive = Run.EliteMaxAlive
+	director.overflowMult = 1
 	director.nextEliteAt = os.clock() + Run.EliteFirstAt
 	director.burstLeft = 0
 end
 
-function EnemyService.setDirector(opts: { active: boolean?, densityMult: number?, hpMult: number?, damageMult: number?, finalWave: boolean?, eliteEvery: number? })
+-- Réglé par RunManager. Les champs absents gardent leur valeur.
+function EnemyService.setDirector(opts: { active: boolean?, densityMult: number?, hpMult: number?, damageMult: number?, eliteShare: number?, eliteMaxAlive: number? })
 	if opts.active ~= nil then
 		director.active = opts.active
 	end
 	director.densityMult = opts.densityMult or director.densityMult
 	director.hpMult = opts.hpMult or director.hpMult
 	director.damageMult = opts.damageMult or director.damageMult
-	if opts.finalWave ~= nil then
-		director.finalWave = opts.finalWave
-	end
+	director.eliteShare = opts.eliteShare or director.eliteShare
+	director.eliteMaxAlive = opts.eliteMaxAlive or director.eliteMaxAlive
+end
+
+-- Lecture du directeur (debug, HUD de test) : multiplicateur d'excès au plafond.
+function EnemyService.getOverflowMult(): number
+	return director.overflowMult
 end
 
 -- Wave: `size` extra enemies spread over `seconds` (still under the 300 cap).
@@ -996,6 +1069,11 @@ function EnemyService.clearNonBoss()
 			removeAt(i)
 		end
 	end
+end
+
+-- Commandes de test Studio (RunManager) : avance l'horloge du directeur avec le chrono de la run.
+function EnemyService._debugSkip(seconds: number)
+	director.stageStart -= seconds
 end
 
 function EnemyService._elapsed(): number
@@ -1069,6 +1147,7 @@ function EnemyService.start()
 		end
 		acc = math.min(acc - DT, DT) -- never run more than one catch-up tick
 		simTick += 1
+		cachedPlayers = countRunPlayers()
 		local targets, viewers = gatherTargets()
 		step(targets, os.clock())
 		send(viewers)

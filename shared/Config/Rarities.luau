@@ -31,10 +31,10 @@ local Rarities = {
 	} :: { [string]: Color3 },
 
 	Name = {
-		Common = { fr = "Commun", en = "Common" },
-		Rare = { fr = "Rare", en = "Rare" },
-		Epic = { fr = "Épique", en = "Epic" },
-		Legendary = { fr = "Légendaire", en = "Legendary" },
+		Common = { en = "Common", fr = "Common" },
+		Rare = { en = "Rare", fr = "Rare" },
+		Epic = { en = "Epic", fr = "Epic" },
+		Legendary = { en = "Legendary", fr = "Legendary" },
 	} :: { [string]: { fr: string, en: string } },
 }
 
@@ -43,7 +43,7 @@ function Rarities.rank(rarity: string): number
 	return table.find(Rarities.Order, rarity) or 1
 end
 
--- Rolls a rarity. `minRank` forces at least that rank (Astrel guarantee). Pure: pass your Random.
+-- Rolls a rarity. `minRank` forces at least that rank (garantie du passif Mage). Pure: pass your Random.
 function Rarities.roll(luck: number, rng: Random, minRank: number?): string
 	local l = math.clamp(if luck == luck then luck else 0, 0, Rarities.LuckCap)
 	local lo = minRank or 1

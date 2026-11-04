@@ -1,7 +1,8 @@
 --!strict
--- TraitService (avatar domain): the class trait is an Accessory added to the player's own avatar,
--- built from parts in code (no asset ids), grown at run levels 10/20/30.
--- Design: docs/dossier/50-classes-avatar-mouvement.md section 3.
+-- TraitService : l'équipement voxel de la classe (décisions v2 section 3) est un Accessory ajouté
+-- à l'avatar du joueur, construit en blocs dans le code (aucun id d'asset), qui grandit aux niveaux
+-- de run 10/20/30. Pièces provisoires en attendant les Accessories de A01 (vague 1, A04).
+-- Ancien design (traits physiques v1) : docs/dossier/50-classes-avatar-mouvement.md section 3.
 -- API (ARCHITECTURE section 4): applyClass(player, classId) · setTraitStage(player, stage) · clear(player)
 -- Player attributes set here (server-owned): ClassId, TraitStage, KnockbackImmune.
 
@@ -66,221 +67,199 @@ end
 
 local BALL = Enum.PartType.Ball
 local BLOCK = Enum.PartType.Block
-local CYL = Enum.PartType.Cylinder
-local WEDGE = Enum.PartType.Wedge
 local rad = math.rad
-
--- Cylinders run along X: this turns one upright.
-local UPRIGHT = CFrame.Angles(0, 0, rad(90))
 
 -- ---------------------------------------------------------------- builders (stage 1 sizes, scale 1)
 
 local Builders: { [string]: (BuildCtx) -> { Piece } } = {}
 
-function Builders.RamHorns(ctx: BuildCtx): { Piece }
-	local out = {}
-	local count = if ctx.stage >= 2 then 4 else 3
-	for _, side in { -1, 1 } do
-		for i = 0, count - 1 do
-			local a = i * rad(70)
-			local pos = Vector3.new(side * (0.5 + 0.45 * math.sin(a)), -0.1 + 0.45 * (math.cos(a) - 1) + 0.2, 0.05 + 0.12 * i)
-			local d = 0.42 - 0.07 * i
-			local tip = i == count - 1
-			table.insert(
-				out,
-				piece(BALL, Vector3.one * d, CFrame.new(pos), ctx.tint, Enum.Material.SmoothPlastic, if tip and ctx.stage >= 4 then "Fire" else nil)
-			)
-			if ctx.stage >= 3 and i == 1 then
-				table.insert(out, piece(CYL, Vector3.new(0.06, d + 0.04, d + 0.04), CFrame.new(pos), GOLD, Enum.Material.Neon))
-			end
-		end
-	end
-	return out
+-- Équipement provisoire des 8 classes v2, en blocs (style voxel), en attendant les Accessories de
+-- A01. Repère : celui de l'attachement R15 ; l'avant du personnage est -Z, le haut +Y.
+-- Paliers : 1 = niveau 1, 2 = niveau 10, 3 = niveau 20, 4 = niveau 30 (Movement.Trait.StageLevels).
+local SMOOTH = Enum.Material.SmoothPlastic
+local METAL = Enum.Material.Metal
+local NEON = Enum.Material.Neon
+local RED = Color3.fromRGB(200, 45, 50)
+local BROWN = Color3.fromRGB(120, 80, 45)
+
+local function block(size: Vector3, pos: Vector3, color: Color3, material: Enum.Material?, effect: string?): Piece
+	return piece(BLOCK, size, CFrame.new(pos), color, material or SMOOTH, effect)
 end
 
-function Builders.FeatherWings(ctx: BuildCtx): { Piece }
-	local out = {}
-	local count = if ctx.stage >= 2 then 5 else 4
-	local color = if ctx.stage >= 3 then GOLD else ctx.tint
-	local material = if ctx.stage >= 4 then Enum.Material.Neon else Enum.Material.SmoothPlastic
-	for _, side in { -1, 1 } do
-		for i = 0, count - 1 do
-			local pos = Vector3.new(side * (0.45 + i * 0.32), 0.35 - i * 0.1, 0.3)
-			local size = Vector3.new(0.32, 1.5 - 0.15 * i, 0.08)
-			local cf = CFrame.new(pos) * CFrame.Angles(0, 0, -side * rad(15 + i * 12))
-			table.insert(out, piece(BLOCK, size, cf, color, material, if ctx.stage >= 4 and i == 0 then "Light" else nil))
-		end
-	end
-	return out
-end
-
-function Builders.MechArm(ctx: BuildCtx): { Piece }
-	local s = ctx.side
-	local color = if ctx.stage >= 4 then GOLD else ctx.tint
-	local metal = Enum.Material.Metal
+-- Knight : casque ouvert (le visage reste visible), crête dorée au palier 3, armure brillante au 4.
+function Builders.KnightHelm(ctx: BuildCtx): { Piece }
+	local steel = if ctx.stage >= 4 then GOLD else ctx.tint
+	local mat = if ctx.stage >= 4 then METAL else SMOOTH
 	local out = {
-		piece(BLOCK, Vector3.new(0.9, 0.35, 0.9), CFrame.new(s * 0.2, 0.1, 0.15), color, metal, if ctx.stage >= 4 then "Smoke" else nil),
-		piece(CYL, Vector3.new(0.8, 0.32, 0.32), CFrame.new(s * 0.75, -0.35, 0.35) * UPRIGHT, color, metal),
-		piece(BALL, Vector3.one * 0.38, CFrame.new(s * 0.75, -0.8, 0.35), DARK, metal),
-		piece(CYL, Vector3.new(0.75, 0.28, 0.28), CFrame.new(s * 0.75, -1.2, 0.35) * UPRIGHT, color, metal),
-		piece(WEDGE, Vector3.new(0.1, 0.35, 0.2), CFrame.new(s * 0.75, -1.7, 0.25), DARK, metal),
-		piece(WEDGE, Vector3.new(0.1, 0.35, 0.2), CFrame.new(s * 0.75, -1.7, 0.45) * CFrame.Angles(0, rad(180), 0), DARK, metal),
+		block(Vector3.new(1.35, 0.45, 1.35), Vector3.new(0, 0.05, 0), steel, mat),
+		block(Vector3.new(0.16, 0.75, 1.1), Vector3.new(-0.68, -0.4, 0.05), steel, mat),
+		block(Vector3.new(0.16, 0.75, 1.1), Vector3.new(0.68, -0.4, 0.05), steel, mat),
+		block(Vector3.new(1.35, 0.75, 0.16), Vector3.new(0, -0.4, 0.62), steel, mat),
+		block(Vector3.new(0.18, 0.5, 0.12), Vector3.new(0, -0.3, -0.7), steel, mat),
+	}
+	if ctx.stage >= 3 then
+		local plume = if ctx.stage >= 4 then RED else GOLD
+		for i = 0, 2 do
+			table.insert(out, block(Vector3.new(0.22, 0.3, 0.35), Vector3.new(0, 0.42 + i * 0.12, -0.25 + i * 0.3), plume, SMOOTH, if ctx.stage >= 4 and i == 2 then "Sparkles" else nil))
+		end
+	end
+	return out
+end
+
+function Builders.KnightCape(ctx: BuildCtx): { Piece }
+	local long = if ctx.stage >= 4 then 0.5 else 0
+	local out = {
+		block(Vector3.new(1.7, 2.3 + long, 0.12), Vector3.new(0, -0.95 - long / 2, 0.25), RED),
+		block(Vector3.new(1.9, 0.25, 0.25), Vector3.new(0, 0.2, 0.15), RED),
+	}
+	if ctx.stage >= 3 then
+		table.insert(out, block(Vector3.new(1.72, 0.12, 0.14), Vector3.new(0, -2.05 - long, 0.25), GOLD, METAL))
+	end
+	return out
+end
+
+-- Archer : capuche et carquois ; plume au palier 2, carquois plein au 3, flèches dorées au 4.
+function Builders.ArcherHood(ctx: BuildCtx): { Piece }
+	local out = {
+		block(Vector3.new(1.35, 0.45, 1.35), Vector3.new(0, 0.02, 0.02), ctx.tint),
+		block(Vector3.new(1.35, 0.85, 0.2), Vector3.new(0, -0.42, 0.62), ctx.tint),
+		block(Vector3.new(0.2, 0.8, 0.9), Vector3.new(-0.62, -0.42, 0.15), ctx.tint),
+		block(Vector3.new(0.2, 0.8, 0.9), Vector3.new(0.62, -0.42, 0.15), ctx.tint),
+		block(Vector3.new(0.5, 0.35, 0.5), Vector3.new(0, 0.1, 0.75), ctx.tint),
 	}
 	if ctx.stage >= 2 then
-		table.insert(out, piece(CYL, Vector3.new(0.7, 0.1, 0.1), CFrame.new(s * 0.95, -0.75, 0.5) * UPRIGHT, WHITE, metal))
-		table.insert(out, piece(CYL, Vector3.new(0.7, 0.1, 0.1), CFrame.new(s * 0.55, -0.75, 0.5) * UPRIGHT, WHITE, metal))
+		table.insert(out, piece(BLOCK, Vector3.new(0.1, 0.9, 0.25), CFrame.new(0.72, 0.35, 0.2) * CFrame.Angles(0, 0, rad(-25)), RED, SMOOTH))
+	end
+	return out
+end
+
+function Builders.ArcherQuiver(ctx: BuildCtx): { Piece }
+	local tilt = CFrame.Angles(0, 0, rad(20))
+	local base = CFrame.new(0.15, -0.45, 0.45) * tilt
+	local out = {
+		piece(BLOCK, Vector3.new(0.55, 1.6, 0.55), base, BROWN, SMOOTH),
+		piece(BLOCK, Vector3.new(0.6, 0.12, 0.6), base * CFrame.new(0, 0.55, 0), Color3.fromRGB(90, 60, 35), SMOOTH),
+	}
+	local arrows = if ctx.stage >= 3 then 5 else 3
+	local tip = if ctx.stage >= 4 then GOLD else WHITE
+	for i = 1, arrows do
+		local ox = (i - (arrows + 1) / 2) * 0.12
+		table.insert(out, piece(BLOCK, Vector3.new(0.06, 0.7, 0.06), base * CFrame.new(ox, 1.05, 0), Color3.fromRGB(200, 170, 120), SMOOTH))
+		table.insert(out, piece(BLOCK, Vector3.new(0.14, 0.2, 0.04), base * CFrame.new(ox, 1.4, 0), tip, if ctx.stage >= 4 then NEON else SMOOTH))
+	end
+	return out
+end
+
+-- Mage : chapeau pointu en blocs empilés, étoile au palier 2, rune flottante au 3, lumineux au 4.
+function Builders.MageHat(ctx: BuildCtx): { Piece }
+	local band = if ctx.stage >= 4 then NEON else SMOOTH
+	local out = {
+		block(Vector3.new(2.0, 0.15, 2.0), Vector3.new(0, 0.05, 0), ctx.tint),
+		block(Vector3.new(1.25, 0.5, 1.25), Vector3.new(0, 0.37, 0), ctx.tint),
+		block(Vector3.new(1.28, 0.12, 1.28), Vector3.new(0, 0.18, 0), GOLD, band),
+		block(Vector3.new(0.9, 0.5, 0.9), Vector3.new(0, 0.85, 0.05), ctx.tint),
+		block(Vector3.new(0.6, 0.45, 0.6), Vector3.new(0, 1.3, 0.12), ctx.tint),
+		block(Vector3.new(0.35, 0.4, 0.35), Vector3.new(0, 1.68, 0.25), ctx.tint, SMOOTH, if ctx.stage >= 4 then "Sparkles" else nil),
+	}
+	if ctx.stage >= 2 then
+		table.insert(out, piece(BLOCK, Vector3.new(0.3, 0.3, 0.08), CFrame.new(0, 0.85, -0.5) * CFrame.Angles(0, 0, rad(45)), GOLD, NEON))
 	end
 	if ctx.stage >= 3 then
-		table.insert(out, piece(CYL, Vector3.new(1.0, 0.26, 0.26), CFrame.new(s * 0.6, 0.55, 0.6) * CFrame.Angles(0, 0, s * rad(35)), color, metal))
-		table.insert(out, piece(BALL, Vector3.one * 0.3, CFrame.new(s * 1.0, 0.85, 0.6), DARK, metal))
+		table.insert(out, piece(BLOCK, Vector3.new(0.35, 0.35, 0.35), CFrame.new(0.9, 1.2, 0) * CFrame.Angles(rad(45), rad(45), 0), Color3.fromRGB(150, 220, 255), NEON, "Light"))
 	end
 	return out
 end
 
-function Builders.CatEars(ctx: BuildCtx): { Piece }
-	local out = {}
-	for _, side in { -1, 1 } do
-		local cf = CFrame.new(side * 0.38, 0.12, 0) * CFrame.Angles(0, rad(90), side * rad(-12))
-		table.insert(out, piece(WEDGE, Vector3.new(0.12, 0.5, 0.35), cf, ctx.tint, Enum.Material.SmoothPlastic))
-		if ctx.stage >= 2 then
-			table.insert(out, piece(WEDGE, Vector3.new(0.13, 0.25, 0.18), cf * CFrame.new(0, -0.05, 0), DARK, Enum.Material.SmoothPlastic))
-		end
-	end
-	return out
-end
-
-function Builders.CatTail(ctx: BuildCtx): { Piece }
-	local out = {}
-	local tails = if ctx.stage >= 3 then { -0.18, 0.18 } else { 0 }
-	for _, x in tails do
-		for i = 0, 3 do
-			local pos = Vector3.new(x * (1 + i * 0.5), -0.1 + 0.08 * i * i, 0.3 + 0.28 * i)
-			local stripe = ctx.stage >= 2 and i % 2 == 1
-			table.insert(
-				out,
-				piece(BALL, Vector3.one * (0.3 - 0.03 * i), CFrame.new(pos), if stripe then DARK else ctx.tint, Enum.Material.SmoothPlastic, if ctx.stage >= 4 and i == 3 then "Sparkles" else nil)
-			)
-		end
-	end
-	return out
-end
-
-function Builders.StonePlate(ctx: BuildCtx): { Piece }
+-- Guardian : grosses épaulières de pierre ; rivets au palier 3, bords en fusion au 4.
+function Builders.GuardianPauldron(ctx: BuildCtx): { Piece }
 	local s = ctx.side
-	local mat = if ctx.stage >= 4 then Enum.Material.CrackedLava else Enum.Material.Slate
-	local base = CFrame.new(s * 0.15, 0.15, 0) * CFrame.Angles(0, 0, -s * rad(15))
+	local big = if ctx.stage >= 2 then 0.2 else 0
 	local out = {
-		piece(BLOCK, Vector3.new(1.1, 0.4, 1.0), base, ctx.tint, mat, if ctx.stage >= 4 then "Light" else nil),
-		piece(BLOCK, Vector3.new(0.7, 0.3, 0.8), base * CFrame.new(s * 0.3, -0.3, 0), ctx.tint, mat),
+		block(Vector3.new(1.1 + big, 0.5, 1.25 + big), Vector3.new(s * 0.15, 0.2, 0), ctx.tint),
+		block(Vector3.new(0.9 + big, 0.35, 1.05 + big), Vector3.new(s * 0.3, -0.15, 0), ctx.tint),
 	}
-	if ctx.stage >= 2 then
-		table.insert(out, piece(BLOCK, Vector3.new(0.9, 0.1, 0.8), base * CFrame.new(0, 0.22, 0), Color3.fromRGB(90, 140, 60), Enum.Material.Grass))
-	end
 	if ctx.stage >= 3 then
-		for i = -1, 1 do
-			table.insert(out, piece(WEDGE, Vector3.new(0.15, 0.45, 0.25), base * CFrame.new(i * 0.3, 0.45, 0), Color3.fromRGB(150, 230, 255), Enum.Material.Neon))
+		for _, z in { -0.4, 0, 0.4 } do
+			table.insert(out, piece(BALL, Vector3.one * 0.16, CFrame.new(s * 0.15, 0.48, z), DARK, METAL))
 		end
-	end
-	return out
-end
-
-function Builders.MushroomCap(ctx: BuildCtx): { Piece }
-	local g = if ctx.stage >= 4 then 1.3 else 1
-	local out = {
-		piece(BALL, Vector3.new(1.6, 0.6, 1.6) * g, CFrame.new(0, 0.25 * g, 0), ctx.tint, Enum.Material.SmoothPlastic, if ctx.stage >= 3 then "Spores" else nil),
-	}
-	if ctx.stage >= 2 then
-		local spotMat = if ctx.stage >= 4 then Enum.Material.Neon else Enum.Material.SmoothPlastic
-		for i = 0, 4 do
-			local a = i * rad(72)
-			table.insert(out, piece(BALL, Vector3.one * 0.25 * g, CFrame.new(math.cos(a) * 0.5 * g, 0.42 * g, math.sin(a) * 0.5 * g), WHITE, spotMat, if ctx.stage >= 4 and i == 0 then "Light" else nil))
-		end
-	end
-	return out
-end
-
-function Builders.SmallHorns(ctx: BuildCtx): { Piece }
-	local out = {}
-	for _, side in { -1, 1 } do
-		table.insert(out, piece(BALL, Vector3.one * 0.26, CFrame.new(side * 0.35, 0.02, 0), ctx.tint, Enum.Material.Slate))
-		table.insert(out, piece(BALL, Vector3.one * 0.18, CFrame.new(side * 0.42, 0.22, 0.08), ctx.tint, Enum.Material.Slate))
-		table.insert(out, piece(BALL, Vector3.one * 0.1, CFrame.new(side * 0.46, 0.36, 0.14), WHITE, Enum.Material.SmoothPlastic))
-	end
-	return out
-end
-
-function Builders.ScalyTail(ctx: BuildCtx): { Piece }
-	local out = {}
-	local count = if ctx.stage >= 2 then 5 else 4
-	for i = 0, count - 1 do
-		local pos = Vector3.new(0, -0.35 - 0.12 * i, 0.3 + 0.3 * i)
-		local size = Vector3.new(0.4 - 0.05 * i, 0.32 - 0.04 * i, 0.4)
-		local cf = CFrame.new(pos) * CFrame.Angles(rad(-15), 0, 0)
-		table.insert(out, piece(BLOCK, size, cf, ctx.tint, if ctx.stage >= 2 then Enum.Material.Slate else Enum.Material.SmoothPlastic))
-		if ctx.stage >= 3 then
-			table.insert(out, piece(WEDGE, Vector3.new(0.06, 0.22, 0.25), cf * CFrame.new(0, size.Y / 2 + 0.1, 0), GOLD, Enum.Material.SmoothPlastic))
-		end
-	end
-	return out
-end
-
-function Builders.DragonWings(ctx: BuildCtx): { Piece }
-	local out = {}
-	for _, side in { -1, 1 } do
-		local cf = CFrame.new(side * 0.9, 0.45, 0.3) * CFrame.Angles(0, 0, -side * rad(25))
-		table.insert(out, piece(BLOCK, Vector3.new(1.3, 0.8, 0.06), cf, ctx.tint, Enum.Material.SmoothPlastic))
-		table.insert(out, piece(CYL, Vector3.new(1.4, 0.1, 0.1), cf * CFrame.new(0, 0.4, 0), DARK, Enum.Material.SmoothPlastic))
-	end
-	return out
-end
-
-function Builders.StarCrown(ctx: BuildCtx): { Piece }
-	local out = {}
-	for _, side in { -1, 1 } do
-		local cf = CFrame.new(side * 0.25, 0.35, 0) * CFrame.Angles(0, 0, -side * rad(15)) * UPRIGHT
-		table.insert(out, piece(CYL, Vector3.new(0.8, 0.06, 0.06), cf, DARK, Enum.Material.SmoothPlastic))
-		table.insert(out, piece(BALL, Vector3.one * 0.18, CFrame.new(side * 0.36, 0.75, 0), ctx.tint, Enum.Material.Neon))
-	end
-	local stars = ({ 1, 2, 4, 4 })[ctx.stage] or 1
-	for i = 0, stars - 1 do
-		local a = i * (2 * math.pi / stars) + rad(30)
-		table.insert(out, piece(BALL, Vector3.one * 0.3, CFrame.new(math.cos(a), 0.1, math.sin(a)), ctx.tint, Enum.Material.Neon, if i == 0 and ctx.stage >= 3 then "Light" else nil))
 	end
 	if ctx.stage >= 4 then
-		local ring = piece(CYL, Vector3.new(0.05, 2.4, 2.4), CFrame.new(0, 0.1, 0) * UPRIGHT, ctx.tint, Enum.Material.Neon)
-		ring.transparency = 0.4
-		table.insert(out, ring)
+		table.insert(out, block(Vector3.new(1.15 + big, 0.08, 1.3 + big), Vector3.new(s * 0.15, -0.02, 0), Color3.fromRGB(255, 120, 30), NEON, "Fire"))
 	end
 	return out
 end
 
-function Builders.Crystals(ctx: BuildCtx): { Piece }
-	local out = {}
-	local s = ctx.side
-	for i = 0, ctx.stage - 1 do
-		local h = 0.9 + 0.15 * i
-		local cf = CFrame.new(s * (0.1 + 0.18 * i), 0.3 + h / 2 - 0.2, -0.2 + 0.15 * i) * CFrame.Angles(rad(10 * i), 0, -s * rad(12 + 10 * i))
-		table.insert(out, piece(BLOCK, Vector3.new(0.3, h, 0.3), cf, ctx.tint, Enum.Material.Glass, if ctx.stage >= 4 and i == 0 then "Light" else nil))
-		table.insert(out, piece(WEDGE, Vector3.new(0.3, 0.3, 0.3), cf * CFrame.new(0, h / 2 + 0.15, 0), ctx.tint, Enum.Material.Neon))
+-- Rogue : masque de bandit ; capuche au palier 2, nœud au 3, traînée d'ombre au 4.
+function Builders.RogueMask(ctx: BuildCtx): { Piece }
+	local out = {
+		block(Vector3.new(1.28, 0.28, 1.28), Vector3.new(0, -0.62, 0), ctx.tint),
+	}
+	if ctx.stage >= 2 then
+		table.insert(out, block(Vector3.new(1.35, 0.4, 1.35), Vector3.new(0, 0.02, 0.02), DARK))
+		table.insert(out, block(Vector3.new(1.35, 0.8, 0.2), Vector3.new(0, -0.4, 0.62), DARK))
+	end
+	if ctx.stage >= 3 then
+		table.insert(out, piece(BLOCK, Vector3.new(0.12, 0.5, 0.12), CFrame.new(0.15, -0.8, 0.75) * CFrame.Angles(rad(30), 0, rad(20)), ctx.tint, SMOOTH))
+		table.insert(out, piece(BLOCK, Vector3.new(0.12, 0.5, 0.12), CFrame.new(-0.15, -0.8, 0.75) * CFrame.Angles(rad(30), 0, rad(-20)), ctx.tint, SMOOTH))
+	end
+	if ctx.stage >= 4 then
+		out[1] = block(Vector3.new(1.28, 0.28, 1.28), Vector3.new(0, -0.62, 0), ctx.tint, SMOOTH, "Smoke")
 	end
 	return out
 end
 
-function Builders.Tentacles(ctx: BuildCtx): { Piece }
+-- Cleric : auréole carrée lumineuse ; plus brillante au palier 2, double au 3, rayonnante au 4.
+function Builders.ClericHalo(ctx: BuildCtx): { Piece }
 	local out = {}
-	local count = ({ 4, 6, 6, 8 })[ctx.stage] or 4
-	for k = 0, count - 1 do
-		local a = k * (2 * math.pi / count) + math.pi / 4 -- star around the back
-		local dir = Vector3.new(math.cos(a), math.sin(a), 1.2).Unit
-		local root = Vector3.new(math.cos(a) * 0.35, math.sin(a) * 0.35, 0.15)
-		for i = 0, 2 do
-			local d = 0.38 - 0.09 * i
-			local pos = root + dir * (0.35 + 0.42 * i)
-			table.insert(out, piece(BALL, Vector3.one * d, CFrame.new(pos), ctx.tint, Enum.Material.SmoothPlastic))
-			if ctx.stage >= 3 and i < 2 then
-				table.insert(out, piece(BALL, Vector3.one * 0.1, CFrame.new(pos + Vector3.new(0, -d / 2, 0)), Color3.fromRGB(255, 180, 230), Enum.Material.Neon))
-			end
+	local function halo(y: number, w: number, effect: string?)
+		local t = 0.14
+		table.insert(out, block(Vector3.new(w, t, t), Vector3.new(0, y, -w / 2), ctx.tint, NEON, effect))
+		table.insert(out, block(Vector3.new(w, t, t), Vector3.new(0, y, w / 2), ctx.tint, NEON))
+		table.insert(out, block(Vector3.new(t, t, w), Vector3.new(-w / 2, y, 0), ctx.tint, NEON))
+		table.insert(out, block(Vector3.new(t, t, w), Vector3.new(w / 2, y, 0), ctx.tint, NEON))
+	end
+	halo(0.55, 1.0, if ctx.stage >= 2 then "Light" else nil)
+	if ctx.stage >= 3 then
+		halo(0.85, 0.6, if ctx.stage >= 4 then "Sparkles" else nil)
+	end
+	return out
+end
+
+-- Barbarian : casque à cornes ; cornes plus longues au palier 2, bandeau de fourrure au 3, en flammes au 4.
+function Builders.BarbarianHelm(ctx: BuildCtx): { Piece }
+	local out = {
+		block(Vector3.new(1.3, 0.42, 1.3), Vector3.new(0, 0.02, 0), ctx.tint, METAL),
+	}
+	local segments = if ctx.stage >= 2 then 4 else 3
+	for _, side in { -1, 1 } do
+		for i = 0, segments - 1 do
+			local tip = i == segments - 1
+			local size = 0.34 - i * 0.05
+			table.insert(out, block(Vector3.one * size, Vector3.new(side * (0.75 + i * 0.22), 0.05 + i * 0.2, -0.05), WHITE, SMOOTH, if tip and ctx.stage >= 4 then "Fire" else nil))
 		end
+	end
+	if ctx.stage >= 3 then
+		table.insert(out, block(Vector3.new(1.4, 0.18, 1.4), Vector3.new(0, -0.2, 0), BROWN))
+	end
+	return out
+end
+
+-- Tamer : chapeau de dompteuse ; badge patte au palier 2, plume au 3, bande dorée au 4.
+function Builders.TamerHat(ctx: BuildCtx): { Piece }
+	local bandMat = if ctx.stage >= 4 then NEON else SMOOTH
+	local out = {
+		block(Vector3.new(1.7, 0.12, 1.7), Vector3.new(0, 0.05, 0), DARK),
+		block(Vector3.new(1.0, 0.9, 1.0), Vector3.new(0, 0.55, 0), ctx.tint, SMOOTH, if ctx.stage >= 4 then "Sparkles" else nil),
+		block(Vector3.new(1.04, 0.16, 1.04), Vector3.new(0, 0.2, 0), GOLD, bandMat),
+	}
+	if ctx.stage >= 2 then
+		table.insert(out, block(Vector3.new(0.3, 0.26, 0.06), Vector3.new(0, 0.55, -0.52), GOLD))
+		for i = -1, 1 do
+			table.insert(out, block(Vector3.new(0.08, 0.08, 0.05), Vector3.new(i * 0.1, 0.74, -0.53), GOLD))
+		end
+	end
+	if ctx.stage >= 3 then
+		table.insert(out, piece(BLOCK, Vector3.new(0.08, 0.8, 0.22), CFrame.new(0.45, 0.95, 0.1) * CFrame.Angles(0, 0, rad(-20)), Color3.fromRGB(80, 170, 230), SMOOTH))
 	end
 	return out
 end
@@ -617,9 +596,10 @@ end
 function TraitService.applyClass(player: Player, classId: string)
 	local def = Classes[classId]
 	if not def then
-		warn(`[TraitService] unknown class {classId}`)
+		warn(`[TraitService] classe inconnue {classId}`)
 		return
 	end
+	classId = def.id -- id v1 (domaine data) -> id v2 canonique
 	local state = states[player]
 	if state then
 		removeTraits(state)

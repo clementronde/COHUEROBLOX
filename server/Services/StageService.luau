@@ -23,6 +23,7 @@ local StageService = {}
 
 local folder: Folder? = nil
 local portal: Model? = nil
+local cashOut: Model? = nil
 local partCount = 0
 local currentWorld: Worlds.World? = nil
 local hazardState = { active = false, nextAt = math.huge, endsAt = 0, warned = false }
@@ -304,6 +305,7 @@ function StageService.clear()
 		folder = nil
 	end
 	portal = nil
+	cashOut = nil
 	partCount = 0
 	Workspace:SetAttribute(Heightmap.Attribute, "")
 	Workspace:SetAttribute("CohueHazard", "")
@@ -335,17 +337,57 @@ function StageService.getPartCount(): number
 	return partCount
 end
 
-function StageService.showPortal(position: Vector3)
-	if portal or not folder then
-		return
+-- Panneau au-dessus d'un portail (texte joueur en anglais, police cartoon intégrée).
+local function addSign(parent: Model, anchor: BasePart, text: string, color: Color3)
+	local gui = Instance.new("BillboardGui")
+	gui.Name = "Sign"
+	gui.Size = UDim2.fromOffset(260, 70)
+	gui.StudsOffsetWorldSpace = Vector3.new(0, 4, 0)
+	gui.AlwaysOnTop = true
+	gui.MaxDistance = 220
+	gui.LightInfluence = 0
+	gui.Adornee = anchor
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Size = UDim2.fromScale(1, 1)
+	label.Font = Enum.Font.FredokaOne
+	label.TextScaled = true
+	label.Text = text
+	label.TextColor3 = color
+	label.TextStrokeTransparency = 0
+	label.TextStrokeColor3 = Color3.fromRGB(30, 20, 40)
+	label.Parent = gui
+	gui.Parent = parent
+end
+
+local function buildPortal(position: Vector3, name: string, color: Color3, sign: string): Model?
+	if not folder then
+		return nil
 	end
 	local model = Instance.new("Model")
-	model.Name = "Portal"
+	model.Name = name
 	model.Parent = folder
 	local c = CFrame.new(position.X, position.Y, position.Z)
-	makePart({ shape = "Cylinder", size = Vector3.new(0.4, 16, 16), cframe = c * CFrame.new(0, 0.2, 0) * UP_CYL, color = Color3.fromRGB(120, 255, 200), material = Enum.Material.Neon, collide = false, transparency = 0.2, parent = model, name = "PortalDisc" })
-	makePart({ shape = "Cylinder", size = Vector3.new(30, 4, 4), cframe = c * CFrame.new(0, 15, 0) * UP_CYL, color = Color3.fromRGB(120, 255, 200), material = Enum.Material.Neon, collide = false, transparency = 0.5, parent = model, name = "PortalBeam" })
-	portal = model
+	makePart({ shape = "Cylinder", size = Vector3.new(0.4, 16, 16), cframe = c * CFrame.new(0, 0.2, 0) * UP_CYL, color = color, material = Enum.Material.Neon, collide = false, transparency = 0.2, parent = model, name = "PortalDisc" })
+	local beam = makePart({ shape = "Cylinder", size = Vector3.new(30, 4, 4), cframe = c * CFrame.new(0, 15, 0) * UP_CYL, color = color, material = Enum.Material.Neon, collide = false, transparency = 0.5, parent = model, name = "PortalBeam" })
+	addSign(model, beam, sign, color)
+	return model
+end
+
+-- Portail vers le monde suivant (boss tué, hors dernier monde).
+function StageService.showPortal(position: Vector3)
+	if portal then
+		return
+	end
+	portal = buildPortal(position, "Portal", Color3.fromRGB(120, 255, 200), "NEXT WORLD")
+end
+
+-- Portail doré après le boss du dernier monde (A04-02) : tous les joueurs dedans = Cash out.
+function StageService.showCashOut(position: Vector3)
+	if cashOut then
+		return
+	end
+	cashOut = buildPortal(position, "CashOut", Color3.fromRGB(255, 205, 60), "CASH OUT")
 end
 
 -- Hazards (dossier 20 section 3). Called by RunManager with seconds since stage start.

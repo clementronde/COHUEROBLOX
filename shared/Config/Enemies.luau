@@ -62,7 +62,7 @@ local Enemies: { [number]: Def } = {
 	[1] = {
 		id = 1,
 		name = "GlandGrincheux",
-		label = { fr = "Gland grincheux", en = "Grumpy Acorn" },
+		label = { en = "Grumpy Acorn", fr = "Grumpy Acorn" },
 		world = "BoisGrognon",
 		family = "Swarm",
 		hp = 10,
@@ -81,7 +81,7 @@ local Enemies: { [number]: Def } = {
 	[2] = {
 		id = 2,
 		name = "ChampignonSauteur",
-		label = { fr = "Champignon sauteur", en = "Hopshroom" },
+		label = { en = "Hopshroom", fr = "Hopshroom" },
 		world = "BoisGrognon",
 		family = "Jumper",
 		hp = 18,
@@ -104,7 +104,7 @@ local Enemies: { [number]: Def } = {
 	[3] = {
 		id = 3,
 		name = "HibouPlongeur",
-		label = { fr = "Hibou plongeur", en = "Diving Owl" },
+		label = { en = "Diving Owl", fr = "Diving Owl" },
 		world = "BoisGrognon",
 		family = "Shooter",
 		hp = 14,
@@ -131,7 +131,7 @@ local Enemies: { [number]: Def } = {
 	[4] = {
 		id = 4,
 		name = "BogueBlindee",
-		label = { fr = "Bogue blindée", en = "Armored Burr" },
+		label = { en = "Armored Burr", fr = "Armored Burr" },
 		world = "BoisGrognon",
 		family = "Armored",
 		hp = 60,
@@ -155,7 +155,7 @@ local Enemies: { [number]: Def } = {
 	[5] = {
 		id = 5,
 		name = "MomiePQ",
-		label = { fr = "Momie en papier toilette", en = "TP Mummy" },
+		label = { en = "TP Mummy", fr = "TP Mummy" },
 		world = "DunesCroustillantes",
 		family = "Swarm",
 		hp = 14,
@@ -174,7 +174,7 @@ local Enemies: { [number]: Def } = {
 	[6] = {
 		id = 6,
 		name = "CactusCoureur",
-		label = { fr = "Cactus coureur", en = "Dash Cactus" },
+		label = { en = "Dash Cactus", fr = "Dash Cactus" },
 		world = "DunesCroustillantes",
 		family = "Jumper",
 		hp = 22,
@@ -197,7 +197,7 @@ local Enemies: { [number]: Def } = {
 	[7] = {
 		id = 7,
 		name = "VautourCaillou",
-		label = { fr = "Vautour à cailloux", en = "Pebble Vulture" },
+		label = { en = "Pebble Vulture", fr = "Pebble Vulture" },
 		world = "DunesCroustillantes",
 		family = "Shooter",
 		hp = 18,
@@ -223,7 +223,7 @@ local Enemies: { [number]: Def } = {
 	[8] = {
 		id = 8,
 		name = "ScarabeeBlinde",
-		label = { fr = "Scarabée blindé", en = "Armored Scarab" },
+		label = { en = "Armored Scarab", fr = "Armored Scarab" },
 		world = "DunesCroustillantes",
 		family = "Armored",
 		hp = 80,
@@ -246,7 +246,7 @@ local Enemies: { [number]: Def } = {
 	[9] = {
 		id = 9,
 		name = "CraieVivante",
-		label = { fr = "Craie vivante", en = "Living Chalk" },
+		label = { en = "Living Chalk", fr = "Living Chalk" },
 		world = "RecreFantome",
 		family = "Swarm",
 		hp = 16,
@@ -265,7 +265,7 @@ local Enemies: { [number]: Def } = {
 	[10] = {
 		id = 10,
 		name = "CartableMordeur",
-		label = { fr = "Cartable mordeur", en = "Biting Backpack" },
+		label = { en = "Biting Backpack", fr = "Biting Backpack" },
 		world = "RecreFantome",
 		family = "Jumper",
 		hp = 26,
@@ -288,7 +288,7 @@ local Enemies: { [number]: Def } = {
 	[11] = {
 		id = 11,
 		name = "SurveillantFantome",
-		label = { fr = "Fantôme de surveillant", en = "Hall Monitor Ghost" },
+		label = { en = "Hall Monitor Ghost", fr = "Hall Monitor Ghost" },
 		world = "RecreFantome",
 		family = "Shooter",
 		hp = 22,
@@ -314,7 +314,7 @@ local Enemies: { [number]: Def } = {
 	[12] = {
 		id = 12,
 		name = "CasierArmoire",
-		label = { fr = "Casier-armoire", en = "Locker Brute" },
+		label = { en = "Locker Brute", fr = "Locker Brute" },
 		world = "RecreFantome",
 		family = "Armored",
 		hp = 100,
@@ -338,7 +338,7 @@ local Enemies: { [number]: Def } = {
 	[13] = {
 		id = 13,
 		name = "SoucheGeante",
-		label = { fr = "Souche géante", en = "Giant Stump" },
+		label = { en = "Giant Stump", fr = "Giant Stump" },
 		world = "BoisGrognon",
 		family = "MiniBoss",
 		hp = 900,
@@ -362,7 +362,7 @@ local Enemies: { [number]: Def } = {
 	[14] = {
 		id = 14,
 		name = "ChameauTirelire",
-		label = { fr = "Chameau-Tirelire", en = "Piggy Camel" },
+		label = { en = "Piggy Camel", fr = "Piggy Camel" },
 		world = "DunesCroustillantes",
 		family = "MiniBoss",
 		hp = 1100,
@@ -386,7 +386,7 @@ local Enemies: { [number]: Def } = {
 	[15] = {
 		id = 15,
 		name = "PionSpectral",
-		label = { fr = "Le Pion Spectral", en = "Spectral Proctor" },
+		label = { en = "Spectral Proctor", fr = "Spectral Proctor" },
 		world = "RecreFantome",
 		family = "MiniBoss",
 		hp = 1200,
@@ -409,7 +409,7 @@ local Enemies: { [number]: Def } = {
 	[16] = {
 		id = 16,
 		name = "GrandCheneRonchon",
-		label = { fr = "Le Grand Chêne Ronchon", en = "The Grumpy Great Oak" },
+		label = { en = "The Grumpy Great Oak", fr = "The Grumpy Great Oak" },
 		world = "BoisGrognon",
 		family = "Boss",
 		hp = 5000,
@@ -426,7 +426,7 @@ local Enemies: { [number]: Def } = {
 	[17] = {
 		id = 17,
 		name = "PharaonGrillePain",
-		label = { fr = "Le Pharaon-Grille-Pain", en = "The Toaster Pharaoh" },
+		label = { en = "The Toaster Pharaoh", fr = "The Toaster Pharaoh" },
 		world = "DunesCroustillantes",
 		family = "Boss",
 		hp = 6000,
@@ -443,7 +443,7 @@ local Enemies: { [number]: Def } = {
 	[18] = {
 		id = 18,
 		name = "DirectriceEternelle",
-		label = { fr = "La Directrice Éternelle", en = "The Eternal Headmistress" },
+		label = { en = "The Eternal Headmistress", fr = "The Eternal Headmistress" },
 		world = "RecreFantome",
 		family = "Boss",
 		hp = 6500,
@@ -460,7 +460,7 @@ local Enemies: { [number]: Def } = {
 	[19] = {
 		id = 19,
 		name = "GrandBrouhaha",
-		label = { fr = "Le Grand Brouhaha", en = "The Great Hubbub" },
+		label = { en = "The Great Hubbub", fr = "The Great Hubbub" },
 		world = "Any",
 		family = "Boss",
 		hp = 12000,
