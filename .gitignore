@@ -8,3 +8,7 @@ Thumbs.db
 
 # Asset pack copies (regenerate with tools/stage-assets.sh)
 assets/import/
+
+# Agent worktrees and downloaded vault archives
+.claude/worktrees/
+*.zip
