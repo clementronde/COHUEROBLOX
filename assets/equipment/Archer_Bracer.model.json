@@ -1,0 +1,75 @@
+{
+ "className": "Accessory",
+ "children": [
+  {
+   "className": "MeshPart",
+   "properties": {
+    "MeshId": "rbxassetid://120950419069141",
+    "Size": [
+     1.75,
+     1.25,
+     1.75
+    ],
+    "InitialSize": [
+     1.75,
+     1.25,
+     1.75
+    ],
+    "Color": [
+     1,
+     1,
+     1
+    ],
+    "Anchored": false,
+    "CanCollide": false,
+    "CanQuery": false,
+    "CanTouch": false,
+    "CastShadow": false,
+    "Massless": true
+   },
+   "name": "Handle",
+   "attributes": {
+    "RefPartName": "LeftLowerArm",
+    "RefPartSize": {
+     "Vector3": [
+      1.001,
+      1.118,
+      1.002
+     ]
+    }
+   },
+   "children": [
+    {
+     "name": "LeftGripAttachment",
+     "className": "Attachment",
+     "properties": {
+      "CFrame": {
+       "position": [
+        -0.125,
+        -0.875,
+        -0.125
+       ],
+       "orientation": [
+        [
+         1.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.0,
+         0.0,
+         1.0
+        ],
+        [
+         0.0,
+         -1.0,
+         0.0
+        ]
+       ]
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

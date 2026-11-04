@@ -37,7 +37,7 @@ PALETTE: dict[str, str] = {
     "Royal": "2D6BE6",     # bleu roi (Knight)
     "Sky": "3FD0F5",       # cyan : eau, XP, magie froide
     "Leaf": "3DBE4A",      # vert feuillage (Archer, forêt)
-    "Lime": "A6E03A",      # peau des gobelins
+    "Lime": "8FD13F",      # peau des gobelins (moins jaune : A6E03A virait au jaune pur sous le soleil Roblox)
 }
 
 LIGHT_HEX = "FFF4D8"   # lumière chaude du diorama

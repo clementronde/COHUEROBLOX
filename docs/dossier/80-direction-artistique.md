@@ -72,7 +72,7 @@ Les tons dérivés se calculent : `.l` = base mélangée à 35 % avec `#FFF4D8` 
 | Royal | `#2D6BE6` | Knight | |
 | Sky | `#3FD0F5` | XP, magie froide | Sur un ennemi, seulement en `.d` / `.dd` (peau des zombies) ou comme XP volée (Bomber) |
 | Leaf | `#3DBE4A` | Archer ; décor en `.d` / `.dd` | |
-| Lime | `#A6E03A` | Peau des gobelins | Réservé aux gobelins |
+| Lime | `#8FD13F` | Peau des gobelins | Réservé aux gobelins. `#A6E03A` virait au jaune pur sous le soleil de Roblox (relecture du 4 nov.) |
 
 **Hiérarchie de saturation**, du plus vif au plus calme :
 
@@ -108,10 +108,10 @@ Calcul de référence : écran paysage de 1080 px de haut, FieldOfView vertical 
 
 | Rôle | Couleur | Gobelin | Zombie (prévu) | Fantôme (prévu) |
 | --- | --- | --- | --- | --- |
-| Mêlée / essaim | Tomato | Grunt : cocotte rouge en casque | Shambler | Wisp |
+| Mêlée / essaim | Tomato | Grunt : cocotte rouge en casque, louche brandie qui sort de la silhouette | Shambler | Wisp |
 | Tireur | Leaf.d / Leather | Archer : capuche vert sombre, grand arc | Gravedigger (lance de la terre) | Poltergeist |
 | Soutien | Grape | Shaman : champignon magique violet | (à définir) | Banshee |
-| Kamikaze / gros | Ember + bombe Ink | Bomber : bonnet orange, bombe dans les bras | Bloater | Armure hantée (blindé) |
+| Kamikaze / gros | Ember + bombe Ink | Bomber : bonnet orange, grosse bombe à bout de bras sur le côté (silhouette ronde à lui) | Bloater | Armure hantée (blindé) |
 
 **Règles de lecture :**
 
@@ -139,9 +139,9 @@ L'avatar reste intact : la classe ajoute des **Accessories** voxel sur les attac
 
 | Classe | Couleurs | Niveau 10 (tête) | Niveau 20 | Niveau 30 (dos) |
 | --- | --- | --- | --- | --- |
-| Knight | Steel + Royal, rivets Gold | Bassinet ouvert, plumet ridiculement court · `HatAttachment` | Épaulières, la même maille pour les deux (demi-tour à gauche) · `RightShoulderAttachment` + `LeftShoulderAttachment` | Cape bleu roi au canard couronné · `BodyBackAttachment` |
-| Archer | Leaf + Leather | Capuche à pointe, broche en gland · `HatAttachment` | Brassard brodé d'une cible, avant-bras gauche · `LeftGripAttachment` (tourné de −90° sur X) | Carquois en diagonale, une flèche est une carotte · `BodyBackAttachment` |
-| Mage | Grape + Plum, étoiles Gold | Chapeau pointu à grelot · `HatAttachment` | Orbe de feu dans une cage, au-dessus de l'épaule gauche, cœur en cube Neon Ember · `LeftShoulderAttachment` | Cape étoilée à haut col · `BodyBackAttachment` |
+| Knight | Steel + Royal, rivets Gold | Bassinet ouvert, plumet ridiculement court · `HatAttachment` | Épaulières bleu roi (elles se détachent du casque en acier), la même maille pour les deux (demi-tour à gauche) · `RightShoulderAttachment` + `LeftShoulderAttachment` | Cape bleu roi au canard couronné · `BodyBackAttachment` |
+| Archer | Leaf + Leather | Capuche à pointe, broche en gland · `HatAttachment` | Brassard en cuir, cible rouge et crème sur le dos de l'avant-bras (visible de la caméra) · `LeftGripAttachment` (tourné de −90° sur X) | Carquois droit, une flèche est une carotte de 4 voxels · `BodyBackAttachment` |
+| Mage | Grape + Plum, étoiles Gold | Chapeau pointu à grelot · `HatAttachment` | Orbe de feu dans une cage, 1 stud au-dessus et 1,25 stud à l'extérieur de l'épaule gauche (hors du bord du chapeau), cœur en cube Neon Ember · `LeftShoulderAttachment` | Cape étoilée à haut col, arrêtée au genou (les jambes ne la traversent pas) · `BodyBackAttachment` |
 
 Couleurs réservées pour les 5 autres classes (A01-07) : Guardian Stone + Ember · Rogue Plum + Ink + Tomato · Cleric Cream + Gold + Sky · Barbarian Bark + Tomato + fourrure Cream · Tamer Leather + Leaf + Ember.
 
@@ -155,7 +155,7 @@ Mesurés sur les livrables : maillage glouton, une seule maille, aucune texture.
 
 | Classe | Triangles visés / plafond | Mesuré (mailles étanches) |
 | --- | --- | --- |
-| Ennemi d'essaim | 800 / 1 000 | Grunt 568 · Archer 684 · Shaman 716 · Bomber 812 |
+| Ennemi d'essaim | 800 / 1 000 | Grunt 656 · Archer 684 · Shaman 716 · Bomber 792 |
 | Ennemi moyen | 1 200 / 2 000 | — |
 | Mini-boss | 3 000 / 6 000 | — |
 | Boss | 8 000 / 15 000 (mailles < 10 000) | — |
@@ -210,6 +210,30 @@ La place de test contient un `ColorGradingEffect` réglé sur le tonemapper `Ret
 - Silhouettes testées en noir à 64 px. Couleurs vérifiées en jeu sur un sol au ton du monde.
 - Chaque modèle a son gag, listé dans `assets/voxel/manifest.json` (champ `gag` pour les ennemis).
 
+## 10 bis. Relecture quality-score
+
+Trois relecteurs à l'aveugle ont noté les lots le 4 nov. avec la grille modèle du skill, adaptée au voxel (critère V4 = grain unique et arêtes nettes).
+
+| Lot | Relecteur 1 | Relecteur 2 | Relecteur 3 | Médiane |
+| --- | --- | --- | --- | --- |
+| Gobelins | 7,0 | 7,0 | 7,7 | **7,0** |
+| Équipement | 7,0 | 8,0 | 6,7 | **7,0** |
+
+Corrections appliquées (tour 1) :
+
+- **Silhouettes** : Grunt et Bomber faisaient la même tache à 64 px. La louche du Grunt est maintenant brandie hors de la silhouette, et la bombe du Bomber est portée sur le côté.
+- **Peau des gobelins** : Lime moins jaune (`#8FD13F`), et la cocotte remontée d'un voxel pour dégager les yeux.
+- **Intersections de l'équipement** : l'orbe est écartée du chapeau, la queue de capuche raccourcie (elle traversait le carquois), la cape du Mage arrêtée au genou.
+- **Lecture de l'équipement** :
+  - le brassard est d'une seule couleur, avec la cible au dos ;
+  - le carquois est droit, avec une carotte de 4 voxels ;
+  - les épaulières sont bleu roi et posées sur l'épaule ;
+  - la capuche a une vraie pointe.
+
+Un relecteur voyait le casque du Knight tourné d'un quart de tour. La vue de profil dans Studio le contredit : rivets sur le côté, nasal vers −Z, crête d'avant en arrière. Rien n'a été changé sur ce point.
+
+**Tour 2 (nouvelle note par 3 relecteurs) : pas encore fait.** Il faut d'abord refaire les captures Studio de la horde et des gobelins à 20 studs avec les modèles corrigés. Les captures `studio_horde_*` et `studio_gobelins_*` montrent encore l'ancienne version.
+
 ## 11. Créatures existantes (`assets/creatures/`)
 
 Les 15 mailles existantes ont été générées par IA. Elles sont lisses, avec des textures peintes et des dégradés : elles **ne passent pas ce guide** (règles 1, 2 et 4). La capture `assets/style/captures/studio_grunt_vs_anciennes-creatures.jpg` montre l'écart avec un gobelin voxel. Proposition :
@@ -250,7 +274,7 @@ models.py (voxels) → cohue_voxel.py (maillage glouton, tons) → Blender 5.2 e
 
 ### 12.2 Importer dans Studio
 
-`AssetService:CreateAssetAsync` n'est pas encore ouvert (« not available yet », testé le 4 nov.) : le téléversement passe par **Import 3D**.
+`AssetService:CreateAssetAsync` n'est pas encore ouvert (« not available yet », testé le 4 nov.). L'outil MCP `open_cloud_invoke` n'existe que dans une instance de Studio à jour, et apparaît puis disparaît au gré des reconnexions. Le téléversement passe donc par **Import 3D**, ici la file d'importation : un fichier à la fois, l'aperçu s'ouvre seul après l'ajout, puis Importer.
 
 1. Accueil → Import 3D → sélectionner tous les `assets/voxel/glb/*.glb` (import groupé).
 2. Réglages : Scale Unit = **Studs** · Upload to Roblox = **activé** (import final seulement) · Creator = le propriétaire de l'expérience · Merge Meshes désactivé · Use Imported Pivot activé · Ignore Vertex Colors **désactivé**.
@@ -261,11 +285,51 @@ models.py (voxels) → cohue_voxel.py (maillage glouton, tons) → Blender 5.2 e
    - affiche la liste `nom;MeshId;taille`.
 5. Reporter cette liste dans `assets/creatures.csv` et `assets/equipment.csv`, puis écrire les `.model.json`.
 
-**Test à blanc fait le 4 nov.** Des maillages d'aperçu portant les 23 noms ont remplacé les imports. La finalisation a produit 10 Accessories, 8 armes et 2 effets. `ArtLibrary.equipClassTier` a posé 4, 3 et 3 pièces, placées par `AddAccessory` exactement comme prévu, y compris sur un avatar agrandi 1,3 fois (capture `studio_equipClassTier_dos.jpg`). Il reste à faire le vrai Import 3D pour obtenir les ids : voir section 13.
+**Test à blanc fait le 4 nov.** Des maillages d'aperçu portant les 23 noms ont remplacé les imports. La finalisation a produit 10 Accessories, 8 armes et 2 effets. `ArtLibrary.equipClassTier` a posé 4, 3 et 3 pièces, placées par `AddAccessory` exactement comme prévu, y compris sur un avatar agrandi 1,3 fois (capture `studio_equipClassTier_dos.jpg`). Le vrai import a suivi : voir section 13.
 
 ## 13. Livrables et ids Roblox
 
-Voir `assets/equipment.csv`, `assets/creatures.csv` et `assets/voxel/manifest.json`. Les ids sont remplis après l'import groupé dans Studio.
+**Import fait le 4 nov. (soir)** dans la place `COHUE` (placeId 132257920785923), par la file d'importation de Studio, avec les réglages par défaut : unité studs, facteur 1, couleurs par sommet conservées, téléversement sur le compte de Clément. Une capture en jeu des meshes téléversés est dans `assets/style/captures/studio_COHUE_meshes_televerses.jpg`. Contrôles faits :
+
+- les tailles en jeu sont identiques au manifeste ;
+- l'avant de chaque mesh est bien en −Z ;
+- `A01_finalize.luau` a créé `ReplicatedStorage.Assets` : Creatures (4), Equipment (10 Accessories), Weapons (8), FX (2).
+
+**La place n'est pas sauvegardée** : c'est à la session principale de le faire.
+
+Fiches dans le dépôt :
+
+- `assets/a01-meshes.csv` : les 23 meshes, avec attache, décalage, rotation et partie de référence ;
+- les lignes gobelins dans `assets/creatures.csv` ;
+- les fichiers `.model.json` (format Rojo) dans `assets/creatures/`, `assets/equipment/`, `assets/weapons/` et `assets/fx/`, régénérés par `python assets/install/make_records.py`.
+
+Aucune texture : la colonne texture est vide pour tous les meshes.
+
+| Mesh | MeshId | Taille (studs) |
+| --- | --- | --- |
+| Enemy_GoblinGrunt | `102615059367724` | 4.500 × 4.000 × 2.000 |
+| Enemy_GoblinArcher | `132629528679784` | 3.500 × 3.500 × 2.500 |
+| Enemy_GoblinShaman | `85524445528373` | 3.500 × 4.250 × 2.000 |
+| Enemy_GoblinBomber | `85411290248554` | 4.500 × 3.500 × 1.750 |
+| FX_CaptureRing | `127618518100828` | 3.500 × 0.500 × 3.500 |
+| FX_CaptureIcon | `120961194899196` | 1.000 × 2.000 × 1.000 |
+| Knight_Helm | `132240907256271` | 2.000 × 2.000 × 2.250 |
+| Knight_Pauldron | `72447148865331` | 1.750 × 1.500 × 1.500 |
+| Knight_Cape | `99009188505054` | 2.500 × 3.500 × 1.000 |
+| Archer_Hood | `75942870774271` | 2.250 × 2.750 × 2.500 |
+| Archer_Bracer | `120950419069141` | 1.750 × 1.250 × 1.750 |
+| Archer_Quiver | `75868637250392` | 2.000 × 3.500 × 0.750 |
+| Mage_Hat | `92427299567407` | 3.000 × 2.750 × 3.000 |
+| Mage_Orb | `121605107426611` | 2.000 × 2.500 × 2.000 |
+| Mage_Cape | `96432733334599` | 3.000 × 4.250 × 1.000 |
+| Weapon_Broadsword | `135800784718280` | 2.000 × 5.000 × 1.000 |
+| Weapon_Longbow | `125338053789307` | 0.500 × 5.250 × 1.000 |
+| Weapon_FireStaff | `135835703924289` | 1.250 × 5.750 × 1.000 |
+| Weapon_QuakeHammer | `125437062108252` | 2.500 × 5.250 × 1.250 |
+| Weapon_ThrowingDagger | `91444651706594` | 1.000 × 2.500 × 0.750 |
+| Weapon_HolyBell | `83647104694033` | 2.000 × 3.500 × 2.000 |
+| Weapon_SpinningAxe | `102028773090465` | 2.250 × 3.250 × 0.750 |
+| Weapon_BeastWhip | `98868436713221` | 2.000 × 4.750 × 2.000 |
 
 ## Notes du vault utilisées
 

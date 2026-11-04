@@ -62,15 +62,17 @@ def goblin_grunt():
     v = goblin_base("Enemy_GoblinGrunt", "Tomato")
     # Cocotte en fonte émaillée retournée en guise de casque : le dessus de la tête porte le rouge du
     # rôle (la caméra de jeu est haute, on voit surtout le dessus des ennemis).
-    v.box(-5, 4, -4, 2, 11, 11, "Cream")           # bord émaillé
-    v.box(-4, 3, -3, 1, 12, 13, "Tomato")
-    v.box(-1, 0, -2, 0, 14, 14, "Tomato.d")        # bouton du couvercle (fond de la cocotte)
-    v.set(1, -3, 13, "Tomato.l")                   # reflet
-    v.box(4, 6, -1, -1, 12, 12, "Ink")             # poignée sur le côté
-    # Louche en bois comme massue (main droite, côté -X)
-    v.line((-5, -2, 2), (-5, -3, 9), "Bark")
-    v.box(-6, -4, -5, -3, 9, 10, "Steel")
-    v.box(-5, -5, -4, -4, 10, 10, "Steel.d")       # creux de la louche
+    # Posée un voxel plus haut que le crâne : le bord crème ne couvre plus les yeux.
+    v.box(-5, 4, -4, 2, 12, 12, "Cream")           # bord émaillé
+    v.box(-4, 3, -3, 1, 13, 14, "Tomato")
+    v.box(-1, 0, -2, 0, 15, 15, "Tomato.d")        # bouton du couvercle (fond de la cocotte)
+    v.set(1, -3, 14, "Tomato.l")                   # reflet
+    v.box(4, 6, -1, -1, 13, 13, "Ink")             # poignée sur le côté
+    # Louche en bois brandie en diagonale (main droite, côté -X) : elle sort de la silhouette
+    # au-delà de l'oreille, sinon Grunt et Bomber font la même tache noire à 64 px.
+    v.line((-5, -2, 3), (-9, -2, 11), "Bark")
+    v.box(-11, -9, -3, -1, 12, 13, "Steel")
+    v.set(-10, -2, 13, "Steel.d")                  # creux de la louche
     return v, "bottom", {"kind": "enemy", "role": "swarm", "gag": "casserole et louche"}
 
 
@@ -135,20 +137,19 @@ def goblin_bomber():
     v.box(1, 2, -5, -5, 9, 10, "Sky.l")
     v.box(-4, -4, -3, 0, 10, 10, "Steel.d")
     v.box(3, 3, -3, 0, 10, 10, "Steel.d")
-    # Bombe énorme serrée dans les bras, devant lui : lisible de face, c'est de là qu'il arrive
-    v.ell(0, -5, 5.5, 3.6, 3.0, 3.4, "Ink", zmin=2)
-    v.paint_if(lambda x, y, z, c: c == "Ink" and z == 5 and y <= -3, "Steel.d")   # cerclage
-    v.box(-1, 0, -6, -5, 9, 9, "Steel")              # bouchon
-    v.line((0, -6, 10), (2, -7, 12), "Bark")         # mèche
-    v.box(2, 3, -7, -7, 13, 13, "Gold")              # étincelle
-    v.set(3, -8, 13, "Ember")
-    v.set(-2, -8, 6, "Steel")                        # reflet
-    v.box(3, 3, -4, -2, 4, 4, "Lime")                # mains qui serrent la bombe
-    v.box(-4, -4, -4, -2, 4, 4, "Lime")
-    # Sac d'XP volée dans le dos (le gag : il vole ton XP)
-    v.box(-2, 1, 2, 3, 3, 6, "Leather")
-    v.box(-2, 1, 2, 3, 7, 7, "Sky")
-    v.set(0, 3, 8, "Sky.l")
+    # Bombe énorme portée à bout de bras sur le côté droit (-X) : un gros rond noir qui sort de la
+    # silhouette, la mèche loin du visage ; le bonnet orange reste visible sur le dessus.
+    v.ell(-8, -1, 4.5, 3.2, 3.0, 3.2, "Ink", zmin=1)
+    v.paint_if(lambda x, y, z, c: c == "Ink" and z == 4, "Steel.d")             # cerclage
+    v.box(-9, -8, -2, -1, 8, 8, "Steel")             # bouchon
+    v.line((-8, -1, 9), (-7, -2, 11), "Bark")        # mèche
+    v.box(-7, -6, -2, -2, 12, 12, "Gold")            # étincelle
+    v.set(-6, -3, 13, "Ember")
+    v.set(-10, -4, 6, "Steel")                       # reflet
+    # Sac d'XP volée dans la main gauche (le gag : il vole ton XP)
+    v.box(4, 5, -2, -1, 2, 4, "Leather")
+    v.box(4, 5, -2, -1, 5, 5, "Sky")
+    v.set(5, -2, 6, "Sky.l")
     return v, "bottom", {"kind": "enemy", "role": "exploder", "gag": "vole ton XP"}
 
 
@@ -217,13 +218,13 @@ def knight_pauldron():
     v = Vox("Knight_Pauldron")
     # Origine = RightShoulderAttachment (sommet du bras droit). Le bras droit est côté -X dans Blender :
     # l'extérieur est donc -X. Le dessin est symétrique avant/arrière, d'où le demi-tour possible.
-    v.box(-4, 1, -3, 2, 0, 1, "Steel")             # plaque haute
-    v.box(-5, 0, -3, 2, -1, -1, "Steel")           # lame 2
-    v.box(-5, -2, -3, 2, -2, -2, "Steel.d")        # lame 3 tombante
-    v.paint(-5, -2, -3, 2, -2, -2, "Royal")        # liseré bleu roi sur la lame basse
-    v.box(-3, -1, -1, 0, 2, 2, "Royal")            # bosse centrale
+    # Bleu roi (le casque est en acier) : les épaulières se détachent du casque vues de dos.
+    v.box(-4, 1, -3, 2, 0, 1, "Royal")             # plaque haute
+    v.box(-5, 0, -3, 2, -1, -1, "Royal.d")         # lame 2
+    v.box(-5, -2, -3, 2, -2, -2, "Steel.d")        # lame 3 tombante, en acier
+    v.box(-3, -1, -1, 0, 2, 2, "Steel")            # bosse centrale
     v.box(-2, -2, -1, 0, 3, 3, "Gold")             # un seul rivet or
-    return v, (0, 0, 0), {"kind": "accessory", "attach": "RightShoulderAttachment", "part": "RightUpperArm",
+    return v, (0, 0, 1), {"kind": "accessory", "attach": "RightShoulderAttachment", "part": "RightUpperArm",
                           "also": "LeftShoulderAttachment", "tier": 2, "class": "Knight"}
 
 
@@ -265,13 +266,13 @@ def archer_hood():
     v.carve(3, 3, -4, -4, 1, 1)                    # coins arrondis : ce n'est pas un casque
     v.carve(3, 3, 3, 3, 1, 1)
     v.box(0, 2, -3, 2, 2, 2, "Leaf")               # dôme
-    v.box(0, 0, -3, -2, 3, 3, "Leaf.l")            # petite pointe au front
     v.mirror_x()
-    # Pointe de capuche qui tombe dans le dos
+    v.box(-1, 0, -3, -1, 3, 3, "Leaf")             # pointe de capuche qui monte et part en avant
+    v.box(-1, 0, -3, -2, 4, 4, "Leaf.l")
+    v.box(-1, 0, -4, -4, 4, 5, "Leaf.l")
+    # Courte queue dans le dos (s'arrête au-dessus du carquois)
     v.box(-2, 1, 4, 4, -2, 1, "Leaf")
-    v.box(-1, 0, 5, 5, -4, 0, "Leaf")
-    v.box(-1, 0, 6, 6, -6, -3, "Leaf.d")
-    v.box(-1, 0, 7, 7, -7, -6, "Leaf.d")
+    v.box(-1, 0, 5, 5, -3, 0, "Leaf.d")
     # Broche en gland sur la joue gauche (+X)
     v.set(4, -3, -3, "Bark")
     v.set(4, -3, -4, "Leather")
@@ -288,9 +289,10 @@ def archer_bracer():
     v.carve(-2, 1, -2, 1, 1, 5)                    # creux de l'avant-bras (1 stud)
     v.paint(-3, 2, -3, 2, 5, 5, "Leather.d")
     v.paint(-3, 2, -3, 2, 1, 1, "Leather.d")
-    v.paint(-3, 2, -3, 2, 3, 3, "Leaf")            # bande verte
-    v.box(3, 3, -1, 0, 2, 4, "Cream")              # cible brodée
-    v.box(3, 3, -1, 0, 3, 3, "Tomato")
+    v.paint(-3, 2, -3, 2, 5, 5, "Leaf")            # revers vert en haut (pas de rayures)
+    v.box(-2, 1, 3, 3, 2, 4, "Tomato")             # cible brodée sur le dos (+Y : visible de la caméra)
+    v.box(-1, 0, 3, 3, 2, 4, "Cream")
+    v.box(-1, 0, 3, 3, 3, 3, "Tomato.d")
     v.set(-4, -1, 3, "Gold")                       # boucle côté intérieur
     # Les attaches Grip des mains R15 sont tournées de -90° sur X : l'attache de la poignée doit l'être aussi.
     return v, (0, 0, 0), {"kind": "accessory", "attach": "LeftGripAttachment", "part": "LeftLowerArm", "tier": 2,
@@ -298,23 +300,22 @@ def archer_bracer():
 
 
 def archer_quiver():
-    """Carquois en diagonale ; une des flèches est une carotte."""
+    """Carquois droit dans le dos ; une des flèches est une carotte."""
     v = Vox("Archer_Quiver")
-    # Origine = BodyBackAttachment. Le carquois monte vers l'épaule droite (côté -X).
-    for i in range(10):
-        x = 2 - i // 2
-        z = -5 + i
-        v.box(x - 1, x + 1, 1, 3, z, z, "Leather")
-    v.box(-4, 2, 1, 3, -5, -5, "Bark")
-    v.box(-2, 0, 1, 3, 0, 0, "Gold")               # cerclage
-    # Flèches qui dépassent au-dessus de l'épaule droite
-    for k, (dx, fl) in enumerate(((-3, "Tomato"), (-2, "Gold"), (-4, "Leaf"))):
-        v.box(dx, dx, 2, 2, 5, 7 + k % 2, "Bark")
-        v.box(dx, dx, 1, 3, 8 + k % 2, 8 + k % 2, fl)
-    v.box(-1, -1, 2, 2, 5, 6, "Ember")             # la carotte
-    v.box(-1, -1, 2, 2, 7, 7, "Ember.l")
-    v.box(-1, -1, 1, 3, 8, 8, "Leaf")
-    v.box(-5, 3, 0, 0, 2, 2, "Bark")               # sangle (le reste est caché sous le bras)
+    # Origine = BodyBackAttachment. Carquois droit dans le dos, côté épaule droite (-X).
+    v.box(-4, -1, 1, 3, -5, 3, "Leather")
+    v.box(-4, -1, 1, 3, -5, -5, "Bark")            # fond
+    v.paint(-4, -1, 1, 3, 3, 3, "Leather.d")       # col du carquois
+    v.paint(-4, -1, 1, 1, -1, -1, "Gold")          # cerclage (face visible)
+    v.paint(-4, -1, 3, 3, -1, -1, "Gold")
+    # Flèches à empennage bien visible au-dessus de l'épaule ; une des flèches est une carotte
+    for dx, fl in ((-4, "Tomato"), (-1, "Leaf")):
+        v.box(dx, dx, 2, 2, 4, 6, "Bark")
+        v.box(dx, dx, 1, 3, 7, 8, fl)
+    v.box(-3, -2, 2, 2, 4, 6, "Ember")             # la carotte
+    v.box(-3, -2, 2, 2, 7, 7, "Ember.l")
+    v.box(-3, -2, 1, 3, 8, 8, "Leaf")
+    v.line((-1, 1, 3), (3, 1, -3), "Bark")         # sangle en travers du dos
     return v, (0, 0, 0), {"kind": "accessory", "attach": "BodyBackAttachment", "part": "UpperTorso", "tier": 3, "class": "Archer"}
 
 
@@ -354,16 +355,17 @@ def mage_orb():
                 v.set(x, -1, z, "Gold")            # anneau vertical
     v.box(-1, 0, -1, -1, 4, 4, "Gold.l")           # petite flamme au sommet
     v.set(-1, -1, 5, "Ember")
-    # Origine = LeftShoulderAttachment ; l'orbe flotte 1,5 stud au-dessus, un peu vers l'extérieur.
-    return v, (-2, 0, -6), {"kind": "accessory", "attach": "LeftShoulderAttachment", "part": "LeftUpperArm", "tier": 2,
+    # Origine = LeftShoulderAttachment ; l'orbe flotte 1 stud au-dessus et 1,25 stud vers l'extérieur,
+    # hors du bord du chapeau.
+    return v, (-5, 0, -4), {"kind": "accessory", "attach": "LeftShoulderAttachment", "part": "LeftUpperArm", "tier": 2,
                             "class": "Mage", "neon_core": "Ember", "neon_core_at": [0, 0, 0], "neon_core_size": 0.5}
 
 
 def mage_cape():
-    """Cape longue et évasée, haut col pointu, ciel étoilé."""
+    """Cape évasée jusqu'au genou, haut col pointu, ciel étoilé."""
     v = Vox("Mage_Cape")
     top = 4
-    for z in range(-12, top + 1):
+    for z in range(-9, top + 1):
         back = 1 + (0 if z >= -2 else (-z - 1) // 4)
         half = 4 + (0 if z >= -4 else (-z - 3) // 3)
         v.box(-half, half - 1, back, back, z, z, "Plum")
@@ -371,11 +373,11 @@ def mage_cape():
     v.box(-5, -5, 0, 0, top + 1, top + 3, "Grape")
     v.box(4, 4, 0, 0, top + 1, top + 3, "Grape")
     v.box(-4, 3, 0, 0, top, top, "Gold")
-    stars = [(-3, -1), (2, -3), (-1, -6), (3, -8), (-4, -10), (0, -11), (5, -11), (-2, -3)]
+    stars = [(-3, -1), (2, -3), (-1, -6), (3, -8), (-4, -8), (0, -5), (-2, -3)]
     for sx, sz in stars:
         for k in [k for k in v.c if k[0] == sx and k[2] == sz]:
             v.c[(k[0], k[1] + 1, k[2])] = "Gold"
-    v.paint_if(lambda x, y, z, c: z == -12 and c == "Plum", "Grape")
+    v.paint_if(lambda x, y, z, c: z == -9 and c == "Plum", "Grape")
     return v, (0, 0, 0), {"kind": "accessory", "attach": "BodyBackAttachment", "part": "UpperTorso", "tier": 3, "class": "Mage"}
 
 
