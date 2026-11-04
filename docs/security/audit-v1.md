@@ -8,8 +8,8 @@ Agent A11 (anti-triche et sécurité), 4 nov. 2026. Code audité : commit `ef662
 | --- | --- | --- | --- |
 | Critique | 1 | 0 | — |
 | Haute | 3 | 1 (S-04) | 1 |
-| Moyenne | 3 | 1 (S-06) | 0 (prévue en vague 2, voir `regles-v2.md`) |
-| Basse | 6 | 2 | 0 |
+| Moyenne | 4 | 1 (S-06) | 0 (prévue en vague 2, voir `regles-v2.md`) |
+| Basse | 7 | 3 (S-11, S-13, S-15) | 0 |
 
 ## Méthode
 
@@ -43,6 +43,8 @@ Agent A11 (anti-triche et sécurité), 4 nov. 2026. Code audité : commit `ef662
 | S-11 | Basse | `shared/Net.luau:68-79` | Les remotes serveur → client n'ont pas d'écouteur serveur : un client peut les remplir | A11 | Vague 2 |
 | S-12 | Basse | `server/Services/RunManager.luau:1268` | En mode lobby, le serveur de run ne lit pas `MatchService.getRunConfig()` | A04 | À transmettre |
 | S-13 | Basse | `server/Services/LootService.luau:623-662`, `server/Services/ShrineService.luau:612-624` | Ramassage, coffres et autels se fient à la position du client : ils dépendent de S-01 à S-03 | A06 | Couvert par S-01 à S-03 |
+| S-14 | Moyenne | `server/Services/RunManager.luau:1160-1177`, `server/Services/MovementGuard.luau:69-86` | Les ralentissements (à terre, choix de carte) ne sont appliqués que par le client | A06 (+ A04) | À transmettre |
+| S-15 | Basse | `server/Services/DataService.luau:453`, `server/Services/ProgressionService.luau:1435-1439` | Deux petites fuites : tables recréées pour un joueur déjà parti | A11 | Vague 2 |
 
 ## Détail des failles
 
@@ -54,7 +56,7 @@ Agent A11 (anti-triche et sécurité), 4 nov. 2026. Code audité : commit `ef662
 
 - contact ennemi : `server/Services/RunManager.luau:726` exige que les pieds soient à moins de quelques studs du haut de l'ennemi ;
 - projectiles ennemis : `server/Services/EnemyService.luau:412` exige `|Δy| < 4` ;
-- attaques du boss : `server/Services/BossService.luau:263-265` passent la hauteur `above` au test de forme ;
+- attaques du boss : `server/Services/BossService.luau:263-265` passent la hauteur `above` au test de forme, et les ondes en anneau ratent un joueur en l'air (`:118-120`). Seuls les cercles, lignes et charges du boss restent en 2D ;
 - armes du joueur : `server/Services/WeaponService.luau:1123-1124` ne gardent que `x` et `z`, et `EnemyService.queryRadius` est en 2D.
 
 **Scénario.** Un script de vol, ou un simple `HumanoidRootPart.CFrame += Vector3.new(0, 20, 0)` chaque frame, place le joueur 20 studs au-dessus de la horde. MovementGuard ne voit aucun déplacement horizontal anormal et n'applique pas la règle de vol stationnaire. Le joueur ne prend plus aucun dégât, ses armes tuent tout en dessous, il tient l'Overtime à l'infini et prend la première place du classement hebdo des KO.
@@ -77,7 +79,9 @@ Agent A11 (anti-triche et sécurité), 4 nov. 2026. Code audité : commit `ef662
 
 Variante sans recalage : se tenir sur un tremplin, puis se téléporter n'importe où (cage de capture, autel doré, arène du boss). En gonflant son ping (lag switch), la fenêtre monte à 1,6 s.
 
-**Correctif (A06).** Pendant une exemption, garder une borne : déplacement ≤ `vmax × dt × 3` + la portée du lancement connu (tremplin : vecteur et distance tirés du layout serveur). L'exemption d'un tremplin ne vaut qu'une fois par atterrissage. La grâce après recalage ne doit jamais accepter une position plus loin de `lastValid` que ce qu'un pas légitime permet.
+Variante par reset : le bouton Reset de Roblox n'est pas désactivé et le serveur n'écoute pas `Humanoid.Died`. Un reset ne coûte aucun PV de run, et le nouveau personnage a 3 s de grâce d'apparition (`MovementGuard.luau:135`) pendant lesquelles toute position est acceptée.
+
+**Correctif (A06).** Pendant une exemption, garder une borne : déplacement ≤ `vmax × dt × 3` + la portée du lancement connu (tremplin : vecteur et distance tirés du layout serveur). L'exemption d'un tremplin ne vaut qu'une fois par atterrissage. La grâce après recalage ne doit jamais accepter une position plus loin de `lastValid` que ce qu'un pas légitime permet. La grâce d'apparition part du point d'apparition imposé par RunManager, pas de la position que donne le client. (A04) Pendant une run, désactiver le bouton Reset (`StarterGui:SetCore("ResetButtonCallback", false)` côté client) ou traiter un reset comme une mise à terre.
 
 ### S-03 — Haute — Vitesse tolérée d'environ 4,4 fois la marche
 
@@ -104,7 +108,7 @@ Variante sans recalage : se tenir sur un tremplin, puis se téléporter n'import
 
 **Où.** `server/Services/CardService.luau:376-379` donne 8 s d'invulnérabilité à chaque offre de cartes. `:386-395` (`closeOffer`) ne la retire pas quand le joueur choisit. `server/Services/RunManager.luau:1151-1156` ne permet que de l'allonger (`math.max`).
 
-**Scénario.** Avec beaucoup d'XP (Rune Wisdom, pots aspirateurs, partage en coop), un joueur monte d'un niveau toutes les quelques secondes en fin de run. Chaque niveau donne 8 s d'invulnérabilité, même s'il choisit sa carte en 0,2 s. Il devient presque invulnérable pendant l'Overtime. Les décisions v2 gardent « 8 s pour choisir, joueur ralenti et invulnérable » : la protection doit finir avec le choix.
+**Scénario.** Avec beaucoup d'XP (Rune Wisdom, pots aspirateurs, partage en coop), un joueur monte d'un niveau toutes les quelques secondes en fin de run. Chaque niveau donne 8 s d'invulnérabilité, même s'il choisit sa carte en 0,2 s. En laissant expirer 5 offres d'affilée, il cumule 40 s. Le ralentissement censé compenser n'est appliqué que par le client (S-14) : un client modifié reste invulnérable **et** à pleine vitesse. Les décisions v2 gardent « 8 s pour choisir, joueur ralenti et invulnérable » : la protection doit finir avec le choix.
 
 **Correctif (A04).** API RunManager pour retirer une invulnérabilité par source (par exemple `setInvulnerable(player, seconds, source)` et `clearInvulnerable(player, source)`). CardService l'enlève au choix, au passage ou au relancement final. Plafond : 30 % du temps de run passé invulnérable au maximum, toutes sources de cartes confondues.
 
@@ -126,9 +130,9 @@ Variante sans recalage : se tenir sur un tremplin, puis se téléporter n'import
 
 ### S-08 — Basse — `Hop` et `SlideStart` crus sur parole
 
-**Où.** `server/Services/MovementGuard.luau:275-297`. `SlideStart` n'est refusé qu'en l'air, sans contrôle de vitesse ni de délai. `Hop` incrémente `HopChain` et la statistique `Hops` sans vérifier qu'un saut a eu lieu.
+**Où.** `server/Services/MovementGuard.luau:275-297`. `SlideStart` n'est refusé qu'en l'air, sans contrôle de vitesse ni de délai. `Hop` incrémente `HopChain` et la statistique `Hops` sans vérifier qu'un saut a eu lieu (jusqu'à 5 par seconde). Même chose pour `PingsSent` (`server/Services/PingService.luau:87-89`, 3 par seconde).
 
-**Aujourd'hui.** Aucun code serveur ne lit `Sliding` ni `HopChain`, et aucune quête n'utilise `Hops` : rien à gagner.
+**Aujourd'hui.** Aucun code serveur ne lit `Sliding` ni `HopChain`, et aucune quête n'utilise `Hops` ni `PingsSent` (vérifié dans `shared/Config/Quests.luau`) : rien à gagner. Ne jamais ajouter de quête sur ces clés sans contrôle serveur.
 
 **Risque v2.** Shadowstep du Rogue (la glissade donne 0,5 s d'invulnérabilité) et toute vitesse de bunny-hop deviendraient exploitables. Règle dans `regles-v2.md` §1.
 
@@ -167,6 +171,34 @@ Variante sans recalage : se tenir sur un tremplin, puis se téléporter n'import
 **Où.** `server/Services/LootService.luau:623-662` (aimant, pots, coffres) et `server/Services/ShrineService.luau:612-624` (charge des autels) testent la position du `HumanoidRootPart`. En mode classique, c'est la seule position disponible ; les tests eux-mêmes sont corrects (rayon serveur, joueur actif, propriétaire du coffre, distance au marchand).
 
 **Correctif.** Rien à faire dans ces fichiers. Ils sont sûrs dès que S-01 à S-03 sont corrigés.
+
+### S-14 — Moyenne — Ralentissements appliqués par le client seulement
+
+**Où.** `server/Services/RunManager.luau:1160-1177` (`setSlow`) ne fait que poser les attributs `SlowMult` et `SlowUntil`. Seul `client/Controllers/MovementController.luau:87-88` les lit. `server/Services/MovementGuard.luau:69-86` (`maxSpeed`) les ignore.
+
+**Scénario.** Un joueur à terre devrait ramper (`RunManager.luau:612`). Avec un client modifié, il court à pleine vitesse jusqu'à un coéquipier pour se faire relever (rayon de relève de 6 studs, testé sur les positions du client). Même chose pendant le choix de carte (S-05).
+
+**Correctif (A06).** `maxSpeed` multiplie par `SlowMult` tant que `SlowUntil` n'est pas passé.
+
+### S-15 — Basse — Deux petites fuites mémoire
+
+**Où.**
+
+- `server/Services/DataService.luau:453` : une sauvegarde en attente (reçu, `saveSoon`) qui reprend après `onPlayerRemoving` réécrit `lastSaveAt[player]`.
+- `server/Services/ProgressionService.luau:1435-1439` : si la boucle des classements passe sur un joueur pendant sa sauvegarde finale, `writeBoards` recrée `lastWritten[player]` après le nettoyage différé.
+
+**Risque.** Quelques octets et une référence au `Player` par départ malchanceux. Statique, non mesuré.
+
+**Correctif (A11, vague 2).** N'écrire dans ces tables que si la session est toujours celle du joueur (`sessions[player] == session`) ou si `player.Parent` n'est pas `nil`.
+
+### Points à tester en Play (A11-06)
+
+Ces points ne se vérifient pas en lisant le code :
+
+- un client qui supprime son `Humanoid` : si la suppression est répliquée, `MovementGuard.sample` (`:121-126`) ne contrôle plus rien ;
+- ce que voit le serveur de `Humanoid.FloorMaterial` quand le client le falsifie (S-07) ;
+- la durée réelle de la fenêtre de S-04 pendant `BindToClose` (pour confirmer le correctif) ;
+- les seuils de S-01 à S-03 et S-14 avec un client de test qui vole, accélère et se téléporte.
 
 ## Ce qui est sain (vérifié)
 
