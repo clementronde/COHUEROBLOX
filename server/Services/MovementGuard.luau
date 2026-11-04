@@ -20,7 +20,7 @@
 -- Exemptions (mouvement causé par le serveur : tremplins, geysers, tyroliennes, téléports, recul) :
 --   MovementGuard.exempt(player, seconds, reason?)
 --   ou attribut serveur Player.MoveExemptUntil = workspace:GetServerTimeNow() + seconds
--- Lecture : MovementGuard.getStrikes(player) -> number · MovementGuard.getRunStrikes(player) -> number
+-- Lecture : getStrikes(player) -> number · getRunStrikes(player) -> number · getLastValidPosition(player) -> Vector3?
 -- Règles v2 appliquées : docs/security/regles-v2.md §1 (S-01 vol, S-02 exemptions bornées, S-03 bonus
 -- validés, S-08 SlideStart / Hop validés, S-14 ralentis appliqués).
 
@@ -71,7 +71,11 @@ type State = {
 	highSince: number?, -- trop haut au-dessus du sol depuis
 	graceAnchor: Vector3?, -- grâce (recalage, apparition, téléport serveur) : point de départ imposé
 	graceStart: number,
-	settleUntil: number, -- après un déplacement serveur : positions en vol encore acceptées
+	settleUntil: number, -- après un déplacement serveur ou un recalage : positions en vol encore acceptées...
+	settleFrom: Vector3?, -- ...si elles sont près de l'ancienne position
+	graceKind: string, -- "spawn" | "band" (vitesse normale) ou "server" (déplacement serveur)
+	pendingSlideJumpAt: number?, -- saut de glissade en attente d'être vu en l'air
+	lastSupportAt: number, -- dernier sol ou appui vu (sonde par image)
 	slideMemoryUntil: number, -- vitesse de fin de glissade permise jusque-là (seulement si un Hop a suivi)
 	stallSpeed: number, -- vitesse répliquée pendant le gel (min)
 	stallDir: Vector3, -- direction de cette vitesse
@@ -93,7 +97,24 @@ type State = {
 local MovementGuard = {}
 
 local states: { [Player]: State } = {}
-local runStrikes: { [Player]: number } = {} -- survit aux réapparitions ; remis à 0 au début de la run
+local runStrikes: { [number]: number } = {} -- par UserId : survit aux réapparitions et aux reconnexions ; remis à 0 au début de la run
+
+-- Ping borné. En Studio, l'attribut Workspace.CohueTestPing (secondes) le remplace pour tester les branches
+-- qui dépendent du ping (GetNetworkPing vaut 0 en Studio).
+local function pingOf(player: Player): number
+	local ping = player:GetNetworkPing()
+	if IS_STUDIO then
+		local test = Workspace:GetAttribute("CohueTestPing")
+		if type(test) == "number" then
+			ping = test
+		end
+	end
+	return math.clamp(ping, 0, G.PingCap)
+end
+
+local function flatDist(a: Vector3, b: Vector3): number
+	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
+end
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Exclude
 rayParams.RespectCanCollide = true
@@ -161,25 +182,30 @@ local function log(player: Player, s: State, kind: string, data: string)
 		return
 	end
 	s.lastLog = now
-	warn(`[MovementGuard] {kind} {player.Name} ({player.UserId}) {data} ping={math.floor(player:GetNetworkPing() * 1000)}ms strikes={s.strikes}`)
+	warn(`[MovementGuard] {kind} {player.Name} ({player.UserId}) {data} ping={math.floor(pingOf(player) * 1000)}ms strikes={s.strikes}`)
 end
 
 local function addStrike(player: Player, s: State)
 	s.strikes += 1
-	runStrikes[player] = (runStrikes[player] or 0) + 1
+	runStrikes[player.UserId] = (runStrikes[player.UserId] or 0) + 1
 end
 
 local function rubberBand(character: Model, root: BasePart, s: State, player: Player)
 	s.rubberBands += 1
+	local now = os.clock()
+	local ping = pingOf(player)
+	s.settleFrom = root.Position -- positions envoyées avant le recalage, encore en vol
+	s.settleUntil = now + G.TeleportSettle + ping
 	character:PivotTo(s.lastValid)
 	root.AssemblyLinearVelocity = Vector3.zero
 	s.lastPos = s.lastValid.Position
 	s.bucket = 0
 	s.stall = 0
 	s.airborneFor = 0
-	s.exemptUntil = os.clock() + G.GraceAfterRubberBand + math.clamp(player:GetNetworkPing(), 0, G.PingCap)
+	s.exemptUntil = now + G.GraceAfterRubberBand + ping
 	s.graceAnchor = s.lastValid.Position
-	s.graceStart = os.clock()
+	s.graceStart = now
+	s.graceKind = "band"
 end
 
 -- Sol sous le joueur vu par le serveur (rayon indulgent : 1,5 stud sous les pieds).
@@ -237,6 +263,10 @@ local function newState(root: BasePart): State
 		graceAnchor = pos, -- apparition : la grâce part d'ici (RunManager téléporte ensuite via exempt)
 		graceStart = os.clock(),
 		settleUntil = 0,
+		settleFrom = nil,
+		graceKind = "spawn",
+		pendingSlideJumpAt = nil,
+		lastSupportAt = os.clock(),
 		slideMemoryUntil = 0,
 		stallSpeed = 0,
 		stallDir = Vector3.zero,
@@ -281,6 +311,7 @@ local function endSlide(player: Player, s: State, now: number)
 	end
 	player:SetAttribute("Sliding", false)
 	player:SetAttribute("SlideCharge", false)
+	player:SetAttribute("SlidePose", false)
 end
 
 -- Suivi en l'air : crédits de bunny-hop, chute pour l'atterrissage lourd.
@@ -346,11 +377,23 @@ local function acceptSlide(player: Player, s: State, now: number)
 	s.slideEntryBonus = hopBonusAllowed(s, now)
 	s.slideSlopeGain = 0
 	s.slideSpeed = math.min(L.base * (1 + s.slideEntryBonus) * L.boost * G.SlideStartSlack, L.slideCap)
+	-- Visuel et charge à chaque glissade acceptée ; l'attribut de gameplay Sliding (Shadowstep) au plus une
+	-- fois par SlideValidateInterval (S-08).
+	player:SetAttribute("SlidePose", true)
+	player:SetAttribute("SlideCharge", prof.slide ~= nil and prof.slide.charge == true)
 	if now - s.lastValidSlideAt >= G.SlideValidateInterval then
 		s.lastValidSlideAt = now
 		player:SetAttribute("Sliding", true)
-		player:SetAttribute("SlideCharge", prof.slide ~= nil and prof.slide.charge == true)
 	end
+end
+
+-- Conditions d'une glissade : au sol vu par le serveur, recharge complète, intervalle, vitesse mesurée.
+local function slideReady(s: State, now: number, grounded: boolean): boolean
+	return s.slideUntil == 0
+		and grounded
+		and now - s.slideEndAt >= Movement.SlideCooldown * G.SlideCooldownSlack
+		and now - s.lastSlideStart >= G.SlideMinInterval
+		and s.lastSpeed >= Movement.SlideMinSpeed * G.SlideMinMeasured
 end
 
 local function sample(player: Player, dt: number)
@@ -415,32 +458,37 @@ local function sample(player: Player, dt: number)
 	-- serveur lui-même (exempt() ou MoveExemptUntil posés juste avant un PivotTo) est accepté une fois.
 	-- La position valide n'avance pas pendant une exemption.
 	if isExempt(player, s, now) or root.Anchored or humanoid.SeatPart ~= nil or dt > G.HitchFactor * G.Interval then
-		local pingE = math.clamp(player:GetNetworkPing(), 0, G.PingCap)
-		if s.rebaseNext or root.Anchored or humanoid.SeatPart ~= nil then
-			-- Déplacement imposé par le serveur : la nouvelle position devient l'ancre et la position valide.
+		local pingE = pingOf(player)
+		local graceTime = now - s.graceStart + dt + pingE
+		if s.rebaseNext then
+			-- Déplacement imposé par le serveur (exempt() ou MoveExemptUntil juste avant un PivotTo) : la nouvelle
+			-- position devient l'ancre et la position valide ; l'ancienne reste acceptée le temps que les positions
+			-- du client encore en vol arrivent.
 			s.rebaseNext = false
-			s.graceAnchor = pos
-			s.graceStart = now
+			s.settleFrom = s.lastPos
 			s.settleUntil = now + G.TeleportSettle + pingE
-			if not root.Anchored and humanoid.SeatPart == nil then
-				s.lastValid = root.CFrame
-			end
-		elseif now < s.settleUntil then
-			-- Juste après un déplacement serveur, d'anciennes positions du client peuvent encore arriver :
-			-- on suit sans juger, et l'ancre repart d'ici.
 			s.graceAnchor = pos
 			s.graceStart = now
+			s.graceKind = "server"
+			s.lastValid = root.CFrame
 		else
-			-- Distance cumulée depuis l'ancre (pas seulement le dernier pas) : réécrire sa position à chaque
-			-- image pendant la grâce ne déplace plus la base.
+			-- Distance cumulée depuis l'ancre : réécrire sa position à chaque image ne déplace pas la base.
+			-- Apparition et recalage : vitesse normale (A11) ; déplacement serveur : vitesse max + lancement.
 			local anchor = s.graceAnchor or s.lastPos
-			local fromAnchor = Vector3.new(pos.X - anchor.X, 0, pos.Z - anchor.Z).Magnitude
-			local bound = L.maxPossible * (now - s.graceStart + dt + pingE) * G.GraceSpeedFactor + G.ExemptLaunchStuds
-			local step = Vector3.new(pos.X - s.lastPos.X, 0, pos.Z - s.lastPos.Z).Magnitude
-			local stepBound = L.maxPossible * (dt + pingE) * G.ExemptBoundFactor + G.ExemptLaunchStuds
-			if fromAnchor > bound or step > stepBound then
+			local bound
+			if s.graceKind == "server" then
+				bound = L.maxPossible * graceTime * G.GraceSpeedFactor + G.ExemptLaunchStuds
+			else
+				bound = L.base * (1 + hopBonusAllowed(s, now)) * G.Margin * graceTime + G.SlackStuds
+			end
+			local ok = flatDist(pos, anchor) <= bound
+			local from = s.settleFrom
+			if not ok and from and now < s.settleUntil then
+				ok = flatDist(pos, from) <= L.base * (1 + hopBonusAllowed(s, now)) * G.Margin * graceTime + G.SlackStuds
+			end
+			if not ok then
 				addStrike(player, s)
-				log(player, s, "exempt-step", `fromAnchor={math.floor(fromAnchor)} bound={math.floor(bound)} step={math.floor(step)}`)
+				log(player, s, "exempt-step", `fromAnchor={math.floor(flatDist(pos, anchor))} bound={math.floor(bound)} kind={s.graceKind}`)
 				if G.Enforce then
 					rubberBand(character, root, s, player)
 					return
@@ -452,6 +500,7 @@ local function sample(player: Player, dt: number)
 		s.stall = 0
 		s.airborneFor = 0
 		s.highSince = nil
+		s.lastSupportAt = now -- un long trajet imposé par le serveur ne compte pas comme du vol
 		return
 	end
 	s.graceAnchor = nil
@@ -475,7 +524,7 @@ local function sample(player: Player, dt: number)
 	if Workspace:GetAttribute("CohueHazard") == "Sandstorm" then
 		vlim += G.SandstormPush
 	end
-	local ping = math.clamp(player:GetNetworkPing(), 0, G.PingCap)
+	local ping = pingOf(player)
 	local horizontal = Vector3.new(pos.X - s.lastPos.X, 0, pos.Z - s.lastPos.Z).Magnitude
 
 	-- Temps couvert par cet échantillon : dt + le gel qui le précède (rattrapage de réplication).
@@ -491,7 +540,7 @@ local function sample(player: Player, dt: number)
 	if pendingSlide then
 		if now - pendingSlide > G.SlidePendDefer then
 			s.pendingSlideAt = nil
-		elseif s.lastSpeed >= Movement.SlideMinSpeed * G.SlideMinMeasured and onGround then
+		elseif slideReady(s, now, onGround or now - s.lastGroundAt <= G.HopLandWindow) then
 			s.pendingSlideAt = nil
 			acceptSlide(player, s, now)
 			vlim = math.max(vlim, s.slideSpeed)
@@ -584,6 +633,18 @@ local function sample(player: Player, dt: number)
 		s.highSince = nil
 	end
 
+	if onPad then
+		s.lastSupportAt = now
+	elseif now - s.lastSupportAt > G.MaxAirTime then
+		addStrike(player, s)
+		log(player, s, "airtime", `air={string.format("%.1f", now - s.lastSupportAt)}s`)
+		s.lastSupportAt = now
+		if G.HoverEnforce then
+			rubberBand(character, root, s, player)
+			return
+		end
+	end
+
 	-- 4. Vol stationnaire et vol : en l'air longtemps sans amplitude verticale (un bunny-hop oscille de
 	-- plusieurs studs, le plané descend), ou monté bien plus haut qu'un saut de la classe.
 	if onGround or onPad then
@@ -635,7 +696,13 @@ end
 
 -- Strikes depuis le début de la run en cours (quarantaine du classement, regles-v2 §4.5).
 function MovementGuard.getRunStrikes(player: Player): number
-	return runStrikes[player] or 0
+	return runStrikes[player.UserId] or 0
+end
+
+-- Dernière position au sol jugée valide par le serveur (reset de A04), ou nil.
+function MovementGuard.getLastValidPosition(player: Player): Vector3?
+	local s = states[player]
+	return if s then s.lastValid.Position else nil
 end
 
 function MovementGuard.getStrikes(player: Player): number
@@ -646,9 +713,6 @@ end
 -- ---------------------------------------------------------------- MoveEvent (C->S)
 
 local function creditHop(player: Player, s: State, hopAt: number)
-	if hopAt - s.slideEndAt <= G.SlideHopGrace then
-		s.slideMemoryUntil = os.clock() + G.SlideMemory -- saut en fin de glissade : son élan reste permis un moment
-	end
 	if hopAt - s.lastHopCountAt < G.MinHopTime then
 		s.hopStats.rate = (s.hopStats.rate or 0) + 1
 		return -- au plus un hop compté par MinHopTime
@@ -677,16 +741,36 @@ local function probeGround(player: Player, now: number)
 	if not s or not humanoid or not root then
 		return
 	end
-	if groundHit(root, humanoid) then
+	local grounded = groundHit(root, humanoid) ~= nil
+	if grounded then
 		s.lastGroundAt = now
+		s.lastSupportAt = now
 		local pending = s.pendingHopAt
 		if pending then
 			s.pendingHopAt = nil
 			creditHop(player, s, pending)
 		end
-	elseif s.pendingHopAt and now - (s.pendingHopAt :: number) > G.HopLandDefer then
-		s.pendingHopAt = nil
-		s.hopStats.noLand = (s.hopStats.noLand or 0) + 1
+	else
+		if now - s.lastSupportAt > 1 and supported(character :: Model, root, humanoid) then
+			s.lastSupportAt = now -- bord de plateau, tête d'un coéquipier : appuyé, pas en vol
+		end
+		if s.pendingHopAt and now - (s.pendingHopAt :: number) > G.HopLandDefer then
+			s.pendingHopAt = nil
+			s.hopStats.noLand = (s.hopStats.noLand or 0) + 1
+		end
+	end
+	-- Saut de glissade : crédité (et son élan permis) seulement quand le serveur voit le joueur décoller.
+	local slideJump = s.pendingSlideJumpAt
+	if slideJump then
+		if not grounded and now - slideJump <= G.SlideJumpDefer then
+			s.pendingSlideJumpAt = nil
+			s.slideMemoryUntil = now + G.SlideMemory
+			s.lastAirAt = now
+			creditHop(player, s, slideJump)
+		elseif now - slideJump > G.SlideJumpDefer then
+			s.pendingSlideJumpAt = nil
+			s.hopStats.noAir = (s.hopStats.noAir or 0) + 1
+		end
 	end
 end
 
@@ -705,16 +789,24 @@ local function onMoveEvent(player: Player, kind: any)
 		return
 	end
 	local now = os.clock()
+	local run = Registry.find("RunManager")
+	if (kind == "SlideStart" or kind == "Hop") and run and run.isDowned then
+		local ok, downed = pcall(run.isDowned, player)
+		if ok and downed then
+			return -- à terre : ni glissade ni hop
+		end
+	end
 	if kind == "SlideStart" then
 		-- Au sol, recharge respectée, vitesse mesurée par le serveur suffisante (S-08). Si seule la vitesse
 		-- manque (départ presque à l'arrêt, positions répliquées en retard), la glissade attend SlidePendDefer
 		-- secondes que l'échantillon serveur la voie.
-		local cooled = now - s.slideEndAt >= Movement.SlideCooldown * G.SlideCooldownSlack
-		if now - s.lastSlideStart >= G.SlideMinInterval and cooled and s.slideUntil == 0 and groundHit(root, humanoid) then
-			if s.lastSpeed >= Movement.SlideMinSpeed * G.SlideMinMeasured then
+		-- Toujours mis en attente puis accepté dès que les conditions sont vues (positions en retard, recharge
+		-- mesurée à la réception) ; abandonné après SlidePendDefer.
+		if s.slideUntil == 0 then
+			s.pendingSlideAt = now
+			if slideReady(s, now, groundHit(root, humanoid) ~= nil or now - s.lastGroundAt <= G.HopLandWindow) then
+				s.pendingSlideAt = nil
 				acceptSlide(player, s, now)
-			else
-				s.pendingSlideAt = now
 			end
 		end
 	elseif kind == "SlideEnd" then
@@ -725,13 +817,18 @@ local function onMoveEvent(player: Player, kind: any)
 			return
 		end
 		s.lastHopAt = now
-		-- Un saut depuis une glissade (en cours ou finie à l'instant) décolle du sol : son élan reste permis.
-		local fromSlide = s.slideUntil > 0 or now - s.slideEndAt <= G.SlideHopGrace
-		if fromSlide then
-			s.slideMemoryUntil = now + G.SlideMemory
+		-- Saut depuis une glissade (le client n'envoie pas SlideEnd dans ce cas) : la glissade se termine, et le
+		-- hop n'est crédité, son élan permis, que lorsque le serveur voit ensuite le joueur décoller.
+		if s.slideUntil > 0 or now - s.slideEndAt <= G.SlideHopGrace then
+			s.pendingSlideAt = nil
+			if s.slideUntil > 0 then
+				endSlide(player, s, now)
+			end
+			s.pendingSlideJumpAt = now
+			return
 		end
 		-- Sinon, un hop ne crédite le bonus que si le serveur a vu le joueur en l'air récemment...
-		if not fromSlide and now - s.lastAirAt > G.AirMemory + G.HopAirSlack then
+		if now - s.lastAirAt > G.AirMemory + G.HopAirSlack then
 			s.hopStats.noAir = (s.hopStats.noAir or 0) + 1
 			return -- pas vu en l'air : ni crédit, ni statistique
 		end
@@ -758,6 +855,7 @@ local function watchPlayer(player: Player)
 		states[player] = nil -- état neuf (avec la grâce d'apparition) au prochain échantillon
 		player:SetAttribute("Sliding", false)
 		player:SetAttribute("SlideCharge", false)
+		player:SetAttribute("SlidePose", false)
 		player:SetAttribute("HopChain", 0)
 		task.defer(refreshFilter)
 	end)
@@ -777,7 +875,6 @@ function MovementGuard.init()
 	Players.PlayerAdded:Connect(watchPlayer)
 	Players.PlayerRemoving:Connect(function(player)
 		states[player] = nil
-		runStrikes[player] = nil
 		task.defer(refreshFilter)
 	end)
 end

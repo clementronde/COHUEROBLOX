@@ -88,7 +88,7 @@ local Movement = {
 	GroundNormalMinY = 0.55,
 
 	-- Signaux au serveur (remote MoveEvent)
-	MoveEventRate = 10, -- par seconde et par joueur
+	MoveEventRate = 5, -- par seconde et par joueur (regles-v2 §0.3) ; un saut de glissade n'envoie pas SlideEnd
 	SlidingAttrTimeout = 2.5, -- s avant que le serveur efface Sliding de lui-même
 	HopMinInterval = 0.2, -- s entre deux hops comptés
 
@@ -179,12 +179,12 @@ local Movement = {
 		MinHopTime = 0.4, -- s : un hop crédité au plus par MinHopTime (vol le plus court d'un hop légitime ~0,47 s)
 		HopAirSlack = 0.5, -- s ajoutées à AirMemory pour accepter un Hop reçu juste au décollage
 		SlideMemory = 0.8, -- s après la fin d'une glissade où son plafond reste permis
-		SlideMinInterval = 0.6, -- s entre deux SlideStart acceptés (chaîne glissade-saut légitime : ~0,65 s)
+		SlideMinInterval = 0.4, -- s entre deux SlideStart acceptés (chaîne glissade-saut légitime : ~0,55 s)
 		SlideStartSlack = 1.1, -- marge sur la vitesse de départ de glissade calculée par le serveur
 		SlopeLeniency = 1.5, -- le gain de pente vu à 4 Hz est majoré (le joueur a pu passer sur plus raide)
 		SlideFrictionLeniency = 0.8, -- part du frottement de glissade appliquée par le serveur, en continu
 		StallMoveStuds = 0.2, -- en dessous, l'échantillon compte comme « gelé » (rattrapage réseau ensuite)
-		StallCap = 1.5, -- s de gel max pris en compte
+		StallCap = 0.75, -- s de gel max pris en compte (A11)
 		BucketMax = 20, -- studs d'excès cumulé avant recalage
 		CreditSeconds = 0.5, -- un pas court laisse au plus ça de course en avance (positions répliquées par paquets)
 		LeakPerSecond = 1.5,
@@ -204,7 +204,7 @@ local Movement = {
 		PadGrace = 2.5, -- s de vitesse relevée après un tremplin (le client applique le lancer)
 		PadMaxSpeed = 30, -- studs/s permis pendant cette grâce (lancer latéral 22 + marche) ; téléport toujours contrôlé
 		SandstormPush = 8, -- studs/s ajoutés pendant la tempête de sable (pushSpeed 6 + marge)
-		SlideCooldownSlack = 0.6, -- part de SlideCooldown exigée entre SlideEnd et SlideStart reçus (gigue réseau)
+		SlideCooldownSlack = 1.0, -- part de SlideCooldown exigée entre SlideEnd et SlideStart reçus (en attente sinon)
 		SlideProtectExtra = 0.3, -- s : une glissade lancée juste après un saut garde la chaîne de hops maxFlatTime + ça
 		StallMinVelocity = 2, -- studs/s : le gel ne compte que si la vitesse répliquée dit que le joueur bouge
 		-- Règles v2 (docs/security/regles-v2.md §1)
@@ -218,6 +218,8 @@ local Movement = {
 		SlidePendDefer = 0.5, -- s : un SlideStart trop lent pour le serveur attend ça qu'il voie la vitesse
 		SlideMinMeasured = 0.8, -- part de SlideMinSpeed exigée sur la vitesse mesurée par le serveur
 		HopLandWindow = 0.3, -- s : un Hop n'est crédité que si le serveur a vu le sol aussi récemment (S-08)...
+		SlideJumpDefer = 0.5, -- s : un saut de glissade n'est crédité que si le serveur voit ensuite le joueur en l'air
+		MaxAirTime = 4, -- s sans sol ni appui (hors tremplin) : vol, recalage
 		HopLandDefer = 0.5, -- ...ou le voit dans ce délai après le Hop (positions répliquées en retard sur l'événement)
 		SlideHopGrace = 0.35, -- s : la vitesse de fin de glissade reste permise seulement si un Hop suit d'aussi près
 		TeleportSettle = 0.5, -- s (+ ping) après un déplacement serveur sans juger les positions en vol

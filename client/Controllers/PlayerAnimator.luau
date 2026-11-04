@@ -144,7 +144,7 @@ local function step(dt: number)
 		if player == localPlayer and movement then
 			sliding = movement.isSliding()
 		else
-			sliding = player:GetAttribute("Sliding") == true
+			sliding = player:GetAttribute("SlidePose") == true or player:GetAttribute("Sliding") == true
 		end
 		local charging = sliding and player:GetAttribute("SlideCharge") == true
 		rig.slide = approach(rig.slide, if sliding and not charging then 1 else 0, dt)

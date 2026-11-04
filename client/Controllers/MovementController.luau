@@ -250,7 +250,8 @@ local function slideCap(): number
 	return baseWalk() * M.slideMaxMult(prof)
 end
 
-local function endSlide()
+-- silent : fin par un saut, le Hop qui suit suffit au serveur (une remote de moins par saut de glissade).
+local function endSlide(silent: boolean?)
 	if not sliding then
 		return
 	end
@@ -261,7 +262,9 @@ local function endSlide()
 		slideMover.Enabled = false
 	end
 	dlog(`slideEnd speed={string.format("%.1f", slideExitSpeed)}`)
-	send("SlideEnd")
+	if not silent then
+		send("SlideEnd")
+	end
 end
 
 local function startSlide()
@@ -287,7 +290,7 @@ local function startSlide()
 	else
 		return
 	end
-	local speed = math.min(math.max(flat.Magnitude, h.WalkSpeed) * slideTune("boost", M.SlideBoost), slideCap())
+	local speed = math.min(math.max(flat.Magnitude, h.WalkSpeed) * slideTune("boost", M.SlideBoost), slideCap() * slowMult())
 	slideVel = dir * speed
 	slideEntrySpeed = speed
 	slideEntryBonus = hopBonus
@@ -342,7 +345,7 @@ local function updateSlide(dt: number)
 			slideVel = dir.Unit * speed
 		end
 	end
-	speed = math.min(slideVel.Magnitude, slideCap())
+	speed = math.min(slideVel.Magnitude, slideCap() * slowMult()) -- ralenti (choix de carte, à terre) compris
 	if speed > 0 then
 		slideVel = slideVel.Unit * speed
 	end
@@ -396,7 +399,7 @@ local function groundJump()
 	local base = math.max(baseWalk(), 1)
 	if sliding or now - slideEndedAt <= M.SlideJumpGrace then
 		local speed = if sliding then slideVel.Magnitude else slideExitSpeed
-		endSlide()
+		endSlide(true)
 		slideEndedAt = -math.huge -- grâce consommée
 		local delta = (speed - slideEntrySpeed) / base
 		local bonus = slideEntryBonus + delta
