@@ -14,10 +14,10 @@ Le hub est un **petit village voxel compact** : on y arrive face au portail, on 
 
 | Champ | Valeur |
 | --- | --- |
-| Nom (jeu) | « the Village » en attendant le nom anglais du jeu. Nom de travail proposé : **Hubbub Village** (« cohue » en anglais) |
+| Nom (jeu) | **Hubbub Village** (« cohue » en anglais), nom de travail validé par Clément en attendant le nom du jeu |
 | Fantasme | Un village voxel joyeux et un peu absurde, là où les héros se préparent avant d'aller taper la horde |
 | Jeu, dans l'ordre | arrivée → choisir une classe → portail → run ; au retour : compagnons, boutique, quêtes, classements |
-| Cible | mobile d'abord, 9-15 ans ; **20 joueurs max par serveur de lobby** (proposition), 3 à 8 présents en même temps en général |
+| Cible | mobile d'abord, 9-15 ans ; **8 joueurs max par serveur de lobby** (décision de Clément, 4 nov.), donc 2 groupes complets au plus |
 | Échelle | R15 par défaut, WalkSpeed 16 (100 studs = 6 s), pas de saut de précision, aucune marche > 1 stud |
 | Style | voxel, palette vive (guide de style A01, `80-direction-artistique.md`, en cours) |
 | Ambiance | lumière de jour chaude, effet diorama (bloom léger, profondeur de champ douce) : réglage final A02/A07 |
@@ -141,13 +141,13 @@ Les 3 classes gratuites sont les plus proches de l'arrivée. Chaque présentoir 
 - Détection : boîte interrogée par le serveur (`GetPartBoundsInBox`), **jamais `Touched`** (peu fiable pour un personnage immobile, note du vault).
 - Bords dégagés : on descend d'un pad sans traverser personne. Les pads sont à 26 studs les uns des autres.
 - État visible sur l'anneau du pad **et** en texte : « Step in! », « Starting in 3 », « 2/4 · Starting in 8 », « Full ».
-- Le pad Public lance la run avec les joueurs **de ce serveur de lobby**. Un vrai matchmaking entre serveurs (MemoryStore) viendra après le lancement si les serveurs sont trop vides (question ouverte n° 4).
+- Le pad Public lance la run avec les joueurs **de ce serveur de lobby** (validé). Avec 8 joueurs par serveur, il partira souvent à 1 ou 2 : c'est pourquoi le décompte est plafonné à 20 s. Si les mesures de la bêta montrent trop de runs publiques en solo, on ajoute le matchmaking entre serveurs (MemoryStore, A12).
 - Monde de départ : toujours le monde 1 (la run enchaîne les 3 mondes, décision v2 à confirmer).
 
 ### 3.5 Critter Pen (enclos des compagnons)
 
 - Prairie clôturée de 56 × 48 studs, porte côté place. Panneau humoristique : « Do not feed the critters. They bite. »
-- **Ta collection s'y promène** : jusqu'à 12 de tes compagnons capturés, rendus **côté client** (chacun ne voit que les siens). Ça ne coûte rien au serveur et ça évite 20 joueurs × 30 créatures. Déplacement simple à 10 Hz, en pause si le joueur est à plus de 120 studs.
+- **Ta collection s'y promène** : jusqu'à 12 de tes compagnons capturés, rendus **côté client** (chacun ne voit que les siens). Ça ne coûte rien au serveur et ça évite 8 joueurs × 30 créatures. Déplacement simple à 10 Hz, en pause si le joueur est à plus de 120 studs.
 - Toucher une créature ouvre le prompt « Equip » (portée 6). Le kiosque à la porte ouvre l'écran Collection.
 - **Ton compagnon équipé te suit partout dans le village** et les autres le voient : c'est là qu'on montre sa collection et ses cosmétiques (chapeaux, couleurs, auras).
 - Le Tamer, qui équipe 2 compagnons, est suivi par les deux.
@@ -347,7 +347,18 @@ Checklist anti-AI-slop du doc de suivi, appliquée à ce qui existe (un plan et 
 
 ## 12. Questions ouvertes pour Clément
 
-**Retour de Clément (4 nov. 2026)** : « Je valide » le plan du hub et la structure des 8 écrans, sans autre retour. Il n'a pas répondu une à une aux 6 questions ci-dessous : les propositions écrites dans ce dossier servent de valeur par défaut pour la vague 2. Clément peut encore les changer.
+**Retours de Clément (4 nov. 2026)** : « Je valide » le plan du hub et la structure des 8 écrans. Réponses aux questions :
+
+| # | Question | Décision |
+| --- | --- | --- |
+| 1 | Nom du village | Oui : **Hubbub Village** |
+| 2 | Solo mis en avant pour la 1re run, Public ensuite | Oui |
+| 3 | Joueurs par serveur de lobby | **8** (au lieu des 20 proposés) |
+| 4 | File publique dans le même serveur d'abord | Oui |
+| 5 | Essai des classes verrouillées | Question pas comprise : réexpliquée, en attente |
+| 6 | Enclos : chacun voit sa collection | Oui |
+
+Questions telles que posées :
 
 1. **Nom du village en jeu** : « Hubbub Village » en attendant le nom du jeu (A12 cherche le nom anglais) ? Les noms anglais des mondes (« Grumpy Woods » pour Bois Grognon) sont des exemples à remplacer.
 2. **1re run en Solo mis en avant** (le plus rapide pour apprendre), puis Public mis en avant dès la 2e visite : d'accord ?
