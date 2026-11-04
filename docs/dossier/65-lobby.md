@@ -224,10 +224,15 @@ Toutes les stations sont aussi dans le HUD, pour qu'un joueur mobile n'ait jamai
 
 ## 6. Les 8 écrans de menu (A09-01)
 
-Maquettes Figma : lien dans la section 11, et dans le Journal du doc de suivi. Règles communes :
+Maquettes Figma : **[COHUE — Menus & Lobby (A09)](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b)** (équipe « c_rondepierre's team »). Pages : `00 · Read me`, `01 · Hub plan` (ce plan en vecteurs), `02 · Wireframes` (les 8 écrans + le HUD du hub, une note par écran), `03 · Wireframe kit` (17 composants gris). **État : wireframes en niveaux de gris**, en attendant le design system de A08 ; l'habillage glossy remplacera les composants du kit sans changer la structure.
 
-- textes en anglais ; lisibles sur un téléphone de 6 pouces (référence 844 × 390) ; **texte ≥ 15 px de maquette** (≥ 12 px à l'écran) ; **zones tactiles ≥ 52 px de maquette** (≥ 44 px à l'écran), écarts ≥ 10 px ;
-- dessinés en 1920 × 1080 avec la barre Roblox et l'encoche marquées (couche `skip_safe_area`), puis vérifiés en 844 × 390 ;
+Planche des wireframes (capture du 4 nov. 2026) : [img/65-wireframes-v1.png](img/65-wireframes-v1.png).
+
+Règles communes :
+
+- textes en anglais ; lisibles sur un téléphone de 6 pouces. Dessin en **pixels logiques sur la référence téléphone 844 × 390** (convention de `60-ui-ux.md`) : texte ≥ 12 px, zones tactiles ≥ 44 px, écarts ≥ 8 px ;
+- zones réservées dessinées sur chaque écran (`skip_safe_area`, en magenta) : encoche (48 px), boutons Roblox en haut à gauche, barre du bas. Rien d'interactif dedans ;
+- **adaptation** : un menu est un panneau en mise en page flexible. Échelle = clamp(min(L / 844, H / 390), 1, 1,4) : jamais de texte sous 12 px. La hauteur du corps suit l'écran, les listes défilent. Sous 780 px logiques de large, la colonne d'aperçu 3D est cachée et remplacée par un bouton « VIEW 3D » (« hide, do not shrink »). Vérifié sur l'écran le plus dense (Choix de classe) en 800 × 360 (Android 6") et 667 × 375 (petit iPhone) : rien ne déborde ;
 - **une seule action verte** par écran, avec un verbe ;
 - un bouton verrouillé dit toujours pourquoi ;
 - la couleur n'est jamais le seul signal (icône, mot, losanges de rareté) ;
@@ -325,7 +330,22 @@ A09-04 : place du lobby, blockout gris puis formes, puis décor (méthode `fwjel
 | VFX (A07) | Pop d'équipement au « Try on », tourbillon du portail, anneau de décompte des pads |
 | monde (A02) | Lumière diorama du hub ; kit de maisons voxel |
 
-## 11. Questions ouvertes pour Clément
+## 11. Auto-contrôle avant validation
+
+Checklist anti-AI-slop du doc de suivi, appliquée à ce qui existe (un plan et des wireframes, rien de construit) :
+
+| # | Point | État |
+| --- | --- | --- |
+| 1 | Guide de style (palette, voxel, proportions) | Non applicable encore : le guide A01 est en cours ; les teintes de zone sont marquées provisoires |
+| 2 | Lisible sur téléphone | Hub : repères de 12 à 44 studs, tout à moins de 10 s. Menus : 3 tailles de téléphone vérifiées par capture |
+| 3 | Silhouette reconnaissable | Non applicable (pas de modèle) |
+| 4 | Aucune sortie brute | Polices Fredoka One + Nunito choisies, pas de dégradé par défaut, composants faits pour le projet |
+| 5 | Une touche d'humour par élément | Gob le gobelin boutiquier, le Gland Grincheux gardien du portail, le Hibou des quêtes, « Do not feed the critters », le casque trop grand du Knight, la statue « Your statue here? » |
+| 6 | quality-score ≥ 8 | **Auto-évaluation seulement** (pas de relecteurs à l'aveugle lancés) sur la grille UI : U1 clarté 2/2, U2 hiérarchie 2/2, U3 cohérence 2/2, U4 mouvement 0/2 (pas encore dessiné, viendra avec le kit A08), U5 lisibilité 2/2, U6 perf 1/2 (listes en pool prévues mais non codées) → **7,9 / 10**. Brouillon tant que le mouvement et l'habillage ne sont pas faits |
+| 7 | Vérifié en jeu (capture Studio) | Non : rien n'est construit en vague 1 |
+| 8 | Budget de perf | Budget du hub fixé (§8), à mesurer en vague 2 |
+
+## 12. Questions ouvertes pour Clément
 
 1. **Nom du village en jeu** : « Hubbub Village » en attendant le nom du jeu (A12 cherche le nom anglais) ? Les noms anglais des mondes (« Grumpy Woods » pour Bois Grognon) sont des exemples à remplacer.
 2. **1re run en Solo mis en avant** (le plus rapide pour apprendre), puis Public mis en avant dès la 2e visite : d'accord ?
