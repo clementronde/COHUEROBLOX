@@ -14,6 +14,7 @@ local Balance = require(Config:WaitForChild("Balance"))
 local Enemies = require(Config:WaitForChild("Enemies"))
 local Codec = require(Shared:WaitForChild("EnemyCodec"))
 local Net = require(Shared:WaitForChild("Net"))
+local Bus = require(script.Parent.Parent:WaitForChild("Bus"))
 
 local DT = 1 / Balance.SimHz
 local CELL = Balance.GridCellSize
@@ -315,18 +316,35 @@ end
 
 -- Public API ------------------------------------------------------------------
 
--- Applies damage on the server. Returns true if the enemy died.
-function EnemyService.damage(id: number, amount: number): boolean
+-- Applies damage on the server. Returns true if the enemy died (fires Bus.EnemyKilled).
+-- state bit 1 (value 1) = elite; the run domain owns the meaning of the other state bits.
+function EnemyService.damage(id: number, amount: number, source: Player?): boolean
 	local i = indexOf[id]
 	if not i then
 		return false
 	end
 	hps[i] -= amount
 	if hps[i] <= 0 then
+		local kind, x, z = kinds[i], xs[i], zs[i]
+		local isElite = bit32.band(states[i], 1) ~= 0
 		removeAt(i)
+		Bus.EnemyKilled:fire(id, kind, x, z, source, isElite)
 		return true
 	end
 	return false
+end
+
+-- Current position of a live enemy, or nil.
+function EnemyService.getPosition(id: number): (number?, number?)
+	local i = indexOf[id]
+	if not i then
+		return nil, nil
+	end
+	return xs[i], zs[i]
+end
+
+function EnemyService.isAlive(id: number): boolean
+	return indexOf[id] ~= nil
 end
 
 -- Ids of enemies within radius. Uses the grid from the last tick, then re-checks the real

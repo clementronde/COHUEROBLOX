@@ -1,6 +1,10 @@
-# COHUE — Phase 0 skeleton
+# COHUE
 
-Survivors-like coop game on Roblox (working title). See the design doc, sections 12 and 14.
+Survivors-like coop game on Roblox (working title).
+
+- **Architecture contract** (ids, service APIs, remotes, file ownership): [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- **Design dossier**: [docs/dossier/](docs/dossier/) — `00-vision.md` (the design doc), then one file per domain (combat, run, loot, companions, classes/avatar, UI, data).
+- **Syntax check**: `bash tools/check.sh` (all files) or `bash tools/check.sh path/to/file.luau`.
 
 ## Studio ↔ disk mapping (Script Sync)
 

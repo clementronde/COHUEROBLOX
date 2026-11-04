@@ -1,6 +1,8 @@
 --!strict
 -- The one list of remotes (doc 12.3). The server creates them; clients wait for them.
 -- Server boot: Net.create() -> every service init() -> Net.publish() -> every service start().
+-- Payload formats: docs/ARCHITECTURE.md section 6. A domain may add internal remotes in its own
+-- shared/NetDefs/<Domain>.luau (returns { [name]: class }); names must be unique.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -11,10 +13,53 @@ type RemoteClass = "RemoteEvent" | "UnreliableRemoteEvent"
 local FOLDER_NAME = "Remotes"
 
 local DEFINITIONS: { [string]: RemoteClass } = {
-	EnemySnapshot = "UnreliableRemoteEvent", -- server -> client, binary chunks (EnemyCodec)
-	-- Client -> server inputs (card choice, ultimate, ping) go here as RemoteEvents,
-	-- always wired through Net.onServerEvent so they are rate limited.
+	-- run domain (EnemyService, RunManager, BossService)
+	EnemySnapshot = "UnreliableRemoteEvent",
+	RunState = "RemoteEvent",
+	Announce = "RemoteEvent",
+	PlayerVitals = "RemoteEvent",
+	RunSummary = "RemoteEvent",
+	Replay = "RemoteEvent", -- client -> server
+	BossState = "RemoteEvent",
+	-- combat domain
+	PlayerProgress = "RemoteEvent",
+	Build = "RemoteEvent",
+	CardOffer = "RemoteEvent",
+	CardChoice = "RemoteEvent", -- client -> server
+	WeaponFx = "UnreliableRemoteEvent",
+	-- loot domain
+	LootSnapshot = "UnreliableRemoteEvent",
+	Coins = "RemoteEvent",
+	ShrineState = "RemoteEvent",
+	ShrineOffer = "RemoteEvent",
+	ShrineChoice = "RemoteEvent", -- client -> server
+	-- companion domain
+	CompanionState = "RemoteEvent",
+	CompanionSnapshot = "UnreliableRemoteEvent",
+	CompanionUltimate = "RemoteEvent", -- client -> server
+	-- ui domain
+	Ping = "RemoteEvent", -- client -> server
+	PingBroadcast = "RemoteEvent",
+	-- data domain
+	Profile = "RemoteEvent",
+	SelectLoadout = "RemoteEvent", -- client -> server
+	EquipCosmetic = "RemoteEvent", -- client -> server
+	UpdateSettings = "RemoteEvent", -- client -> server
 }
+
+-- Merge per-domain extras from shared/NetDefs.
+local netDefs = script.Parent:FindFirstChild("NetDefs")
+if netDefs then
+	for _, module in netDefs:GetChildren() do
+		if module:IsA("ModuleScript") then
+			local extra = (require :: any)(module) :: { [string]: RemoteClass }
+			for name, class in extra do
+				assert(DEFINITIONS[name] == nil, `Remote "{name}" defined twice ({module.Name})`)
+				DEFINITIONS[name] = class
+			end
+		end
+	end
+end
 
 local Net = {}
 
