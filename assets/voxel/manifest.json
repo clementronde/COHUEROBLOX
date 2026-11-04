@@ -1,16 +1,16 @@
 [
  {
   "name": "Enemy_GoblinGrunt",
-  "tris": 568,
-  "voxels": 516,
+  "tris": 656,
+  "voxels": 562,
   "size": [
-   3.5,
-   3.75,
+   4.5,
+   4.0,
    2.0
   ],
   "attach_from_center": [
    0.0,
-   -1.875,
+   -2.0,
    -0.0
   ],
   "colors": [
@@ -23,7 +23,7 @@
    "Steel",
    "Tomato"
   ],
-  "glb_bytes": 40980,
+  "glb_bytes": 46868,
   "kind": "enemy",
   "role": "swarm",
   "gag": "casserole et louche"
@@ -88,12 +88,12 @@
  },
  {
   "name": "Enemy_GoblinBomber",
-  "tris": 812,
-  "voxels": 643,
+  "tris": 792,
+  "voxels": 596,
   "size": [
+   4.5,
    3.5,
-   3.5,
-   3.0
+   1.75
   ],
   "attach_from_center": [
    0.0,
@@ -112,7 +112,7 @@
    "Steel",
    "Tomato"
   ],
-  "glb_bytes": 61016,
+  "glb_bytes": 59780,
   "kind": "enemy",
   "role": "exploder",
   "gag": "vole ton XP"
@@ -198,7 +198,7 @@
   ],
   "attach_from_center": [
    -0.375,
-   -0.25,
+   -0.0,
    -0.0
   ],
   "colors": [
@@ -206,7 +206,7 @@
    "Royal",
    "Steel"
   ],
-  "glb_bytes": 6924,
+  "glb_bytes": 7088,
   "kind": "accessory",
   "attach": "RightShoulderAttachment",
   "part": "RightUpperArm",
@@ -243,24 +243,24 @@
  },
  {
   "name": "Archer_Hood",
-  "tris": 278,
-  "voxels": 279,
+  "tris": 274,
+  "voxels": 275,
   "size": [
    2.25,
    2.75,
-   3.0
+   2.5
   ],
   "attach_from_center": [
    0.125,
-   0.375,
-   -0.5
+   -0.125,
+   -0.25
   ],
   "colors": [
    "Bark",
    "Leaf",
    "Leather"
   ],
-  "glb_bytes": 19984,
+  "glb_bytes": 19564,
   "kind": "accessory",
   "attach": "HatAttachment",
   "part": "Head",
@@ -269,17 +269,17 @@
  },
  {
   "name": "Archer_Bracer",
-  "tris": 160,
-  "voxels": 107,
+  "tris": 148,
+  "voxels": 113,
   "size": [
-   2.0,
+   1.75,
    1.25,
-   1.5
+   1.75
   ],
   "attach_from_center": [
-   0.0,
+   -0.125,
    -0.875,
-   -0.0
+   -0.125
   ],
   "colors": [
    "Cream",
@@ -288,7 +288,7 @@
    "Leather",
    "Tomato"
   ],
-  "glb_bytes": 13400,
+  "glb_bytes": 11328,
   "kind": "accessory",
   "attach": "LeftGripAttachment",
   "part": "LeftLowerArm",
@@ -302,17 +302,17 @@
  },
  {
   "name": "Archer_Quiver",
-  "tris": 238,
-  "voxels": 142,
+  "tris": 202,
+  "voxels": 146,
   "size": [
-   2.25,
-   3.75,
-   1.0
+   2.0,
+   3.5,
+   0.75
   ],
   "attach_from_center": [
-   -0.125,
-   -0.625,
-   -0.5
+   0.0,
+   -0.5,
+   -0.625
   ],
   "colors": [
    "Bark",
@@ -322,7 +322,7 @@
    "Leather",
    "Tomato"
   ],
-  "glb_bytes": 18428,
+  "glb_bytes": 16332,
   "kind": "accessory",
   "attach": "BodyBackAttachment",
   "part": "UpperTorso",
@@ -365,8 +365,8 @@
    2.0
   ],
   "attach_from_center": [
-   0.5,
-   -1.75,
+   1.25,
+   -1.25,
    -0.0
   ],
   "colors": [
@@ -395,24 +395,24 @@
  },
  {
   "name": "Mage_Cape",
-  "tris": 290,
-  "voxels": 202,
+  "tris": 256,
+  "voxels": 163,
   "size": [
-   3.5,
-   5.0,
-   1.25
+   3.0,
+   4.25,
+   1.0
   ],
   "attach_from_center": [
    0.0,
-   0.5,
-   -0.625
+   0.125,
+   -0.5
   ],
   "colors": [
    "Gold",
    "Grape",
    "Plum"
   ],
-  "glb_bytes": 21012,
+  "glb_bytes": 18608,
   "kind": "accessory",
   "attach": "BodyBackAttachment",
   "part": "UpperTorso",

@@ -72,7 +72,7 @@ Les tons dérivés se calculent : `.l` = base mélangée à 35 % avec `#FFF4D8` 
 | Royal | `#2D6BE6` | Knight | |
 | Sky | `#3FD0F5` | XP, magie froide | Sur un ennemi, seulement en `.d` / `.dd` (peau des zombies) ou comme XP volée (Bomber) |
 | Leaf | `#3DBE4A` | Archer ; décor en `.d` / `.dd` | |
-| Lime | `#A6E03A` | Peau des gobelins | Réservé aux gobelins |
+| Lime | `#8FD13F` | Peau des gobelins | Réservé aux gobelins. `#A6E03A` virait au jaune pur sous le soleil de Roblox (relecture du 4 nov.) |
 
 **Hiérarchie de saturation**, du plus vif au plus calme :
 
@@ -108,10 +108,10 @@ Calcul de référence : écran paysage de 1080 px de haut, FieldOfView vertical 
 
 | Rôle | Couleur | Gobelin | Zombie (prévu) | Fantôme (prévu) |
 | --- | --- | --- | --- | --- |
-| Mêlée / essaim | Tomato | Grunt : cocotte rouge en casque | Shambler | Wisp |
+| Mêlée / essaim | Tomato | Grunt : cocotte rouge en casque, louche brandie qui sort de la silhouette | Shambler | Wisp |
 | Tireur | Leaf.d / Leather | Archer : capuche vert sombre, grand arc | Gravedigger (lance de la terre) | Poltergeist |
 | Soutien | Grape | Shaman : champignon magique violet | (à définir) | Banshee |
-| Kamikaze / gros | Ember + bombe Ink | Bomber : bonnet orange, bombe dans les bras | Bloater | Armure hantée (blindé) |
+| Kamikaze / gros | Ember + bombe Ink | Bomber : bonnet orange, grosse bombe à bout de bras sur le côté (silhouette ronde à lui) | Bloater | Armure hantée (blindé) |
 
 **Règles de lecture :**
 
@@ -139,9 +139,9 @@ L'avatar reste intact : la classe ajoute des **Accessories** voxel sur les attac
 
 | Classe | Couleurs | Niveau 10 (tête) | Niveau 20 | Niveau 30 (dos) |
 | --- | --- | --- | --- | --- |
-| Knight | Steel + Royal, rivets Gold | Bassinet ouvert, plumet ridiculement court · `HatAttachment` | Épaulières, la même maille pour les deux (demi-tour à gauche) · `RightShoulderAttachment` + `LeftShoulderAttachment` | Cape bleu roi au canard couronné · `BodyBackAttachment` |
-| Archer | Leaf + Leather | Capuche à pointe, broche en gland · `HatAttachment` | Brassard brodé d'une cible, avant-bras gauche · `LeftGripAttachment` (tourné de −90° sur X) | Carquois en diagonale, une flèche est une carotte · `BodyBackAttachment` |
-| Mage | Grape + Plum, étoiles Gold | Chapeau pointu à grelot · `HatAttachment` | Orbe de feu dans une cage, au-dessus de l'épaule gauche, cœur en cube Neon Ember · `LeftShoulderAttachment` | Cape étoilée à haut col · `BodyBackAttachment` |
+| Knight | Steel + Royal, rivets Gold | Bassinet ouvert, plumet ridiculement court · `HatAttachment` | Épaulières bleu roi (elles se détachent du casque en acier), la même maille pour les deux (demi-tour à gauche) · `RightShoulderAttachment` + `LeftShoulderAttachment` | Cape bleu roi au canard couronné · `BodyBackAttachment` |
+| Archer | Leaf + Leather | Capuche à pointe, broche en gland · `HatAttachment` | Brassard en cuir, cible rouge et crème sur le dos de l'avant-bras (visible de la caméra) · `LeftGripAttachment` (tourné de −90° sur X) | Carquois droit, une flèche est une carotte de 4 voxels · `BodyBackAttachment` |
+| Mage | Grape + Plum, étoiles Gold | Chapeau pointu à grelot · `HatAttachment` | Orbe de feu dans une cage, 1 stud au-dessus et 1,25 stud à l'extérieur de l'épaule gauche (hors du bord du chapeau), cœur en cube Neon Ember · `LeftShoulderAttachment` | Cape étoilée à haut col, arrêtée au genou (les jambes ne la traversent pas) · `BodyBackAttachment` |
 
 Couleurs réservées pour les 5 autres classes (A01-07) : Guardian Stone + Ember · Rogue Plum + Ink + Tomato · Cleric Cream + Gold + Sky · Barbarian Bark + Tomato + fourrure Cream · Tamer Leather + Leaf + Ember.
 
@@ -155,7 +155,7 @@ Mesurés sur les livrables : maillage glouton, une seule maille, aucune texture.
 
 | Classe | Triangles visés / plafond | Mesuré (mailles étanches) |
 | --- | --- | --- |
-| Ennemi d'essaim | 800 / 1 000 | Grunt 568 · Archer 684 · Shaman 716 · Bomber 812 |
+| Ennemi d'essaim | 800 / 1 000 | Grunt 656 · Archer 684 · Shaman 716 · Bomber 792 |
 | Ennemi moyen | 1 200 / 2 000 | — |
 | Mini-boss | 3 000 / 6 000 | — |
 | Boss | 8 000 / 15 000 (mailles < 10 000) | — |
@@ -209,6 +209,30 @@ La place de test contient un `ColorGradingEffect` réglé sur le tonemapper `Ret
 - Pas de motif bruité : le damier du chapeau du Shaman et le mouchetis de l'herbe ont été retirés. On préfère de grandes bandes ou des plaques.
 - Silhouettes testées en noir à 64 px. Couleurs vérifiées en jeu sur un sol au ton du monde.
 - Chaque modèle a son gag, listé dans `assets/voxel/manifest.json` (champ `gag` pour les ennemis).
+
+## 10 bis. Relecture quality-score
+
+Trois relecteurs à l'aveugle ont noté les lots le 4 nov. avec la grille modèle du skill, adaptée au voxel (critère V4 = grain unique et arêtes nettes).
+
+| Lot | Relecteur 1 | Relecteur 2 | Relecteur 3 | Médiane |
+| --- | --- | --- | --- | --- |
+| Gobelins | 7,0 | 7,0 | 7,7 | **7,0** |
+| Équipement | 7,0 | 8,0 | 6,7 | **7,0** |
+
+Corrections appliquées (tour 1) :
+
+- **Silhouettes** : Grunt et Bomber faisaient la même tache à 64 px. La louche du Grunt est maintenant brandie hors de la silhouette, et la bombe du Bomber est portée sur le côté.
+- **Peau des gobelins** : Lime moins jaune (`#8FD13F`), et la cocotte remontée d'un voxel pour dégager les yeux.
+- **Intersections de l'équipement** : l'orbe est écartée du chapeau, la queue de capuche raccourcie (elle traversait le carquois), la cape du Mage arrêtée au genou.
+- **Lecture de l'équipement** :
+  - le brassard est d'une seule couleur, avec la cible au dos ;
+  - le carquois est droit, avec une carotte de 4 voxels ;
+  - les épaulières sont bleu roi et posées sur l'épaule ;
+  - la capuche a une vraie pointe.
+
+Un relecteur voyait le casque du Knight tourné d'un quart de tour. La vue de profil dans Studio le contredit : rivets sur le côté, nasal vers −Z, crête d'avant en arrière. Rien n'a été changé sur ce point.
+
+**Tour 2 (nouvelle note par 3 relecteurs) : pas encore fait.** Il faut d'abord refaire les captures Studio de la horde et des gobelins à 20 studs avec les modèles corrigés. Les captures `studio_horde_*` et `studio_gobelins_*` montrent encore l'ancienne version.
 
 ## 11. Créatures existantes (`assets/creatures/`)
 
