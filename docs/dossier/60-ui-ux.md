@@ -64,7 +64,7 @@ Plancher technique 12 px après échelle ; le plus petit style est à **14 px** 
 
 **Échelle** : téléphone 1 ; PC et tablette `clamp(petit côté / 420, 1, 1,6)` (le plafond passe de 1,4 à 1,6 : à 1,4 le HUD était trop petit sur un écran 1080p).
 
-**Manette et clavier** : composant `FocusRing` (anneau or 4 px + halo encre, 6 px autour du bouton ; c'est le `SelectionImageObject`), focus par défaut sur la carte 1, Cash out et Play again. Glyphes `PadGlyph` (A, B, X, Y, croix haut) pour les maquettes ; en jeu, glyphes de la plateforme via `UserInputService:GetImageForKeyCode`. Touches : 1/2/3 cartes, R / X / B Relancer / Passer / Bannir (pas S : le joueur marche encore en ZQSD/WASD pendant l'offre), C / K Victory, Entrée / L écran de fin (Échap est réservé au menu Roblox), Espace / Maj / E / G en run.
+**Manette et clavier** : composant `FocusRing` (anneau or 4 px + halo encre, 6 px autour du bouton ; c'est le `SelectionImageObject`), focus par défaut sur la carte 1, Cash out et Play again. Glyphes `PadGlyph` (A, B, X, Y, croix haut) pour les maquettes ; en jeu, glyphes de la plateforme via `UserInputService:GetImageForKeyCode`. Touches : 1/2/3 cartes, R / X / B Relancer / Passer / Bannir (pas S : le joueur marche encore en ZQSD/WASD pendant l'offre), C / K Victory, Entrée / L écran de fin (Échap est réservé au menu Roblox), Espace / Maj / F / G en run (les touches affichées sont lues dans `InputController.getHint` : la Capture est sur F chez A06).
 
 ### 0.4 Composants (page Components)
 
@@ -140,7 +140,7 @@ Premier jet 5,0 (plafonné : boutons du plateau jugés < 44 px, chevauchements, 
 | --- | --- |
 | data | `Profile.bestKills` (record perso de KO en une run) ; `RunSummary.weeklyRank` ; remote `ReturnToLobby` (bouton Lobby) |
 | companion (A05) | Remote `CaptureState { state = "Idle" \| "Available" \| "Capturing" \| "Interrupted" \| "Captured", progress, holdSeconds, name }` dans `shared/NetDefs/Companion.luau`, et `RunSummary.captured` |
-| avatar (A06) | Action `Capture` dans `InputController` (présente sur la branche A06, absente de main : avertissement « unknown action Capture » tant que ce n'est pas fusionné) |
+| avatar (A06) | Fait : l'action `Capture` (touche F, X à la manette) est dans main depuis la fusion A06 |
 | combat (A04) | Renommer `Build.grimoires` / `grimoireSlots` en `runes` / `runeSlots` quand le contenu v2 arrive (le HUD lit les deux) |
 | lead | Ajouter `VictoryBanner` et `CaptureUI` à la liste des modules UI (modules simples démarrés par HUD, pas de nom de boot) |
 
