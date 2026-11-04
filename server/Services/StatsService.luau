@@ -1,6 +1,7 @@
 --!strict
 -- Per-player run build: XP/level, weapons, grimoires, items, final StatBlock (dossier 10, sections 1-4).
 -- Cross-domain API (ARCHITECTURE.md section 4): get, addStat, addXp, getLevel, getBuild, grantItem, resetRun.
+-- Compteur de KO (A04-03) : getKills(player), getRunKills(), Bus.KOScored, attribut joueur RunKills.
 -- Combat-internal API (used by CardService / WeaponService / PassiveService): see "Domain API" below.
 
 local Players = game:GetService("Players")
@@ -10,6 +11,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Cards = require(Config:WaitForChild("Cards"))
+local Classes = require(Config:WaitForChild("Classes"))
 local Grimoires = require(Config:WaitForChild("Grimoires"))
 local Items = require(Config:WaitForChild("Items"))
 local Weapons = require(Config:WaitForChild("Weapons"))
@@ -45,6 +47,9 @@ export type RunState = {
 	buildDirty: boolean,
 	progressDirty: boolean,
 	damageByWeapon: { [string]: number },
+	kills: number, -- KO de la run, comptés par le serveur uniquement (A04-03)
+	eliteKills: number,
+	killsDirty: boolean,
 }
 
 local SEND_PERIOD = 0.2 -- Build / PlayerProgress coalesced at 5 Hz
@@ -191,6 +196,7 @@ local function sendProgress(player: Player, s: RunState)
 		level = s.level,
 		xp = s.xp,
 		xpNext = Cards.xpToNext(s.level),
+		kills = s.kills,
 	})
 end
 
@@ -291,15 +297,20 @@ function StatsService.grantItem(player: Player, itemId: string)
 	markStats(s)
 end
 
--- New run build for this player: start weapon of the class, meta slots and draw controls.
+-- Nouveau build de run : arme de départ de la classe, emplacements méta, contrôles de tirage.
+-- `classId` peut être un id v1 (domaine data) : Config/Classes le résout vers la classe v2.
 function StatsService.resetRun(player: Player, classId: string)
+	local def = Classes[classId]
+	if not def then
+		warn(`[StatsService] classe inconnue {classId}, Knight par défaut`)
+		def = Classes.Knight
+	end
+	classId = def.id
 	local passive = Weapons.Passives[classId]
-	local startWeapon = Weapons.StartWeapon[classId]
-	if not startWeapon then
-		warn(`[StatsService] unknown class {classId}, using Cornu`)
-		classId = "Cornu"
-		startWeapon = Weapons.StartWeapon.Cornu
-		passive = Weapons.Passives.Cornu
+	local startWeapon = def.startWeapon
+	if not Weapons.Defs[startWeapon] then
+		warn(`[StatsService] arme de départ inconnue {startWeapon} pour {classId}`)
+		startWeapon = Weapons.Order[1]
 	end
 	local meta = metaBonuses(player)
 	local extraSlots = if passive and passive.extraWeaponSlots then passive.extraWeaponSlots :: number else 0
@@ -324,6 +335,9 @@ function StatsService.resetRun(player: Player, classId: string)
 		buildDirty = true,
 		progressDirty = true,
 		damageByWeapon = {},
+		kills = 0,
+		eliteKills = 0,
+		killsDirty = true,
 	}
 	states[player] = s
 	local weaponService = Registry.find("WeaponService")
@@ -347,6 +361,51 @@ function StatsService.getDamageByWeapon(player: Player): { [string]: number }
 		out[k] = math.floor(v)
 	end
 	return out
+end
+
+-- Compteur de KO (A04-03) ---------------------------------------------------------------
+-- Source unique : Bus.EnemyKilled, tiré par EnemyService (serveur) avec le joueur crédité
+-- (`source` passé à EnemyService.damage par les armes, statuts, passifs et compagnons du serveur).
+-- Le client n'envoie jamais de KO : le total ne peut pas être falsifié depuis un remote.
+
+-- KO de la run en cours pour ce joueur (0 hors run).
+function StatsService.getKills(player: Player): number
+	local s = states[player]
+	return if s then s.kills else 0
+end
+
+-- KO d'élites (inclus dans getKills).
+function StatsService.getEliteKills(player: Player): number
+	local s = states[player]
+	return if s then s.eliteKills else 0
+end
+
+-- Copie { [Player]: kills } de tous les joueurs qui ont un build de run (classement de fin, HUD).
+function StatsService.getRunKills(): { [Player]: number }
+	local out = {}
+	for player, s in states do
+		out[player] = s.kills
+	end
+	return out
+end
+
+local function onEnemyKilled(_id: number, kind: number, _x: number, _z: number, killer: unknown, isElite: unknown, hordeElite: unknown)
+	if typeof(killer) ~= "Instance" or not (killer :: Instance):IsA("Player") then
+		return
+	end
+	local player = killer :: Player
+	local s = states[player]
+	if not s then
+		return
+	end
+	local elite = isElite == true or hordeElite == true
+	s.kills += 1
+	if elite then
+		s.eliteKills += 1
+	end
+	s.killsDirty = true
+	s.progressDirty = true
+	Bus.KOScored:fire(player, s.kills, kind, elite)
 end
 
 -- Domain API (combat only) -------------------------------------------------------------
@@ -501,6 +560,7 @@ end
 function StatsService.init()
 	buildRemote = Net.event("Build")
 	progressRemote = Net.event("PlayerProgress")
+	Bus.EnemyKilled:connect(onEnemyKilled)
 	Players.PlayerRemoving:Connect(function(player)
 		states[player] = nil
 	end)
@@ -530,6 +590,11 @@ function StatsService.start()
 			if s.progressDirty then
 				s.progressDirty = false
 				sendProgress(player, s)
+			end
+			if s.killsDirty then
+				-- Attribut serveur, répliqué à tous les clients : HUD, tableau d'équipe (lecture seule).
+				s.killsDirty = false
+				player:SetAttribute("RunKills", s.kills)
 			end
 		end
 	end)

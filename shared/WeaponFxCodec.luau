@@ -44,17 +44,17 @@ Codec.Kind = {
 	Attach = 5,
 }
 
--- Visual ids above the 16 weapons
+-- Ids visuels au-dessus des 16 armes (passifs de classe et objets)
 Codec.Visual = {
-	FusionFlag = 0, -- reserved
-	FelyneBolt = 20,
-	CornuRam = 21,
+	FusionFlag = 0, -- réservé
+	Parry = 20, -- Knight / Valor : parade
+	Blessing = 21, -- Cleric / Blessing (réservé au soin visible)
 	Ghost = 22,
 	Whistle = 23,
 	Megaphone = 24,
 	Thorns = 25,
-	Contagion = 26,
-	ChainBolt = 27, -- Thunder Claw crit arcs
+	Shadowstep = 26, -- Rogue : glissade intouchable
+	ChainBolt = 27, -- arcs de critique (chainOnCrit)
 	MiniBomb = 28,
 }
 

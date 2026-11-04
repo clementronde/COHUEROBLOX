@@ -54,7 +54,7 @@ end
 local Worlds: { [string]: World } = {
 	BoisGrognon = {
 		id = "BoisGrognon",
-		name = { fr = "Bois Grognon", en = "Grumpy Woods" },
+		name = { en = "Grumpy Woods", fr = "Grumpy Woods" },
 		size = 560,
 		roster = { Swarm = 1, Jumper = 2, Shooter = 3, Armored = 4 },
 		miniBoss = 13,
@@ -62,7 +62,7 @@ local Worlds: { [string]: World } = {
 		finalBoss = "GrandBrouhaha",
 		hazard = {
 			id = "Fog",
-			label = { fr = "Le brouillard tombe !", en = "Fog rolls in!" },
+			label = { en = "Fog rolls in!", fr = "Fog rolls in!" },
 			firstAt = 90,
 			every = 100,
 			duration = 30,
@@ -89,7 +89,7 @@ local Worlds: { [string]: World } = {
 	},
 	DunesCroustillantes = {
 		id = "DunesCroustillantes",
-		name = { fr = "Dunes Croustillantes", en = "Crunchy Dunes" },
+		name = { en = "Crunchy Dunes", fr = "Crunchy Dunes" },
 		size = 640,
 		roster = { Swarm = 5, Jumper = 6, Shooter = 7, Armored = 8 },
 		miniBoss = 14,
@@ -97,7 +97,7 @@ local Worlds: { [string]: World } = {
 		finalBoss = "GrandBrouhaha",
 		hazard = {
 			id = "Sandstorm",
-			label = { fr = "Tempête de sable !", en = "Sandstorm!" },
+			label = { en = "Sandstorm!", fr = "Sandstorm!" },
 			firstAt = 120,
 			every = 120,
 			duration = 20,
@@ -125,7 +125,7 @@ local Worlds: { [string]: World } = {
 	},
 	RecreFantome = {
 		id = "RecreFantome",
-		name = { fr = "Récré Fantôme", en = "Haunted Recess" },
+		name = { en = "Haunted Recess", fr = "Haunted Recess" },
 		size = 520,
 		roster = { Swarm = 9, Jumper = 10, Shooter = 11, Armored = 12 },
 		miniBoss = 15,
@@ -133,7 +133,7 @@ local Worlds: { [string]: World } = {
 		finalBoss = "GrandBrouhaha",
 		hazard = {
 			id = "Blackout",
-			label = { fr = "Coupure de courant !", en = "Power cut!" },
+			label = { en = "Power cut!", fr = "Power cut!" },
 			firstAt = 150,
 			every = 110,
 			duration = 20,
