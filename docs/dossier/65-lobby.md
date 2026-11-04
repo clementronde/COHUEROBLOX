@@ -1,6 +1,6 @@
 # 65 — Lobby : hub 3D et menus (domaine A09)
 
-Statut : **plan du hub et structure des 8 écrans validés par Clément le 4 nov. 2026** (A09-02, A09-03). Écrans habillés le 4 nov. avec le design system de A08 (bibliothèque Figma publiée par Clément) : habillage à valider (A09-01). Rien n'est construit en vague 1.
+Statut : **plan du hub et structure des 8 écrans validés par Clément le 4 nov. 2026** (A09-02, A09-03). Écrans habillés le 4 nov. avec le design system de A08 (bibliothèque Figma publiée par Clément) : **habillage validé par Clément le 4 nov.** (A09-01). Rien n'est construit en vague 1.
 Sources : `01-decisions-v2.md` (fait foi), `00-vision.md` §5.1, §11.3, §12.1, `70-donnees-progression-monetisation.md` §13 et §15, `60-ui-ux.md`.
 Schéma : [img/65-lobby-plan.svg](img/65-lobby-plan.svg) (vue de dessus à l'échelle, 1 stud = 3 px).
 
