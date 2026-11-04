@@ -1,0 +1,422 @@
+[
+ {
+  "name": "Enemy_GoblinGrunt",
+  "tris": 420,
+  "voxels": 516,
+  "size": [
+   3.5,
+   3.75,
+   2.0
+  ],
+  "attach_from_center": [
+   0.0,
+   -1.875,
+   -0.0
+  ],
+  "colors": [
+   "Bark",
+   "Cream",
+   "Gold",
+   "Ink",
+   "Leather",
+   "Lime",
+   "Steel",
+   "Tomato"
+  ],
+  "glb_bytes": 35768,
+  "kind": "enemy",
+  "role": "swarm",
+  "gag": "casserole et louche"
+ },
+ {
+  "name": "Enemy_GoblinArcher",
+  "tris": 524,
+  "voxels": 550,
+  "size": [
+   3.5,
+   3.5,
+   2.5
+  ],
+  "attach_from_center": [
+   0.0,
+   -1.75,
+   -0.0
+  ],
+  "colors": [
+   "Bark",
+   "Cream",
+   "Gold",
+   "Ink",
+   "Leaf",
+   "Leather",
+   "Lime",
+   "Tomato"
+  ],
+  "glb_bytes": 44928,
+  "kind": "enemy",
+  "role": "ranged",
+  "gag": "flèches à ventouse"
+ },
+ {
+  "name": "Enemy_GoblinShaman",
+  "tris": 540,
+  "voxels": 674,
+  "size": [
+   3.5,
+   4.25,
+   2.0
+  ],
+  "attach_from_center": [
+   0.0,
+   -2.125,
+   -0.0
+  ],
+  "colors": [
+   "Bark",
+   "Cream",
+   "Gold",
+   "Grape",
+   "Ink",
+   "Leather",
+   "Lime",
+   "Tomato"
+  ],
+  "glb_bytes": 45340,
+  "kind": "enemy",
+  "role": "support",
+  "gag": "chapeau de gland, bâton champignon"
+ },
+ {
+  "name": "Enemy_GoblinBomber",
+  "tris": 662,
+  "voxels": 643,
+  "size": [
+   3.5,
+   3.5,
+   3.0
+  ],
+  "attach_from_center": [
+   0.0,
+   -1.75,
+   -0.0
+  ],
+  "colors": [
+   "Bark",
+   "Cream",
+   "Ember",
+   "Gold",
+   "Ink",
+   "Leather",
+   "Lime",
+   "Sky",
+   "Steel",
+   "Tomato"
+  ],
+  "glb_bytes": 55516,
+  "kind": "enemy",
+  "role": "exploder",
+  "gag": "vole ton XP"
+ },
+ {
+  "name": "FX_CaptureRing",
+  "tris": 108,
+  "voxels": 100,
+  "size": [
+   3.5,
+   0.5,
+   3.5
+  ],
+  "attach_from_center": [
+   0.0,
+   -0.25,
+   -0.0
+  ],
+  "colors": [
+   "Bubblegum"
+  ],
+  "glb_bytes": 10052,
+  "kind": "fx",
+  "material": "Neon",
+  "color": "Bubblegum"
+ },
+ {
+  "name": "FX_CaptureIcon",
+  "tris": 84,
+  "voxels": 60,
+  "size": [
+   1.0,
+   2.0,
+   1.0
+  ],
+  "attach_from_center": [
+   0.0,
+   -1.0,
+   -0.0
+  ],
+  "colors": [
+   "Bubblegum"
+  ],
+  "glb_bytes": 7500,
+  "kind": "fx",
+  "material": "Neon",
+  "color": "Bubblegum"
+ },
+ {
+  "name": "Knight_Helm",
+  "tris": 158,
+  "voxels": 204,
+  "size": [
+   2.0,
+   2.0,
+   2.25
+  ],
+  "attach_from_center": [
+   0.0,
+   -0.0,
+   0.125
+  ],
+  "colors": [
+   "Gold",
+   "Royal",
+   "Steel"
+  ],
+  "glb_bytes": 13536,
+  "kind": "accessory",
+  "attach": "HatAttachment",
+  "part": "Head",
+  "tier": 1,
+  "class": "Knight"
+ },
+ {
+  "name": "Knight_Pauldron",
+  "tris": 62,
+  "voxels": 140,
+  "size": [
+   1.75,
+   1.5,
+   1.5
+  ],
+  "attach_from_center": [
+   -0.375,
+   -0.25,
+   -0.0
+  ],
+  "colors": [
+   "Gold",
+   "Royal",
+   "Steel"
+  ],
+  "glb_bytes": 6416,
+  "kind": "accessory",
+  "attach": "RightShoulderAttachment",
+  "part": "RightUpperArm",
+  "also": "LeftShoulderAttachment",
+  "tier": 2,
+  "class": "Knight"
+ },
+ {
+  "name": "Knight_Cape",
+  "tris": 212,
+  "voxels": 144,
+  "size": [
+   2.5,
+   3.5,
+   1.0
+  ],
+  "attach_from_center": [
+   0.0,
+   0.5,
+   -0.5
+  ],
+  "colors": [
+   "Ember",
+   "Gold",
+   "Ink",
+   "Royal"
+  ],
+  "glb_bytes": 18592,
+  "kind": "accessory",
+  "attach": "BodyBackAttachment",
+  "part": "UpperTorso",
+  "tier": 3,
+  "class": "Knight"
+ },
+ {
+  "name": "Archer_Hood",
+  "tris": 212,
+  "voxels": 279,
+  "size": [
+   2.25,
+   2.75,
+   3.0
+  ],
+  "attach_from_center": [
+   0.125,
+   0.375,
+   -0.5
+  ],
+  "colors": [
+   "Bark",
+   "Leaf",
+   "Leather"
+  ],
+  "glb_bytes": 18264,
+  "kind": "accessory",
+  "attach": "HatAttachment",
+  "part": "Head",
+  "tier": 1,
+  "class": "Archer"
+ },
+ {
+  "name": "Archer_Bracer",
+  "tris": 136,
+  "voxels": 107,
+  "size": [
+   2.0,
+   1.25,
+   1.5
+  ],
+  "attach_from_center": [
+   0.0,
+   -0.875,
+   -0.0
+  ],
+  "colors": [
+   "Cream",
+   "Gold",
+   "Leaf",
+   "Leather",
+   "Tomato"
+  ],
+  "glb_bytes": 12616,
+  "kind": "accessory",
+  "attach": "LeftGripAttachment",
+  "part": "LeftLowerArm",
+  "tier": 2,
+  "class": "Archer",
+  "attach_rot": [
+   -90,
+   0,
+   0
+  ]
+ },
+ {
+  "name": "Archer_Quiver",
+  "tris": 180,
+  "voxels": 142,
+  "size": [
+   2.25,
+   3.75,
+   1.0
+  ],
+  "attach_from_center": [
+   -0.125,
+   -0.625,
+   -0.5
+  ],
+  "colors": [
+   "Bark",
+   "Ember",
+   "Gold",
+   "Leaf",
+   "Leather",
+   "Tomato"
+  ],
+  "glb_bytes": 16400,
+  "kind": "accessory",
+  "attach": "BodyBackAttachment",
+  "part": "UpperTorso",
+  "tier": 3,
+  "class": "Archer"
+ },
+ {
+  "name": "Mage_Hat",
+  "tris": 272,
+  "voxels": 292,
+  "size": [
+   3.0,
+   2.75,
+   3.0
+  ],
+  "attach_from_center": [
+   0.0,
+   -0.875,
+   -0.0
+  ],
+  "colors": [
+   "Cream",
+   "Gold",
+   "Grape"
+  ],
+  "glb_bytes": 23588,
+  "kind": "accessory",
+  "attach": "HatAttachment",
+  "part": "Head",
+  "tier": 1,
+  "class": "Mage"
+ },
+ {
+  "name": "Mage_Orb",
+  "tris": 210,
+  "voxels": 63,
+  "size": [
+   2.0,
+   2.5,
+   2.0
+  ],
+  "attach_from_center": [
+   0.5,
+   -1.75,
+   -0.0
+  ],
+  "colors": [
+   "Ember",
+   "Gold",
+   "Grape"
+  ],
+  "glb_bytes": 18168,
+  "kind": "accessory",
+  "attach": "LeftShoulderAttachment",
+  "part": "LeftUpperArm",
+  "tier": 2,
+  "class": "Mage",
+  "neon_core": "Ember",
+  "neon_core_at": [
+   0,
+   0,
+   0
+  ],
+  "neon_core_size": 0.5,
+  "neon_core_from_center": [
+   0.0,
+   -0.25,
+   -0.0
+  ]
+ },
+ {
+  "name": "Mage_Cape",
+  "tris": 210,
+  "voxels": 202,
+  "size": [
+   3.5,
+   5.0,
+   1.25
+  ],
+  "attach_from_center": [
+   0.0,
+   0.5,
+   -0.625
+  ],
+  "colors": [
+   "Gold",
+   "Grape",
+   "Plum"
+  ],
+  "glb_bytes": 18612,
+  "kind": "accessory",
+  "attach": "BodyBackAttachment",
+  "part": "UpperTorso",
+  "tier": 3,
+  "class": "Mage"
+ }
+]
