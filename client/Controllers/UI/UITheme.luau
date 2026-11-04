@@ -8,6 +8,7 @@ local GuiService = game:GetService("GuiService")
 local LocalizationService = game:GetService("LocalizationService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
@@ -219,12 +220,27 @@ end
 
 ---------------------------------------------------------------------------- device / scale
 
+-- Studio only: the player attribute UIDebugDevice ("phone" | "tablet" | "desktop") forces the
+-- device profile so phone layouts can be checked without the device emulator. No effect live.
+local function debugDevice(): string?
+	if RunService:IsStudio() then
+		local v = Players.LocalPlayer:GetAttribute("UIDebugDevice")
+		if v == "phone" or v == "tablet" or v == "desktop" then
+			return v
+		end
+	end
+	return nil
+end
+
 local function computeDevice(): (Device, number)
 	local camera = Workspace.CurrentCamera
 	local vp = if camera then camera.ViewportSize else Vector2.new(844, 390)
 	local short = math.min(vp.X, vp.Y)
 	local kind: Device
-	if UserInputService.TouchEnabled then
+	local forced = debugDevice()
+	if forced then
+		kind = forced :: Device
+	elseif UserInputService.TouchEnabled then
 		kind = if short < UIConfig.Scale.PhoneShortSide then "phone" else "tablet"
 	else
 		kind = "desktop"
@@ -256,6 +272,10 @@ end
 local lastPortrait = false
 
 function UITheme.isTouch(): boolean
+	local forced = debugDevice()
+	if forced then
+		return forced ~= "desktop"
+	end
 	return UserInputService.PreferredInput == Enum.PreferredInput.Touch
 		or (UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled)
 end
@@ -395,7 +415,9 @@ local function styleText(t: TextLabel | TextButton, opts: LabelOpts)
 	t.TextXAlignment = opts.align or Enum.TextXAlignment.Center
 	t.TextYAlignment = opts.valign or Enum.TextYAlignment.Center
 	t.TextWrapped = opts.wrap or false
-	t.TextTruncate = if opts.wrap then Enum.TextTruncate.None else Enum.TextTruncate.AtEnd
+	-- Auto-sized labels grow with their text: truncating them would cut "DANGER 2" to "DANGE...".
+	local autoX = opts.autoSize == Enum.AutomaticSize.X or opts.autoSize == Enum.AutomaticSize.XY
+	t.TextTruncate = if opts.wrap or autoX then Enum.TextTruncate.None else Enum.TextTruncate.AtEnd
 	t.AutoLocalize = false
 	if opts.outline then
 		-- Ink outline at most 8 % of the size, min 1 px (vault SYMPTOMS: glyph counters; v2 review).
@@ -1054,7 +1076,11 @@ function UITheme.short(n: number): string
 	elseif n >= 1e4 then
 		text = string.format("%.1fk", n / 1e3)
 	else
-		text = tostring(math.floor(n + 0.5))
+		-- Thousands separator under 10k: 1,284 (en) / 1 284 (fr), as on the mockups.
+		local whole = tostring(math.floor(n + 0.5))
+		local sep = if lang == "fr" then " " else ","
+		text = string.reverse((string.gsub(string.reverse(whole), "(%d%d%d)(%d)", "%1" .. sep .. "%2")))
+		return text
 	end
 	if lang == "fr" then
 		text = string.gsub(text, "%.", ",")
@@ -1222,6 +1248,10 @@ function UITheme.start()
 		end
 		refreshDevice()
 	end
+	Players.LocalPlayer:GetAttributeChangedSignal("UIDebugDevice"):Connect(function()
+		refreshDevice()
+		UITheme.changed:fire("device")
+	end)
 	Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(hookCamera)
 	hookCamera()
 

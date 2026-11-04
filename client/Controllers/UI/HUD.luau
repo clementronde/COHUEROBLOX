@@ -400,7 +400,8 @@ local function buildKo(parent: Instance)
 end
 
 local function buildDowned()
-	vignetteGui = UITheme.screen("COHUE_Vignette", 24, Enum.ScreenInsets.None)
+	-- Under the HUD (DisplayOrder 9 < 10) so the vitals stay readable (Figma L10).
+	vignetteGui = UITheme.screen("COHUE_Vignette", 9, Enum.ScreenInsets.None)
 	vignetteGui.Enabled = false
 	local ring = UITheme.new("Frame", {
 		BackgroundTransparency = 1,

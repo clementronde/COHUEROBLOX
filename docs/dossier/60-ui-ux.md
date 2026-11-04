@@ -64,7 +64,7 @@ Plancher technique 12 px après échelle ; le plus petit style est à **14 px** 
 
 **Échelle** : téléphone 1 ; PC et tablette `clamp(petit côté / 420, 1, 1,6)` (le plafond passe de 1,4 à 1,6 : à 1,4 le HUD était trop petit sur un écran 1080p).
 
-**Manette et clavier** : composant `FocusRing` (anneau or 4 px + halo encre, 6 px autour du bouton ; c'est le `SelectionImageObject`), focus par défaut sur la carte 1, Cash out et Play again. Glyphes `PadGlyph` (A, B, X, Y, croix haut) pour les maquettes ; en jeu, glyphes de la plateforme via `UserInputService:GetImageForKeyCode`. Touches : 1/2/3 cartes, R/S/B Relancer/Passer/Bannir, C/K Victory, Entrée/Échap écran de fin, Espace/Maj/E/G en run (à valider).
+**Manette et clavier** : composant `FocusRing` (anneau or 4 px + halo encre, 6 px autour du bouton ; c'est le `SelectionImageObject`), focus par défaut sur la carte 1, Cash out et Play again. Glyphes `PadGlyph` (A, B, X, Y, croix haut) pour les maquettes ; en jeu, glyphes de la plateforme via `UserInputService:GetImageForKeyCode`. Touches : 1/2/3 cartes, R / X / B Relancer / Passer / Bannir (pas S : le joueur marche encore en ZQSD/WASD pendant l'offre), C / K Victory, Entrée / L écran de fin (Échap est réservé au menu Roblox), Espace / Maj / E / G en run.
 
 ### 0.4 Composants (page Components)
 

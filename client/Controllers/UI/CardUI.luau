@@ -382,7 +382,7 @@ local function renderView(v: CardView, card: any, hint: string?)
 	local kind = tostring(card.kind)
 	if string.sub(kind, 1, 9) == "Companion" then
 		v.tag.setTone("Info")
-		UITheme.setText(v.tag.label, S.Companion)
+		UITheme.setText(v.tag.label, S.CompanionTag)
 		v.tag.frame.Visible = true
 	elseif string.sub(kind, 1, 3) == "New" then
 		v.tag.setTone("Primary")
