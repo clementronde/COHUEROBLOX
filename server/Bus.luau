@@ -28,7 +28,7 @@ return {
 	PlayerRevived = Signal.new(),
 	-- RunManager: (player: Player)
 	PlayerDied = Signal.new(),
-	-- RunManager: (player: Player, amount: number)
+	-- RunManager: (player: Player, amount: number, source: string) -- source "Contact" = mêlée
 	PlayerDamaged = Signal.new(),
 	-- LootService: (player: Player, chestKind: string)
 	ChestOpened = Signal.new(),
@@ -38,4 +38,7 @@ return {
 	CompanionEvolved = Signal.new(),
 	-- DataService: (player: Player)
 	ProfileLoaded = Signal.new(),
+	-- StatsService (A04-03): (player: Player, runKills: number, enemyKind: number, isElite: boolean)
+	-- Un KO compté par le serveur, déjà ajouté au total de la run. Aucune valeur ne vient du client.
+	KOScored = Signal.new(),
 }

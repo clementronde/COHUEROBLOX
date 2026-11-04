@@ -39,7 +39,6 @@ type PlayerRun = {
 	reviveProgress: number,
 	invulnUntil: number,
 	contactReadyAt: number,
-	kills: number,
 	revives: number,
 	replay: boolean,
 	dirty: boolean,
@@ -213,7 +212,6 @@ local function getRecord(player: Player): PlayerRun
 			reviveProgress = 0,
 			invulnUntil = 0,
 			contactReadyAt = 0,
-			kills = 0,
 			revives = 0,
 			replay = false,
 			dirty = true,
@@ -354,7 +352,6 @@ local function initPlayerForRun(r: PlayerRun)
 	r.ghost = false
 	r.reviveProgress = 0
 	r.shield = 0
-	r.kills = 0
 	r.revives = 0
 	r.replay = false
 	setGhostLook(r, false)
@@ -492,11 +489,16 @@ local function buildSummary(r: PlayerRun, victory: boolean): Types.RunSummary
 			damageByWeapon = map
 		end
 	end
-	local level = 1
+	local level, kills = 1, 0
 	if stats then
 		local ok, lv = safe(stats.getLevel, player)
 		if ok and type(lv) == "number" then
 			level = lv
+		end
+		-- KO comptés par StatsService (A04-03), seule source de vérité
+		local okKills, n = safe(stats.getKills, player)
+		if okKills and type(n) == "number" then
+			kills = n
 		end
 	end
 	local coins, chests = 0, r.player:GetAttribute("RunChestsOpened") or 0
@@ -522,7 +524,7 @@ local function buildSummary(r: PlayerRun, victory: boolean): Types.RunSummary
 		worldId = state.worldId,
 		tier = state.tier,
 		stageReached = state.stage,
-		kills = r.kills,
+		kills = kills,
 		damageByWeapon = damageByWeapon,
 		finalWaveSeconds = math.floor(state.finalWaveSeconds),
 		coinsEarned = coins,
@@ -1300,14 +1302,6 @@ function RunManager.init()
 		state.firstReplayAt = state.firstReplayAt or now()
 	end)
 
-	Bus.EnemyKilled:connect(function(_id: number, _kind: number, _x: number, _z: number, killer: Player?)
-		if killer then
-			local r = records[killer]
-			if r then
-				r.kills += 1
-			end
-		end
-	end)
 	Bus.ChestOpened:connect(function(player: Player)
 		if typeof(player) == "Instance" and player:IsA("Player") then
 			player:SetAttribute("RunChestsOpened", ((player:GetAttribute("RunChestsOpened") or 0) :: number) + 1)
