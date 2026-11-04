@@ -522,6 +522,14 @@ function CameraController.start()
 	UserInputService.InputBegan:Connect(onInputBegan)
 	UserInputService.InputChanged:Connect(onInputChanged)
 	UserInputService.InputEnded:Connect(onInputEnded)
+	UserInputService.WindowFocusReleased:Connect(function()
+		-- Alt-Tab clic droit enfoncé : ne pas laisser le curseur verrouillé ni les doigts « posés ».
+		table.clear(touches)
+		if mouseRotating then
+			mouseRotating = false
+			UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		end
+	end)
 
 	local ic = inputController()
 	if ic then

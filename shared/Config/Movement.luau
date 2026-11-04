@@ -75,6 +75,9 @@ local Movement = {
 	LandIgnoreAfterJump = 0.15, -- s : un retour au sol aussi tôt après notre saut n'est pas un atterrissage
 	CoyoteIgnoreAfterJump = 0.1, -- s : une chute aussi tôt après notre saut n'ouvre pas le coyote time
 	HopResetDelay = 0.2, -- s après un saut avant de pouvoir perdre le bonus au sol
+	GroundProbeExtra = 0.6, -- studs sous les pieds pour le rayon de sol client
+	LandProbeExtra = 2, -- studs de plus à l'état Landed (le personnage est encore un peu au-dessus du sol)
+	LandingSoonExtra = 0.3, -- studs de marge pour « touchera le sol dans JumpBuffer »
 	SlideTouchTap = true, -- tactile : un appui lance toute la glissade (relâcher ne l'arrête pas)
 
 	-- Atterrissage (visuel local)
@@ -176,13 +179,14 @@ local Movement = {
 		MinHopTime = 0.4, -- s : un hop crédité au plus par MinHopTime (vol le plus court d'un hop légitime ~0,47 s)
 		HopAirSlack = 0.5, -- s ajoutées à AirMemory pour accepter un Hop reçu juste au décollage
 		SlideMemory = 0.8, -- s après la fin d'une glissade où son plafond reste permis
-		SlideMinInterval = 0.5, -- s entre deux SlideStart acceptés
+		SlideMinInterval = 0.6, -- s entre deux SlideStart acceptés (chaîne glissade-saut légitime : ~0,65 s)
 		SlideStartSlack = 1.1, -- marge sur la vitesse de départ de glissade calculée par le serveur
 		SlopeLeniency = 1.5, -- le gain de pente vu à 4 Hz est majoré (le joueur a pu passer sur plus raide)
-		SlideFrictionLeniency = 0.5, -- part du frottement de glissade appliquée par le serveur au plat
+		SlideFrictionLeniency = 0.8, -- part du frottement de glissade appliquée par le serveur, en continu
 		StallMoveStuds = 0.2, -- en dessous, l'échantillon compte comme « gelé » (rattrapage réseau ensuite)
 		StallCap = 1.5, -- s de gel max pris en compte
 		BucketMax = 20, -- studs d'excès cumulé avant recalage
+		CreditSeconds = 0.5, -- un pas court laisse au plus ça de course en avance (positions répliquées par paquets)
 		LeakPerSecond = 1.5,
 		TeleportMinStuds = 45,
 		TeleportFactor = 2.5,
@@ -211,8 +215,17 @@ local Movement = {
 		ExemptBoundFactor = 3, -- pendant une exemption, pas <= vitesse max x temps x ça + portée de lancement (S-02)
 		ExemptLaunchStuds = 12,
 		SlideValidateInterval = 1.5, -- s entre deux glissades validées (attribut Sliding, Shadowstep) (S-08)
+		SlidePendDefer = 0.5, -- s : un SlideStart trop lent pour le serveur attend ça qu'il voie la vitesse
 		SlideMinMeasured = 0.8, -- part de SlideMinSpeed exigée sur la vitesse mesurée par le serveur
-		HopLandWindow = 0.3, -- s : un Hop n'est crédité que si le serveur a vu le sol aussi récemment (S-08)
+		HopLandWindow = 0.3, -- s : un Hop n'est crédité que si le serveur a vu le sol aussi récemment (S-08)...
+		HopLandDefer = 0.5, -- ...ou le voit dans ce délai après le Hop (positions répliquées en retard sur l'événement)
+		SlideHopGrace = 0.35, -- s : la vitesse de fin de glissade reste permise seulement si un Hop suit d'aussi près
+		TeleportSettle = 0.5, -- s (+ ping) après un déplacement serveur sans juger les positions en vol
+		GraceSpeedFactor = 1.2, -- grâce (recalage, apparition, téléport serveur) : distance à l'ancre <= vitesse max x temps x ça
+		StallBreachStuds = 5, -- excès sur un rattrapage après gel : strike immédiat au-delà
+		StallDirDot = 0.5, -- le rattrapage doit aller dans la direction de la vitesse répliquée pendant le gel
+		SupportRadius = 1.2, -- rayon de la sphère d'appui (bord de plateau, tête d'un coéquipier)
+		GroundReachExtra = 1.5, -- studs sous les pieds pour le rayon de sol serveur
 	},
 }
 
