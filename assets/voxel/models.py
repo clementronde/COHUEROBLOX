@@ -463,14 +463,16 @@ def weapon_throwingdagger():
 
 def weapon_holybell():
     """Cleric : l'Aura sacrée sonne avec une cloche de cantine en porcelaine."""
+    # Clochette à main : manche en haut (la prise), cloche évasée vers le bas, battant qui dépasse.
     v = Vox("Weapon_HolyBell")
-    v.box(-1, 0, -1, 0, -4, 1, "Leather")          # manche
-    v.box(-1, 0, -1, 0, 2, 2, "Gold")
-    for z, r in ((3, 2), (4, 2), (5, 3), (6, 3), (7, 4)):
+    v.box(-1, 0, -1, 0, -1, 4, "Leather")          # manche
+    v.box(-1, 0, -1, 0, 5, 5, "Leather.d")         # bouton du manche
+    v.box(-1, 0, -1, 0, -2, -2, "Gold")            # bague
+    for z, r in ((-3, 2), (-4, 2), (-5, 3), (-6, 3), (-7, 4)):
         v.box(-r, r - 1, -r, r - 1, z, z, "Cream")
-    v.carve(-3, 2, -3, 2, 6, 7)
-    v.paint(-4, 3, -4, 3, 7, 7, "Gold")            # bord doré
-    v.box(-1, 0, -1, 0, 6, 8, "Sky")               # battant
+    v.carve(-3, 2, -3, 2, -7, -6)                  # creux de la cloche
+    v.paint(-4, 3, -4, 3, -7, -7, "Gold")          # bord doré
+    v.box(-1, 0, -1, 0, -8, -6, "Sky")             # battant
     return v, (0, 0, 0), {**WEAPON, "class": "Cleric", "weapon": "HolyAura", "gag": "cloche de cantine"}
 
 

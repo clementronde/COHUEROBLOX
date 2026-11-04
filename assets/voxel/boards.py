@@ -219,7 +219,7 @@ def lineup_weapons(out):
     sc = fresh()
     ground(sc, 160, 40, "Cream.d")
     B.diorama_light(sc, world="F3E3C8")
-    x = -14.0
+    x = -15.0
     for fn in M.WEAPONS:
         vox, origin, meta = fn()
         ob = cv.to_blender(vox, "bottom")
@@ -227,7 +227,7 @@ def lineup_weapons(out):
         ob.rotation_euler.z = math.radians(-35)
         x += 3.6
     B.place(M.mannequin, (x + 1.0, 0, 0), rot_z=math.radians(-20))
-    B.camera(sc, (0, -40, 9), (1.0, 0, 2.6), lens=50)
+    B.camera(sc, (-0.5, -48, 9), (-0.5, 0, 2.6), lens=50)
     B.render(sc, out, res=(2000, 760))
 
 

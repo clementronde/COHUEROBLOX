@@ -563,16 +563,16 @@
  },
  {
   "name": "Weapon_HolyBell",
-  "tris": 144,
-  "voxels": 136,
+  "tris": 152,
+  "voxels": 140,
   "size": [
    2.0,
-   3.25,
+   3.5,
    2.0
   ],
   "attach_from_center": [
    0.0,
-   -0.625,
+   0.25,
    -0.0
   ],
   "colors": [
@@ -581,7 +581,7 @@
    "Leather",
    "Sky"
   ],
-  "glb_bytes": 10180,
+  "glb_bytes": 10864,
   "kind": "weapon",
   "class": "Cleric",
   "weapon": "HolyAura",

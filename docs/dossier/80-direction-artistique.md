@@ -153,20 +153,35 @@ Couleurs réservées pour les 5 autres classes (A01-07) : Guardian Stone + Ember
 
 Mesurés sur les livrables : maillage glouton, une seule maille, aucune texture.
 
-| Classe | Triangles visés / plafond | Mesuré |
+| Classe | Triangles visés / plafond | Mesuré (mailles étanches) |
 | --- | --- | --- |
-| Ennemi d'essaim | 600 / 1 000 | Grunt 420 · Archer 524 · Shaman 540 · Bomber 662 |
-| Ennemi moyen | 1 000 / 2 000 | — |
+| Ennemi d'essaim | 800 / 1 000 | Grunt 568 · Archer 684 · Shaman 716 · Bomber 812 |
+| Ennemi moyen | 1 200 / 2 000 | — |
 | Mini-boss | 3 000 / 6 000 | — |
 | Boss | 8 000 / 15 000 (mailles < 10 000) | — |
-| Pièce d'équipement | 300 / 800 (limite Roblox des accessoires : 4 000) | 62 à 272 |
-| Arme | 300 / 800 | — |
-| Marqueur de capture (anneau + cage) | 200 / 400 | 108 + 84 |
-| Petit prop | 200 / 600 | rocher 174 |
-| Arbre | 500 / 1 500 | 460 à 468 |
+| Pièce d'équipement | 300 / 800 (limite Roblox des accessoires : 4 000) | 80 à 348 |
+| Arme | 300 / 800 | 94 à 232 |
+| Marqueur de capture (anneau + cage) | 300 / 500 | 158 + 130 |
+| Petit prop | 300 / 600 | — |
+| Arbre | 600 / 1 500 | — |
 | Tuile de terrain | 1 500 / 4 000 | — |
 
-Textures : **0 octet** (couleurs par sommet). Une horde de 300 gobelins à 520 triangles en moyenne fait environ 156 000 triangles, sur 4 mailles partagées. Le plafond d'ennemis réel reste à mesurer par A13.
+Textures : **0 octet** (couleurs par sommet). Une horde de 300 gobelins à 700 triangles en moyenne fait environ 210 000 triangles, sur 4 mailles partagées. Le plafond d'ennemis réel reste à mesurer par A13.
+
+## 8 bis. Armes de départ (A01-05)
+
+Planche : [05-armes-depart.png](../../assets/style/05-armes-depart.png). L'origine est le centre de la prise, et l'arme pointe vers +Y dans Roblox. L'attribut `GripOffset` donne la prise depuis le centre de la maille.
+
+| Arme | Classe | Gag |
+| --- | --- | --- |
+| Broadsword | Knight | Pommeau en canard (rappel de la cape) |
+| Longbow | Archer | Une feuille pousse au bout de la branche |
+| Fire Staff | Mage | Une guimauve grille sous la flamme ; cristal doublé d'un cube Neon |
+| Quake Hammer | Guardian | Pansement en croix sur la tête du marteau |
+| Throwing Daggers | Rogue | Ruban rouge noué au pommeau (projectile) |
+| Holy Aura | Cleric | Clochette de cantine en porcelaine qui « sonne » l'aura |
+| Spinning Axes | Barbarian | Smiley gravé sur le fer |
+| Beast Whip | Tamer | Fouet enroulé à pompon de cirque (les anneaux carrés sont à revoir s'ils gênent) |
 
 ## 9. Lumière diorama (proposition pour A02-05)
 
@@ -227,6 +242,7 @@ models.py (voxels) → cohue_voxel.py (maillage glouton, tons) → Blender 5.2 e
 
 - **Échelle** : 1 unité Blender = 1 stud, un voxel = 0,25. Z en haut dans Blender, le modèle regarde vers −Y. L'export glTF +Y up suivi de l'import Roblox donne : avant −Z, main droite en +X, soit la conversion (x, y, z) → (−x, z, y).
 - **Triangles** : maillage glouton, une face par rectangle de même couleur. Les sommets sont séparés par direction de face, d'où un ombrage parfaitement plat.
+- **Mode étanche** : la fusion crée des jonctions en T, sources de fentes topologiques et de pixels qui scintillent. Les coins voisins sont donc insérés dans les arêtes longues. Chaque face est triangulée en éventail depuis un coin libre, sinon depuis un point seul sur son arête, sinon depuis son centre. Résultat : 0 arête de bord, 0 triangle plat, pour environ +35 % de triangles. Il reste quelques arêtes non-manifold, là où deux voxels ne se touchent que par une arête (marches en diagonale) : c'est normal en voxel et sans effet sur le rendu.
 - **UV et couleurs** : couleur par coin de face (`BYTE_COLOR`, sRGB), un jeu d'UV neutre (Roblox en attend un), un seul matériau `COHUE_Voxel`.
 - **Export** : GLB, `export_apply`, normales, `export_vertex_color = ACTIVE`, une maille par fichier. `manifest.json` donne pour chaque modèle : triangles, taille en studs (axes Roblox), décalage de l'attache depuis le centre de la maille, rotation d'attache, couleurs.
 - **Toujours exporter en ligne de commande.** Forcer le contexte d'une autre scène dans un Blender ouvert l'a fait planter pendant ce lot.
@@ -239,10 +255,13 @@ models.py (voxels) → cohue_voxel.py (maillage glouton, tons) → Blender 5.2 e
 1. Accueil → Import 3D → sélectionner tous les `assets/voxel/glb/*.glb` (import groupé).
 2. Réglages : Scale Unit = **Studs** · Upload to Roblox = **activé** (import final seulement) · Creator = le propriétaire de l'expérience · Merge Meshes désactivé · Use Imported Pivot activé · Ignore Vertex Colors **désactivé**.
 3. Lire le panneau d'avertissements, puis importer.
-4. Pour chaque MeshPart : `Color` blanc, `Anchored`, CanCollide, CanQuery et CanTouch désactivés, `CastShadow` désactivé pour les ennemis, `PivotOffset = CFrame.new()`.
-5. Noter MeshId et taille dans `assets/creatures.csv` ou `assets/equipment.csv`, puis écrire le `.model.json`.
+4. Lancer `assets/install/A01_finalize.luau` (généré par `python assets/install/make_finalize.py` depuis le manifeste). Le script :
+   - range les MeshParts dans `ReplicatedStorage.Assets` (Creatures, Equipment, Weapons, FX) et règle leurs propriétés : Color blanc, collisions coupées, pas d'ombre, `PivotOffset` nul ;
+   - construit les 10 Accessories : Handle, attache R15 avec sa rotation, attributs `RefPartName` et `RefPartSize`, cœur Neon soudé pour l'orbe ;
+   - affiche la liste `nom;MeshId;taille`.
+5. Reporter cette liste dans `assets/creatures.csv` et `assets/equipment.csv`, puis écrire les `.model.json`.
 
-Résultat du test d'import : voir section 13.
+**Test à blanc fait le 4 nov.** Des maillages d'aperçu portant les 23 noms ont remplacé les imports. La finalisation a produit 10 Accessories, 8 armes et 2 effets. `ArtLibrary.equipClassTier` a posé 4, 3 et 3 pièces, placées par `AddAccessory` exactement comme prévu, y compris sur un avatar agrandi 1,3 fois (capture `studio_equipClassTier_dos.jpg`). Il reste à faire le vrai Import 3D pour obtenir les ids : voir section 13.
 
 ## 13. Livrables et ids Roblox
 
