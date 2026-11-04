@@ -1,20 +1,25 @@
-# 50 — Classes, avatar et mouvement (domaine avatar)
+# 50 — Classes, avatar et mouvement
 
-Ce dossier détaille les sections 6, 10, 10.2 et 12.4 de `00-vision.md`. Les ids sont en anglais (ou les ids de `ARCHITECTURE.md` section 3), le texte joueur en `{ fr, en }`.
-Fichiers du domaine : `shared/Config/{Classes,Movement}.luau`, `shared/NetDefs/Avatar.luau`, `server/Services/{TraitService,MovementGuard}.luau`, `client/Controllers/{InputController,MovementController}.luau`.
+Ce dossier détaille les sections 3, 7 et 10 de `01-decisions-v2.md` (qui prime sur `00-vision.md`). Ids en anglais, texte joueur en anglais.
 
-## 1. Décisions
+**Deux propriétaires.** Les sections 2 et 3 (classes, équipement, trait) appartiennent à A04 (gameplay) et datent de la v1 : A04 les réécrit pour les 8 classes v2. Les sections 1, 4 à 9 (mouvement, caméra, contrôles, anti-triche) appartiennent à A06 et sont à jour au 4 nov. 2026.
+Fichiers A06 : `shared/Config/Movement.luau`, `shared/NetDefs/Avatar.luau`, `server/Services/MovementGuard.luau`, `client/Controllers/{CameraController,InputController,MovementController}.luau`.
+
+## 1. Décisions (mouvement et caméra)
 
 | Sujet | Décision | Pourquoi |
 | --- | --- | --- |
-| Modèle de mouvement | **Classique** : le client simule son personnage, le serveur contrôle la plausibilité (MovementGuard) | ARCHITECTURE 1 ; bunny-hop et glissade maison faciles ; réactif sur mobile |
-| Contrôleur | **Humanoid classique** + petites forces (`LinearVelocity` en mode Plane pour la glissade, `VectorForce` pour la gravité basse). **Pas** de Character Controller Library | La CCL (opt-in, 11 avril 2026) ne supportait pas les capacités personnalisées à sa sortie, et dans une place CCL `WalkSpeed` / `Jump` / `ChangeState` peuvent ne plus piloter le mouvement. Les API Humanoid ne sont pas dépréciées. À réévaluer quand la CCL supportera les capacités maison |
-| Entrées | **Input Action System** (InputContext / InputAction / InputBinding), sortie complète juin 2026 | Une liaison clavier + manette + tactile par action ; `InputBinding.UIButton` relie un bouton UI à l'action |
-| Scripts joueur par défaut | On garde les scripts par défaut (pas de fork). Notre contexte a `Sink = false` pour ne pas voler Espace / A au saut par défaut | Fork = casse à chaque mise à jour ; bascule IAS par défaut prévue début 2027 |
-| Vitesse | Pile de multiplicateurs nommés côté client (Classe × Stat × Bunny-hop × Ralenti), un seul écrivain de `WalkSpeed` | Évite les buffs « collés » |
-| Avatar | Jamais remplacé ni recoloré, pas de `ApplyDescriptionAsync`. Le trait = `Accessory` construit en code, ajouté par `Humanoid:AddAccessory()` côté serveur, après `CharacterAppearanceLoaded` | Garder l'identité du joueur ; appliquer sur un personnage complètement chargé |
+| Modèle de mouvement | **Classique** : le client simule son personnage, le serveur vérifie (MovementGuard) | Décisions v2 §10 ; bunny-hop et glissade réactifs au pouce |
+| Contrôleur | **Humanoid classique** + `LinearVelocity` (Plane) pour la glissade, `VectorForce` pour la gravité de classe. Pas de Character Controller Library | Les API Humanoid ne sont pas dépréciées ; la CCL ne gère pas encore les capacités maison |
+| Saut | **Piloté par le code** : `Humanoid.JumpHeight` tenu à 0, l'action Jump lance la vitesse √(2 g h) | Contrôle exact du tampon, du coyote time et du bunny-hop ; maintenir Saut ne relance pas (sinon le bunny-hop n'a plus de skill) ; le bouton Saut Roblox par défaut se masque tout seul (JumpHeight 0) |
+| Caméra | **3e personne Scriptable** haute et dézoomée, remplace la vue de dessus | Décisions v2 §7 ; lire la horde au pouce |
+| Visée | Aucune : les armes tirent seules, la caméra sert à voir et à se déplacer | Décisions v2 §7 |
+| Déplacement | Relatif à la caméra (contrôles Roblox par défaut, `CurrentCamera`) | Pas de fork du PlayerModule |
+| Entrées | **Input Action System**, un contexte `Gameplay`, `Sink = false` | Une action pour clavier, manette et bouton tactile (`InputBinding.UIButton`) |
+| Stats de mouvement | Viennent de la **classe** (`Config.Movement.Classes[classId]`, attribut serveur `ClassId`), jamais de l'apparence | Décisions v2 §3 ; même hitbox pour tous |
+| Vitesse | Un seul écrivain de `WalkSpeed` : marche(classe) × stat MoveSpeed × bunny-hop × ralenti × contrecoup | Évite les buffs collés |
 
-## 2. Les 10 classes
+## 2. Les 10 classes (v1 — domaine A04, à réécrire pour les 8 classes v2)
 
 Valeurs de base : `WalkSpeed` 16 studs/s, `JumpHeight` 7,2 studs (`UseJumpPower = false`). Arme de départ = ordre d'ARCHITECTURE 3. Passif = id de classe (implémenté par le domaine combat).
 
@@ -86,82 +91,142 @@ Le serveur vérifie le déblocage (`ProgressionService.isUnlocked(player, "Class
 
 ## 4. Mouvement (client, `MovementController`)
 
-Tous les nombres sont dans `shared/Config/Movement.luau`.
+Tous les nombres sont dans `shared/Config/Movement.luau`. Base : marche **16** studs/s, saut **7,2** studs.
+
+### 4.1 Saut, bunny-hop, saut tampon
 
 | Mécanique | Valeur | Détail |
 | --- | --- | --- |
-| Bunny-hop : fenêtre | **0,15 s** (Félyne 0,25 s) | Saut lancé dans la fenêtre après l'atterrissage = hop réussi, la vitesse est conservée |
-| Bunny-hop : gain | **+3 % par hop**, plafond **+60 %** | Gain seulement si la caméra a tourné d'au moins **8°** pendant le saut précédent (Félyne : pas de condition) |
-| Bunny-hop : perte | Bonus remis à 0 si au sol plus de la fenêtre, ou sans entrée de déplacement | |
-| Saut tampon | **0,12 s** | Saut pressé en l'air (sans charge de double saut) puis atterrissage dans 0,12 s → saut immédiat |
-| Coyote time | **0,10 s** | Après avoir quitté un rebord sans sauter |
-| Glissade : départ | Au sol, vitesse horizontale ≥ **8** studs/s | Vitesse initiale = max(vitesse actuelle, WalkSpeed) × `slideBoost` (défaut **1,15**, Cornu **1,4**) |
-| Glissade : frottement | **14** studs/s² au plat | Fin si vitesse < 0,6 × WalkSpeed, relâchement, ou 1,6 s sans pente |
-| Glissade : pente | Gain = **g × 0,6 × sin(pente)** vers le bas de la pente | Plafond **2,2 ×** WalkSpeed de base |
-| Glissade → saut | Le bonus de bunny-hop prend `vitesse/base − 1` (borné à +60 %) | « Sauter en bas de pente convertit l'élan » |
-| Double saut | Vitesse verticale = √(2 g h) | Recharge sur atterrissage vérifié (rayon, normale Y ≥ 0,55) |
-| Plané | Chute max **8** studs/s | En maintenant Saut, en descente |
-| Escalade courte | **1,2 s** à **14** studs/s | Mur détecté devant à 2 studs (normale |Y| < 0,3), en maintenant Saut |
-| Gravité basse | **×0,6** | `VectorForce` vers le haut = masse × g × 0,4 |
-| Ralenti (choix de carte) | `SlowMult` tant que `workspace:GetServerTimeNow() < SlowUntil` | Attributs du Player posés par RunManager (domaine run). Base de temps choisie : **`GetServerTimeNow`** |
-| Bonus MoveSpeed | × (1 + `stats.MoveSpeed`) | Remote `Build` (domaine combat) |
-| Dégâts de chute | **Aucun** | Roblox n'en a pas par défaut ; `FallingDown` et `Ragdoll` désactivés côté client |
-| Onde d'atterrissage | Chute ≥ **18** studs | Anneau Neon local qui s'élargit (0 → 12 studs en 0,35 s) et s'efface ; inoffensif ; 2 anneaux en pool |
+| Saut | √(2 g h) vers le haut | `ChangeState(Jumping)` + vitesse ; g tient compte de la gravité de classe |
+| Saut tampon | **0,12 s** | Saut pressé en l'air juste avant l'atterrissage → saut à l'atterrissage. Pour le Rogue, un appui à moins de 0,12 s du sol est un tampon, pas le double saut |
+| Coyote time | **0,10 s** | Saut encore permis après avoir quitté un rebord sans sauter |
+| Bunny-hop : fenêtre | **0,15 s** | Relance dans les 0,15 s après l'atterrissage = hop réussi |
+| Bunny-hop : gain | **+3 % par hop**, plafond **+60 %** | 20 hops parfaits pour le plafond (≈ 11 s de chaîne). Le hop ne compte que sur un **appui neuf** (maintenir Saut ne relance pas) et si la vitesse au sol est ≥ **70 %** de la marche (pas de gain contre un mur) |
+| Bunny-hop : perte | Bonus à 0 | Au sol plus de 0,15 s (hors glissade), ou sans entrée de déplacement |
+| Vitesse au plafond | **25,6** studs/s | Marche 16 × 1,6. Mesuré en jeu : 22 hops, 275 studs parcourus |
 
-Tremplins, tyroliennes et geysers : placés par le domaine run, qui doit appeler `MovementGuard.exempt` (voir 6).
+La règle « la caméra doit tourner de 8° pendant le saut » de la v1 est supprimée : au pouce, le pouce droit tape Saut, il ne peut pas tourner la caméra en même temps. Le plafond de skill vient de la fenêtre de 0,15 s, de l'appui neuf et des combos glissade.
 
-**Signaux au serveur** (remote `MoveEvent`, C→S, 8/s) : `("SlideStart")`, `("SlideEnd")`, `("Hop")`, `("HopReset")`. Le serveur les valide (types, au sol, cadence) et pose des attributs **serveur** sur le Player, en lecture seule pour les autres domaines :
-`Sliding` (bool, expire seul après 2,5 s), `HopChain` (hops enchaînés, recompté par le serveur, 1 hop max / 0,2 s), `Airborne` (bool, rayon serveur à 4 Hz). Le domaine combat s'en sert pour Bélier (Cornu), Vent arrière (Plumeline) et Élan (Félyne) ; Élan mémorise `HopChain` au moment d'un contact ennemi. MovementGuard compte aussi `ProgressionService.recordStat(player, "Hops", 1)`.
+### 4.2 Glissade et glissade en pente
 
-## 5. Contrôles et Input Action System
+| Mécanique | Valeur | Détail |
+| --- | --- | --- |
+| Départ | Au sol, vitesse ≥ **6** studs/s ou direction au stick | Vitesse = max(vitesse actuelle, marche actuelle) × **1,2**, plafonnée |
+| Frottement | **12** studs/s² au plat | Glissade au plat : 19,2 → 8,8 studs/s en 0,87 s (mesuré) |
+| Pente | + g × **0,6** × sin(pente) vers le bas | Pente de 24° : 19 → 35 studs/s en 0,8 s (mesuré) |
+| Plafond | **2,2 ×** la marche de base | 35,2 studs/s |
+| Fin | Vitesse < 0,55 × marche, 1,6 s sans pente, 0,3 s en l'air, ou relâchement | Tactile : un appui lance toute la glissade (relâcher ne l'arrête pas), un 2ᵉ appui l'arrête |
+| Braquage | 2,5 /s vers le stick | Relatif à la caméra |
+| Recharge | **0,35 s** entre deux glissades | |
+| Glissade tampon | **0,15 s** | Glisser pressé ou maintenu à l'atterrissage → glissade à l'atterrissage (enchaînement hop → glissade) |
+| Glissade → saut | Bonus = bonus d'entrée + (vitesse − vitesse de départ) / marche, + 3 % si l'élan est gardé | Au plat, ça conserve le bonus (le boost de départ ne compte pas, sinon glisser-sauter remplacerait le timing). En bas de pente, ça convertit l'élan : 35 studs/s → +60 % d'un coup (mesuré). Grâce de **0,2 s** après la fin de la glissade |
 
-`InputController` crée un `InputContext` « Gameplay » (Priority 1000, `Sink = false`) dans un dossier local `ReplicatedStorage/CohueInput` (créé par le client, non répliqué). Une `InputAction` de type `Bool` par action :
+### 4.3 Mouvement par classe (ids de `01-decisions-v2.md` §3)
+
+`Config.Movement.Classes[classId]`, lu par le client et par MovementGuard. Une classe absente reçoit le profil normal.
+
+| Classe | Profil | Mesuré en jeu |
+| --- | --- | --- |
+| `Knight`, `Cleric`, `Tamer` | Normal | Saut 7,1 studs, glissade 0,87 s / 12 studs |
+| `Archer` | Saut haut : **11** studs | 10,9 studs |
+| `Rogue` | Double saut : 1 saut en l'air à 90 % de la hauteur, rechargé au sol | 13,4 studs au total |
+| `Mage` | Plané court : Saut maintenu en descente, chute max **6** studs/s pendant **1,1 s** par saut | Vol de 1,17 s au lieu de 0,54 s |
+| `Guardian` | Lent : marche **13,6** (−15 %), saut **6,5**, gravité **×1,2**. Atterrissage lourd après **8** studs de chute : marche ×0,6 pendant 0,25 s, onde au sol, secousse de caméra | Saut 6,4 studs, vol 0,43 s ; chute de 13 studs → atterrissage lourd côté client et `HeavyLandAt` côté serveur |
+| `Barbarian` | Glissade qui charge : boost **1,45**, frottement **6**, fin à 0,5 × marche, 2,2 s au plat, plafond 2,4 ×, braquage 4. Attribut serveur `SlideCharge` | 2,2 s / 36,6 studs |
+
+Les passifs liés au mouvement (Shadowstep du Rogue : 0,5 s d'invulnérabilité en glissade ; dégâts de charge du Barbarian ; onde de choc du Guardian) sont du gameplay, donc chez A04 : ils lisent les attributs serveur `Sliding`, `SlideCharge` et `HeavyLandAt`.
+
+### 4.4 Autres règles
+
+| Mécanique | Valeur | Détail |
+| --- | --- | --- |
+| Ralenti (choix de carte) | `SlowMult` tant que `GetServerTimeNow() < SlowUntil` | Attributs posés par RunManager |
+| Stat MoveSpeed | × (1 + `stats.MoveSpeed`) | Remote `Build` |
+| Dégâts de chute | Aucun | `FallingDown` et `Ragdoll` désactivés côté client |
+| Onde d'atterrissage | Chute ≥ **18** studs | Anneau Neon local (0 → 12 studs en 0,35 s), secousse légère ; 3 anneaux en pool |
+
+**Signaux au serveur** (remote `MoveEvent`, C→S, 10/s) : `SlideStart`, `SlideEnd`, `Hop`, `HopReset`. Le serveur les valide et pose des attributs **serveur** sur le Player (lecture seule ailleurs) : `Sliding` (expire seul après 2,5 s), `SlideCharge`, `HopChain`, `Airborne` (rayon serveur à 4 Hz), `HeavyLandAt` (`GetServerTimeNow` du dernier atterrissage lourd). MovementGuard compte aussi `ProgressionService.recordStat(player, "Hops", 1)`.
+
+## 5. Caméra 3e personne (client, `CameraController`)
+
+| Réglage | Valeur | Détail |
+| --- | --- | --- |
+| Type | Scriptable, RenderStep Camera + 1 | Le module caméra Roblox ne fait plus rien ; le déplacement reste relatif à `CurrentCamera` |
+| Distance | **32** studs (zoom 14 à 48) | Testé avec 217 ennemis : la horde se lit jusqu'au fond, l'anneau autour du joueur reste visible |
+| Angle | **42°** sous l'horizon (8° à 70°) | 30° montre plus loin mais les ennemis du premier plan cachent le joueur ; 46° tend vers la vue de dessus |
+| Visée | 2,5 studs au-dessus du HumanoidRootPart, caméra avancée de 5 studs | Le joueur est un peu sous le centre : plus d'espace devant |
+| Suivi | Horizontal 20, vertical 8 (lissage exponentiel avec dt) | Les sauts ne secouent pas l'image |
+| FOV | **70**, +8 avec la vitesse | Un seul propriétaire du FOV |
+| Tactile | Glissé d'un doigt sur la **moitié droite** : 260° par hauteur d'écran (vertical × 0,6). Pincement à deux doigts = zoom | Doigt posé sur un bouton ou le joystick ignoré (`gameProcessed`) ; moitié gauche = déplacement |
+| Souris | Clic droit maintenu : 0,3°/pixel, curseur verrouillé. Molette = zoom | Delta d'événement, repli sur l'écart de position |
+| Manette | Stick droit (action `Look`) : 220°/s, 120°/s en vertical, zone morte 0,15, courbe ², gâchettes hautes = zoom | |
+| Clavier | Flèches gauche / droite : 150°/s ; I / O = zoom | |
+| Recentrage | Tactile et manette : après 1 s sans toucher la caméra, en courant vers l'avant (< 75°), à 1,2 /s | Pas de spirale en courant de côté |
+| Sensibilité | `CameraController.setSensitivity(0,25 à 3)` | Sensibilité du jeu ; celle de Roblox n'est pas lue (elle valait 0,2 sur le compte de test et rendait la caméra 5 × trop lente) |
+| Murs | Spherecast rayon 0,6 depuis la tête, marge 0,3, minimum 2 studs ; entrée immédiate, sortie lente (4 /s) | Mur de test à 10 studs derrière : 28,5 → 12,4 studs, reste du bon côté, ressort en 1,5 s |
+| Obstacles fins | Ignorés si leur 2ᵉ plus grande dimension ≤ **3** studs (troncs, poteaux) | Un tronc qui passe ne fait pas sauter le zoom |
+| Estompage | Personnage local transparent sous **5** studs de caméra | |
+| Secousse | `CameraController.shake(force, durée)` : 1,6° max, recalculée chaque image | Ne dérive jamais |
+
+API : `getYaw()`, `setEnabled(on)` (off = caméra Roblox `Custom`, pour une cinématique), `setSensitivity(mult)`, `setDistance(studs)` / `getDistance()`, `setPitch(deg)` / `getPitch()`, `shake(force, durée?)`.
+
+## 6. Contrôles et Input Action System (`InputController`)
+
+Contexte `Gameplay` (Priority 1000, `Sink = false`) dans `ReplicatedStorage/CohueInput`, créé par le client. Une `InputAction` par action.
 
 | Action | Clavier / souris | Manette | Tactile |
 | --- | --- | --- | --- |
-| `Jump` | Espace | ButtonA | Bouton Saut (UI) |
-| `Slide` | LeftControl, LeftShift | ButtonB | Bouton Glisser (UI) |
-| `Ultimate` | E | ButtonY | Bouton Ultime (UI) |
-| `Card1` / `Card2` / `Card3` | 1 / 2 / 3 | DPadLeft / DPadDown / DPadRight | Toucher la carte (CardUI) |
-| `Ping` | Clic molette (`MouseButton3`, via UserInputService) + G | DPadUp | Appui long mini-carte (PingUI) |
+| `Jump` | Espace | A | Bouton Saut (MobileButtons, A08) |
+| `Slide` | Maj gauche, Ctrl gauche, C | B, R2 | Bouton Glisser (A08) |
+| `Capture` | F | X | Bouton Capture (A08, vague 2) — action prête, personne ne l'écoute encore |
+| `Ultimate` | E | Y | Bouton Ultime (A08) |
+| `Card1` à `Card3` | 1 / 2 / 3 (pavé aussi) | Croix gauche / bas / droite | Toucher la carte (CardUI) |
+| `Ping` | G, clic molette | Croix haut | Appui long mini-carte (PingUI) |
+| `CameraLeft` / `CameraRight` | Flèches gauche / droite | — | — |
+| `ZoomIn` / `ZoomOut` | I / O | R1 / L1 | Pincement |
+| `Look` (Direction2D) | — | Stick droit | Glissé moitié droite (UserInputService) |
 
-Déplacement et caméra : contrôles Roblox par défaut (ZQSD/WASD, stick gauche, joystick tactile).
+API : `onAction(name, fn)`, `isDown(name)`, `bindButton(name, button)` (méthode pour l'UI), `trigger(name, pressed)`, `getHint(name)` (texte de la touche pour l'appareil courant), `getVector(name)`, `getContext()`, `setEnabled(on)`. Règle tactile : l'action part à l'appui.
 
-API pour les autres contrôleurs (client) :
-- `InputController.onAction(name, fn: (pressed: boolean) -> ()) -> Connection` (`Connection.disconnect()`)
-- `InputController.getContext() -> InputContext`
-- `InputController.bindButton(name, button: GuiButton) -> InputBinding` : **méthode recommandée pour l'UI**. Crée une `InputBinding` avec `UIButton = button` sous l'action : appuyer sur le bouton déclenche l'action comme la touche (appui = `pressed true`, relâché = `false`). À appeler une fois par bouton (MobileButtons : Jump, Slide, Ultimate).
-- `InputController.trigger(name, pressed)` : repli pour du code (compagnon, tests, gestes). Appelle directement les écouteurs.
-- `InputController.setEnabled(enabled)` : coupe les actions de gameplay quand un menu plein écran est ouvert.
+## 7. Anti-triche mouvement (`MovementGuard`, serveur)
 
-Règle tactile : l'action part à l'**appui**, pas au relâchement.
+Échantillon toutes les **0,25 s**, déplacement **horizontal** seulement. Le serveur ne lit jamais `Humanoid.WalkSpeed` : il suit lui-même la vitesse plausible.
 
-## 6. Anti-triche mouvement (`MovementGuard`, serveur)
+| Contrôle | Règle |
+| --- | --- |
+| Marche | marche(classe) × (1 + MoveSpeed serveur) |
+| Bunny-hop | +3 % par `Hop` reçu pendant que le serveur voit le joueur en l'air (≤ 0,7 + 0,5 s), au plus un hop par **0,4 s** ; perdu après 0,7 s au sol ou sur `HopReset` |
+| Glissade | Vitesse suivie : départ = vitesse permise × boost de classe × 1,1 ; gain de pente seulement si le rayon serveur voit une pente (gain × 1,5) ; frottement × 0,5 au plat ; plafond de classe. Fin de glissade : crédite le bonus d'entrée + la part gagnée en pente + un hop. `SlideStart` accepté au sol, au plus toutes les 0,5 s |
+| Seau percé | permis = vitesse × **1,06** × temps + **0,6** stud + vitesse × ping × 0,25 ; excès cumulé − **1,5** stud/s ; au-delà de **20** studs → recalage |
+| Gel réseau | Si le serveur ne voit plus bouger le joueur (< 0,2 stud), le temps gelé (≤ 1,5 s) s'ajoute au pas suivant : le rattrapage n'est pas puni |
+| Téléport | Un pas > max(**45**, vitesse max possible × (temps + ping) × 2,5) → recalage immédiat |
+| Vol | Mode ombre (log seul) : 3,5 s en l'air avec moins de 2 studs d'amplitude, ou monté de plus que les sauts de la classe + 8 studs |
+| Recalage | `PivotTo` de la dernière position valide au sol, vitesse annulée, 0,6 s + ping de grâce. Jamais de kick |
+| Exemptions | `MovementGuard.exempt(player, s, raison?)` ou attribut `MoveExemptUntil` ; automatiques : 3 s après l'apparition, tremplins, assis, ancré, à-coup serveur (dt > 0,75 s) |
 
-Échantillon toutes les **0,25 s** (Heartbeat), déplacement **horizontal** uniquement.
+**Mesures en jeu (Studio, 4 nov.)**
 
-- **Vitesse max plausible** = `walkSpeed(classe) × (1 + MoveSpeed serveur) × max(1 + 0,6 bunny-hop, 2,2 glissade)`. Valeurs serveur seulement (`StatsService.get`), jamais `Humanoid.WalkSpeed` (le client le change sans que le serveur le voie). Le ralenti n'est pas utilisé pour resserrer la limite (le retard réseau du ralenti ferait des faux positifs).
-- **Seau percé** : excès = max(0, distance − vmax × 1,35 × dt − pingSlack) ; seau += excès − 20 × dt ; au-delà de **40** studs → **recalage**.
-- **Saut énorme** (téléport) : un pas > max(**45** studs, vmax × (dt + ping + 0,5) × 2) → recalage immédiat.
-- **Vol stationnaire** : en l'air plus de **3,5 s** sans redescendre de 0,5 stud sous l'altitude de décollage → signalé ; recalage seulement si `HoverEnforce = true` (désactivé au lancement : mode « ombre », log seul).
-- **Recalage** : `PivotTo(dernière position valide)` + vitesse annulée, puis **0,6 s + ping** de grâce. Une position n'est « valide » que si elle est au sol (rayon serveur) et atteinte sans excès.
-- **Ne punit jamais un pic de lag seul** : marge de ping (ping borné à 1 s × vmax), échantillon ignoré si dt > 3 × intervalle (à-coup serveur), seau au lieu d'un seuil par échantillon, grâce après recalage, pas de kick (logs + compteur `strikes`).
-- **Exemptions** : `MovementGuard.exempt(player, seconds, reason?)` ou attribut serveur `MoveExemptUntil` (temps `GetServerTimeNow`) sur le Player. Automatique : 3 s après apparition, assis (`SeatPart`), ancré, mort.
-- **Logs** : `warn` limité à 1 par joueur toutes les 5 s, avec ping, distance, vmax, strikes.
+| Scénario | Résultat |
+| --- | --- |
+| 22 hops légitimes jusqu'à +60 % (25,6 studs/s) | 0 recalage, pic du seau 1,1 / 20 |
+| Glissade en pente (35 studs/s) → saut → 10 hops à +60 % | 0 recalage, pic du seau 0 |
+| Tests de classe (double saut, plané, atterrissage lourd, charge) | 0 recalage, aucun log « vol » |
+| Hack CFrame à 40 studs/s (×2,5) | Recalé en ~1,6 s, à répétition |
+| Hack +10 studs/s pendant un bunny-hop | Recalé (2 fois en 9 s) |
+| `SlideStart` envoyé en boucle + hack +15 au plat | Recalé (2 fois en 7 s) |
+| Hack ×1,5 au sol (24 studs/s) | Recalé en ~6 s |
+| Téléport de 70 studs | Recalé immédiatement |
 
-## 7. Réglages Studio à faire à la main
+Limite connue : un tricheur qui reste sous ≈ +25 % de la vitesse permise n'est pas recalé (c'est la marge qui protège les joueurs légitimes sur réseau mobile). Mesuré en Studio sans latence : à revalider sur téléphone en 4G (A11-06).
 
-1. **Avatar Settings** (menu Fichier) : Avatar type **R15 only** (points d'attache ; aussi requis pour le taux DevEx 18+ US) ; Collision **Single Collider** (même boîte pour tous) ; Animation **Player Choice** ou Standard R15 ; Body Scale/Build **Player Choice** (identité) ; Accessory Scale **Player Choice** (pour ne pas réduire/supprimer les traits) ; Abilities **Legacy Humanoid** (pas de CCL).
-2. `StarterPlayer.CharacterUseJumpPower = false`, `CharacterJumpHeight = 7.2`, `CharacterWalkSpeed = 16`, `CharacterMaxSlopeAngle = 89` (laissé par défaut).
-3. `Workspace.PlayerScriptsUseInputActionSystem` : laisser par défaut pour l'instant ; tester l'activation (début 2027 elle deviendra le défaut). Ne pas forker le PlayerModule.
-4. `Workspace.Gravity` = 196,2 (défaut ; la gravité basse d'Astrel est une force par joueur).
-5. Écrire ces réglages dans le README de la place : ils changent des comportements invisibles depuis les scripts.
+## 8. Réglages de place à faire à la main (chef de projet)
 
-## 8. Sources vault (LihFolk Vault V2)
+1. `StarterPlayer.EnableMouseLockOption = false` : Maj sert à glisser ; sinon Maj bascule aussi le verrouillage de la souris.
+2. Avatar Settings : R15, Collision **Single Collider** (même hitbox pour tous), Abilities **Legacy Humanoid** (pas de CCL).
+3. `StarterPlayer.CharacterUseJumpPower = false` (déjà le cas). `CharacterJumpHeight` peut rester à 7,2 : MovementController le remet à 0 côté client.
+4. `Workspace.PlayerScriptsUseInputActionSystem` : laisser par défaut ; ne pas forker le PlayerModule.
 
-- *Input - UserInputService and ContextActionService* §5 (IAS : InputContext/InputAction/InputBinding, `UIButton`, Sink, Priority) ; *Server Authority and Input Migration 2026* §4 (calendrier de bascule des scripts joueur, `GetControls` casse) ; *InputBinding* (atlas).
-- *Engine and API Changes 2025-2026* §7 (Character Controller Library, opt-in, capacités maison non supportées) ; *Avatar Body Types and Scale in Gameplay* §2 (Avatar Settings, Single Collider) ; *AI Pitfalls - Physics and Animation*.
-- *Custom Character Controllers* (pile de multiplicateurs, sauts, glissade, validation serveur) ; *Input Responsiveness Buffering and Coyote Time* §2, §4, §6 (tampon 0,12 s, coyote 0,10 s, action à l'appui sur tactile) ; *Mover Constraints and Physics Controllers* §2, §5, §6 (LinearVelocity Plane + `Move(dir)`, VectorForce anti-gravité).
-- *Accessories and Armor That Follow Animation* §1-2 (Weld, accessoire = Handle + Attachment du même nom) ; *R15 Rig Anatomy and Attachments* §3-4 (attaches, `BodyHeightScale`…) ; *Character Select and Class Systems with Different Rigs* §2 (appliquer après `CharacterAppearanceLoaded`) ; *HumanoidDescription and Outfit Systems* ; *Characters and Humanoids* §2 (propriétés de mouvement, `SetStateEnabled` côté client).
-- *Exploits and Anti-Cheat* (seau percé, horizontal seulement) ; *Detecting Movement Exploits - Speed Fly Noclip Teleport* (tolérances, recalage sur position au sol, Common mistakes, Checklist) ; *DevEx and Cashing Out* (règle R15).
-- SYMPTOMS : « slows get stuck » (pile de multiplicateurs), « character slides and cannot stop » (Massless sur les pièces), « I pressed jump on the edge » (coyote).
+## 9. Sources vault
+
+fwjelaa : *Camera Systems* §4 (caméra d'épaule Scriptable, Spherecast depuis le pivot), §7 (tactile, manette, zoom), §8 (lissage exponentiel avec dt, un seul propriétaire du FOV) ; *Camera Obstruction Handling - Occlusion Modes, Fades and Collision* (Spherecast rayon 0,5 à 1, entrée immédiate / sortie lente, petits obstacles exclus) ; *Touch Gestures - Pinch, Pan, Swipe and Long Press* (ratio de pincement depuis le début, seuils à l'échelle de l'écran) ; *Input - UserInputService and ContextActionService* §5 (InputContext / InputAction / InputBinding, `UIButton`, `GetState()` pour l'analogique) ; *Server Authority and Input Migration 2026* (bascule IAS des scripts joueur début 2027, ne pas forker sans désactiver le PlayerModule).
+LihFolk (v1, toujours valables) : *Custom Character Controllers*, *Input Responsiveness Buffering and Coyote Time*, *Mover Constraints and Physics Controllers*, *Exploits and Anti-Cheat*, *Detecting Movement Exploits - Speed Fly Noclip Teleport*.
