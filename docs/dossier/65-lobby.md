@@ -226,7 +226,7 @@ Toutes les stations sont aussi dans le HUD, pour qu'un joueur mobile n'ait jamai
 
 Maquettes Figma : **[COHUE — Menus & Lobby (A09)](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b)** (équipe « c_rondepierre's team »). Pages : `00 · Read me`, `01 · Hub plan` (ce plan en vecteurs), `02 · Wireframes` (les 8 écrans + le HUD du hub, une note par écran), `03 · Wireframe kit` (17 composants propres au lobby). **État : habillés avec le design system de A08** ([fichier A08](https://www.figma.com/design/0Yq5m1skq5dzgOQXZ9bG6D), bibliothèque « COHUE — UI Design System & Run Screens »). Les boutons sont les `Button` de A08 (Go vert = l'action principale, Premium or = prix en Robux, Neutral, Disabled) ; les couleurs, les styles de texte (Display, Title, Label, Body) et les ombres viennent de ses variables et styles ; les composants du kit (cartes, lignes, onglets, interrupteurs) sont liés à ces variables. La structure validée n'a pas bougé.
 
-Couleur d'en-tête de chaque menu = couleur de sa zone dans le village (primitives A08) : Classes `teal/500`, Critters `lime/500`, Shop `orange/500`, Ranks `gold/500`, Quests `blue/500`, Settings `action/neutral/face`, Play `purple/500`, avec une lèvre en `*/700`.
+Couleur d'en-tête de chaque menu = couleur de sa zone dans le village, reliée aux variables sémantiques A08 `zone/<zone>/face` (fond) et `zone/<zone>/lip` (lèvre) : classes, critters, shop, ranks, quests, settings, play.
 
 Planche des maquettes habillées (capture du 4 nov. 2026) : [img/65-maquettes-v2.png](img/65-maquettes-v2.png).
 
@@ -328,7 +328,7 @@ A09-04 : place du lobby, blockout gris puis formes, puis décor (méthode `fwjel
 | data (A12) | Exposer le texte de la quête de déblocage de chaque classe (`Config.Quests`) pour les plaques des présentoirs |
 | classes (A04, propriétaire de l'équipement de classe qui remplace TraitService) | `applyClass(player, classId)` utilisable **dans le lobby** (palier 1) |
 | companion (A05) | Mode lobby de `CompanionRenderer` : le compagnon équipé suit son joueur (visible de tous), la collection du joueur se promène dans l'enclos (client seul) |
-| ui (A08) | Ajouter au design system des variables sémantiques `zone/*` (classes, critters, shop, ranks, quests, settings, play) pour remplacer les primitives utilisées dans les en-têtes ; icônes manquantes pour le lobby : 8 classes, Solo / Friends / Public, quêtes (aujourd'hui des codes de 2 lettres) ; `SettingsUI` suit la maquette n° 7 ; toasts et prompts au style du kit |
+| ui (A08) | ~~Variables `zone/*`~~ : faites par A08 et reliées le 4 nov. ; icônes manquantes pour le lobby : 8 classes, Solo / Friends / Public, quêtes (aujourd'hui des codes de 2 lettres ; prévues par A08 avec A08-07) ; `SettingsUI` suit la maquette n° 7 ; toasts et prompts au style du kit |
 | VFX (A07) | Pop d'équipement au « Try on », tourbillon du portail, anneau de décompte des pads |
 | monde (A02) | Lumière diorama du hub ; kit de maisons voxel |
 
