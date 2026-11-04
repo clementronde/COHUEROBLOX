@@ -1470,6 +1470,7 @@ end
 --   :Invoke("arche")            téléporte l'équipe à l'Arche (boss)
 --   :Invoke("killboss")         inflige des dégâts énormes au boss
 --   :Invoke("world", 3)         saute au monde 3
+--   :Invoke("class", "Cleric")  change la classe de l'équipe pour la suite de la run (test)
 -- Rien de tout ça n'existe hors Studio : aucun remote, aucun accès client.
 local function installStudioCommands()
 	if not (RunService:IsStudio() and Run.Debug.StudioCommands) then
@@ -1519,6 +1520,21 @@ local function installStudioCommands()
 				return enemies.damage(entity, 1e9, runPlayers[1])
 			end
 			return "no boss"
+		elseif cmd == "class" and type(a) == "string" then
+			local traits = find("TraitService")
+			for _, p in runPlayers do
+				local rec = records[p]
+				if rec then
+					rec.classId = a
+				end
+				if stats then
+					stats.resetRun(p, a)
+				end
+				if traits then
+					safe(traits.applyClass, p, a)
+				end
+			end
+			return if stats and runPlayers[1] then stats.getClass(runPlayers[1]) else nil
 		elseif cmd == "world" and type(a) == "number" then
 			startStage(math.clamp(math.floor(a), 1, worldCount()))
 			return state.stage
