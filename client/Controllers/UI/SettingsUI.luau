@@ -99,27 +99,51 @@ function SettingsUI.close()
 	gui.Enabled = false
 end
 
+-- v2 (Figma): phone landscape = left of the minimap (keeps the bottom-right free for the
+-- Capture button); portrait and PC = centred under the minimap.
 local function placeGear()
 	local minimap = Registry.find("Minimap")
-	local top = Config.Margin + 120
+	local scale = UITheme.scale()
+	local size = 120 * scale
+	local bottom = Config.Margin + size
 	if minimap and type(minimap.getBottom) == "function" then
-		top = minimap.getBottom() + Config.Margin
+		bottom = minimap.getBottom()
 	end
-	gearZone.Position = UDim2.new(1, -Config.Margin, 0, top)
+	if minimap and type(minimap.getSize) == "function" then
+		size = minimap.getSize()
+	end
+	if UITheme.device() == "phone" and not UITheme.isPortrait() then
+		gearZone.Position = UDim2.new(1, -(Config.Margin + math.round(size) + 6), 0, math.round(bottom - 44 * scale - 2))
+	else
+		gearZone.Position = UDim2.new(1, -(Config.Margin + math.round(size / 2 - 22 * scale)), 0, math.round(bottom + 6))
+	end
 	gearGui.Enabled = UITheme.inRun()
 end
 
+-- Gear glyph drawn in code (8 teeth around a disc with a hole).
+local function gearGlyph(parent: Instance, size: number)
+	local h = UITheme.new("Frame", { Name = "Glyph", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(size, size), BackgroundTransparency = 1 }, parent)
+	for i = 0, 3 do
+		local tooth = UITheme.new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.new(0.28, 0, 1, 0), Rotation = i * 45, BorderSizePixel = 0 }, h)
+		UITheme.paint(tooth, "BackgroundColor3", "TextDim")
+		UITheme.corner(tooth, 2)
+	end
+	local disc = UITheme.new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.74, 0.74), BorderSizePixel = 0 }, h)
+	UITheme.paint(disc, "BackgroundColor3", "TextDim")
+	UITheme.round(disc)
+	UITheme.stroke(disc, 1.5, "Outline")
+	local hole = UITheme.new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromScale(0.34, 0.34), BorderSizePixel = 0 }, h)
+	UITheme.paint(hole, "BackgroundColor3", "Neutral")
+	UITheme.round(hole)
+	UITheme.stroke(hole, 1.5, "Outline")
+end
+
 function SettingsUI.start()
-	gearGui = UITheme.screen("COHUE_SettingsGear", 13)
+	gearGui = UITheme.screen("COHUE_SettingsGear", 13, Enum.ScreenInsets.DeviceSafeInsets)
 	gearZone = UITheme.zone(gearGui, "Gear", Vector2.new(1, 0), UDim2.new(1, -Config.Margin, 0, 130), UDim2.fromOffset(44, 44))
-	local gear = UITheme.button(gearZone, {
-		name = "Gear",
-		size = UDim2.fromOffset(44, 44),
-		role = "Title",
-		font = "display",
-		text = "...",
-		fill = "Panel",
-	})
+	local gearGloss = UITheme.glossy(gearZone, { name = "Gear", button = true, role = "Neutral", radius = -1, lip = 4, size = UDim2.fromOffset(44, 44) })
+	gearGlyph(gearGloss.content, 26)
+	local gear = gearGloss.root :: GuiButton
 	gear.Activated:Connect(function()
 		if gui.Enabled then
 			SettingsUI.close()
@@ -226,7 +250,7 @@ function SettingsUI.start()
 		end
 	end)
 	UITheme.changed:connect(function(reason: string)
-		if reason == "phase" or reason == "device" then
+		if reason == "phase" or reason == "device" or reason == "scale" then
 			placeGear()
 		end
 		if gui.Enabled and (reason == "profile" or reason == "palette" or reason == "lang") then

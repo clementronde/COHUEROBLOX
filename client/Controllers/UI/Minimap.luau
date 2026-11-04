@@ -306,19 +306,29 @@ end
 
 ---------------------------------------------------------------------------- lifecycle
 
+-- v2 (Figma L01 / P01): top right in the Roblox bar row (device insets). Portrait: under the KO.
+local function topOffset(): number
+	return if UITheme.isPortrait() then 4 + math.round(76 * UITheme.scale()) else 4
+end
+
 local function layout()
 	local s = sizeFor()
 	zone.Size = UDim2.fromOffset(s, s)
+	zone.Position = UDim2.new(1, -Config.Margin, 0, topOffset())
 end
 
 function Minimap.getBottom(): number
-	-- Bottom edge of the map in screen offset (inside the core UI safe area), for SettingsUI.
-	return Config.Margin + sizeFor() * UITheme.scale()
+	-- Bottom edge of the map in screen offset (inside the device safe area), for SettingsUI.
+	return topOffset() + sizeFor() * UITheme.scale()
+end
+
+function Minimap.getSize(): number
+	return sizeFor() * UITheme.scale()
 end
 
 function Minimap.start()
-	gui = UITheme.screen("COHUE_Minimap", 11)
-	zone = UITheme.zone(gui, "Minimap", Vector2.new(1, 0), UDim2.new(1, -Config.Margin, 0, Config.Margin), UDim2.fromOffset(112, 112))
+	gui = UITheme.screen("COHUE_Minimap", 11, Enum.ScreenInsets.DeviceSafeInsets)
+	zone = UITheme.zone(gui, "Minimap", Vector2.new(1, 0), UDim2.new(1, -Config.Margin, 0, 4), UDim2.fromOffset(120, 120))
 	disc = Instance.new("TextButton")
 	disc.Name = "Disc"
 	disc.Text = ""
@@ -326,10 +336,10 @@ function Minimap.start()
 	disc.Size = UDim2.fromScale(1, 1)
 	disc.BorderSizePixel = 0
 	disc.Parent = zone
-	UITheme.paint(disc, "BackgroundColor3", "Panel")
-	UITheme.back(disc, 0.25)
+	UITheme.paint(disc, "BackgroundColor3", "PanelSunken")
+	UITheme.back(disc, 0.2)
 	UITheme.round(disc)
-	UITheme.stroke(disc, 2, "PanelLight")
+	UITheme.stroke(disc, 3, "Outline")
 	-- Range ring at half distance.
 	local ring = UITheme.new("Frame", {
 		BackgroundTransparency = 1,
@@ -338,7 +348,7 @@ function Minimap.start()
 		Size = UDim2.fromScale(0.5, 0.5),
 	}, disc)
 	UITheme.round(ring)
-	UITheme.stroke(ring, 1, "PanelLight").Transparency = 0.5
+	UITheme.stroke(ring, 1.5, "TextMuted").Transparency = 0.65
 	UITheme.label(disc, {
 		size = UDim2.fromOffset(14, 14),
 		position = UDim2.new(0.5, 0, 0, 1),
@@ -359,7 +369,7 @@ function Minimap.start()
 	gui.Enabled = UITheme.inRun()
 
 	UITheme.changed:connect(function(reason: string)
-		if reason == "device" then
+		if reason == "device" or reason == "scale" then
 			layout()
 		elseif reason == "phase" then
 			gui.Enabled = UITheme.inRun()
