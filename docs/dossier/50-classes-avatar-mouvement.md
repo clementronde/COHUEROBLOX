@@ -232,6 +232,7 @@ API : `onAction(name, fn)`, `isDown(name)`, `bindButton(name, button)` (méthode
 | `SlideEnd` + `SlideStart` toutes les 0,5 s + hack +15 au plat (après correctifs) | Recalé 2 fois en 10 s |
 | Immobile 2 s puis clignement de 30 studs (après correctifs) | Recalé (seau 24,7 / 20) |
 | 22 hops légitimes après correctifs | 0 recalage, seau 0 |
+| Pente 24° (35 studs/s) → saut → hops, après correctifs | 0 recalage, pic du seau 6,1 / 20 (le serveur voit la pente à 4 Hz et prend un peu de retard pendant l'accélération) |
 
 Limite connue : un tricheur qui reste sous ≈ +25 % de la vitesse permise n'est pas recalé (c'est la marge qui protège les joueurs légitimes sur réseau mobile). Mesuré en Studio sans latence : à revalider sur téléphone en 4G (A11-06).
 
