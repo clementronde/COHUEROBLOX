@@ -1,7 +1,10 @@
 --!strict
--- Avatar domain remotes (merged by shared/Net.luau).
--- MoveEvent (C->S): (kind: "SlideStart" | "SlideEnd" | "Hop" | "HopReset")
---   Validated by MovementGuard, which sets server attributes Sliding / HopChain / Airborne on the Player.
+-- Remotes du domaine avatar (A06), fusionnés par shared/Net.luau.
+-- MoveEvent (C->S, 10/s) : (kind: "SlideStart" | "SlideEnd" | "Hop" | "HopReset")
+--   Validé par MovementGuard, qui pose les attributs serveur du Player (lecture seule ailleurs) :
+--   Sliding (bool, expire seul après 2,5 s), SlideCharge (bool, glissade de charge du Barbarian),
+--   HopChain (hops enchaînés), Airborne (bool, rayon serveur à 4 Hz),
+--   HeavyLandAt (GetServerTimeNow du dernier atterrissage lourd d'une classe qui en a un).
 
 return {
 	MoveEvent = "RemoteEvent",

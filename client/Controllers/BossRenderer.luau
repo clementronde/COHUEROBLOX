@@ -21,6 +21,7 @@ local Bosses = require(Config:WaitForChild("Bosses"))
 local Worlds = require(Config:WaitForChild("Worlds"))
 local Heightmap = require(Shared:WaitForChild("Heightmap"))
 local Net = require(Shared:WaitForChild("Net"))
+local Motion = require(script.Parent.EnemyMotion)
 local ArtLibrary = require(Shared:WaitForChild("ArtLibrary"))
 
 local HIDDEN = CFrame.new(0, -10000, 0)
@@ -44,6 +45,12 @@ local bossTo = Vector3.zero
 local bossT0 = 0
 local bossVisible = false
 local bossTint = false
+local bossStride = 0
+local bossWalkWeight = 0
+local castStart = -math.huge
+local castHit = -math.huge
+local castTarget: Vector3? = nil
+local castDirection: Vector3? = nil
 local lastState: { [string]: any }? = nil
 
 local telegraphs: { { data: { [string]: any }, visual: TelegraphVisual } } = {}
@@ -155,6 +162,9 @@ local function clearBoss()
 	bossKey = ""
 	bossVisible = false
 	bossTint = false
+	bossStride, bossWalkWeight = 0, 0
+	castStart, castHit = -math.huge, -math.huge
+	castTarget, castDirection = nil, nil
 end
 
 local BOSS_MESH_HEIGHT = 18 -- studs; the generated boss meshes replace the part model
@@ -167,7 +177,8 @@ local function buildBoss(bossId: string)
 		mesh.CFrame = HIDDEN
 		mesh.Parent = container
 		table.insert(bossParts, mesh)
-		table.insert(bossOffsets, CFrame.new(0, mesh.Size.Y / 2, 0))
+		local yaw = if bossId == "GrandCheneRonchon" then math.pi else 0
+		table.insert(bossOffsets, CFrame.new(0, mesh.Size.Y / 2, 0) * CFrame.Angles(0, yaw, 0))
 		table.insert(bossColors, mesh.Color)
 		bossKey = bossId
 		return
@@ -271,6 +282,14 @@ local function onBossState(payload: unknown)
 	end
 	if type(p.telegraphs) == "table" then
 		setTelegraphs(p.telegraphs)
+		local cast = p.telegraphs[1]
+		if cast and type(cast.start) == "number" and type(cast.at) == "number" then
+			if cast.start > castStart + .05 then
+				castStart, castHit = cast.start, cast.at
+			end
+			castTarget = if typeof(cast.position) == "Vector3" then cast.position else nil
+			castDirection = if typeof(cast.dir) == "Vector3" then cast.dir else nil
+		end
 	end
 	local tint = p.vulnerable == true
 	if tint ~= bossTint then
@@ -419,33 +438,67 @@ local function render(dt: number)
 	local n = 0
 	local now = os.clock()
 
+	local serverNow = Workspace:GetServerTimeNow()
 	-- Boss
 	if bossVisible and #bossParts > 0 then
 		local a = math.clamp((now - bossT0) / (1 / Bosses.SendHz), 0, 1)
 		local pos = bossFrom:Lerp(bossTo, a)
-		local dir = bossTo - bossFrom
-		local base
-		if dir.Magnitude > 0.05 then
-			base = CFrame.lookAt(pos, pos + Vector3.new(dir.X, 0, dir.Z))
-		else
-			-- Face the local player when idle
-			local root = localRoot()
-			local look = if root then Vector3.new(root.Position.X, pos.Y, root.Position.Z) else pos - Vector3.zAxis
-			base = if (look - pos).Magnitude > 0.1 then CFrame.lookAt(pos, look) else CFrame.new(pos)
-		end
+		local delta = bossTo - bossFrom
+		local dir = Vector3.new(delta.X, 0, delta.Z)
+		local speed = if a < 1 then dir.Magnitude * Bosses.SendHz else 0
 		local st = lastState
-		if st and st.stunned then
+		local casting = serverNow >= castStart and serverNow < castHit
+		local striking = serverNow >= castHit and serverNow < castHit + .52
+		if casting or striking then
+			local target = castTarget or pos
+			local aim = castDirection or (target - pos)
+			if Vector3.new(aim.X, 0, aim.Z).Magnitude > .15 then
+				dir = Vector3.new(aim.X, 0, aim.Z)
+			end
+		end
+		if dir.Magnitude < .05 then
+			local root = localRoot()
+			dir = if root then Vector3.new(root.Position.X - pos.X, 0, root.Position.Z - pos.Z) else -Vector3.zAxis
+		end
+		local base = if dir.Magnitude > .05 then CFrame.lookAt(pos, pos + dir) else CFrame.new(pos)
+		local profile = Motion.profiles[bossKey]
+		local step = 0
+		local gesture = 0
+		if st and st.stunned and not (casting or striking) then
 			base *= CFrame.Angles(0, 0, math.rad(math.sin(now * 20) * 4))
+		elseif profile then
+			local weight = if casting or striking or (st and st.rooted) then 0 else math.clamp(speed / 5, 0, 1)
+			bossWalkWeight += (weight - bossWalkWeight) * math.min(dt * 12, 1)
+			bossStride = (bossStride + math.min(speed, 19) * dt) % profile.walk.stride
+			if casting then
+				local progress = math.clamp((serverNow - castStart) / math.max(.05, castHit - castStart), 0, 1)
+				base *= Motion.charge(profile, progress, 1)
+				gesture = -progress
+			elseif striking then
+				local progress = (serverNow - castHit) / .52
+				base *= Motion.strike(profile, progress, 1)
+				gesture = math.sin(math.pi * progress)
+			else
+				local walk: CFrame
+				walk, step = Motion.walk(profile, bossStride, bossWalkWeight, now, 1)
+				base *= walk
+			end
 		end
 		for k, part in bossParts do
+			local offset = bossOffsets[k]
+			if bossKey == "PharaonGrillePain" and (k == 9 or k == 10) then
+				local leg = if k == 9 then step else -step
+				offset = offset * CFrame.new(0, math.max(0, leg) * .60, leg * .72)
+			elseif bossKey == "DirectriceEternelle" and k == 6 then
+				offset *= CFrame.Angles(math.rad(-45 * gesture + step * 6), 0, math.rad(22 * gesture))
+			end
 			n += 1
 			moveParts[n] = part
-			moveCFrames[n] = base * bossOffsets[k]
+			moveCFrames[n] = base * offset
 		end
 	end
 
 	-- Telegraphs (fill grows from start to impact)
-	local serverNow = Workspace:GetServerTimeNow()
 	for _, t in telegraphs do
 		local d = t.data
 		local pos: Vector3 = d.position

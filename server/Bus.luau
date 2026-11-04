@@ -6,7 +6,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Signal = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Signal"))
 
 return {
-	-- EnemyService: (id: number, kind: number, x: number, z: number, killer: Player?, isElite: boolean)
+	-- EnemyService: (id: number, kind: number, x: number, z: number, killer: Player?, isElite: boolean, hordeElite: boolean)
+	-- isElite = élite « à butin » (coffre). hordeElite = élite de l'Overtime au-delà du plafond
+	-- classique : une vraie élite (XP, quêtes) mais sans coffre. Une élite est isElite or hordeElite.
 	EnemyKilled = Signal.new(),
 	-- StatsService: (player: Player, level: number)
 	PlayerLeveledUp = Signal.new(),
@@ -28,7 +30,7 @@ return {
 	PlayerRevived = Signal.new(),
 	-- RunManager: (player: Player)
 	PlayerDied = Signal.new(),
-	-- RunManager: (player: Player, amount: number)
+	-- RunManager: (player: Player, amount: number, source: string) -- source "Contact" = mêlée
 	PlayerDamaged = Signal.new(),
 	-- LootService: (player: Player, chestKind: string)
 	ChestOpened = Signal.new(),
@@ -38,4 +40,7 @@ return {
 	CompanionEvolved = Signal.new(),
 	-- DataService: (player: Player)
 	ProfileLoaded = Signal.new(),
+	-- StatsService (A04-03): (player: Player, runKills: number, enemyKind: number, isElite: boolean)
+	-- Un KO compté par le serveur, déjà ajouté au total de la run. Aucune valeur ne vient du client.
+	KOScored = Signal.new(),
 }
