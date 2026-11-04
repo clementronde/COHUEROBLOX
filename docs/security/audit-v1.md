@@ -138,7 +138,7 @@ Variante par reset : le bouton Reset de Roblox n'est pas désactivé et le serve
 
 ### S-09 — Basse — Un joueur choisit monde et tier pour tout le serveur
 
-**Où.** `server/Services/RunManager.luau:1268-1293`. En mode une place, le dernier `SelectStage` valide gagne. Les autres joueurs reçoivent ensuite `Win_<monde>_T<tier>` (`server/Services/ProgressionService.luau:1072`), qui débloque le tier suivant, sans l'avoir débloqué eux-mêmes.
+**Où.** `server/Services/RunManager.luau:1268-1293`. En mode une place, le dernier `SelectStage` valide gagne. Les autres joueurs reçoivent ensuite `Win_<monde>_T<tier>` (`server/Services/ProgressionService.luau:1072`), qui débloque le tier suivant, et `WinsTier3`, qui débloque le grimoire `Interdit` (`shared/Config/Quests.luau:173`), sans les avoir débloqués eux-mêmes.
 
 **Décision à prendre par Clément.** Le « carry » entre amis est courant et peut rester. Sinon : n'accorder `Win_*_T<n>` qu'aux joueurs qui avaient débloqué ce tier.
 
