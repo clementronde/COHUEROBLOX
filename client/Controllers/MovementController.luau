@@ -13,6 +13,7 @@
 -- ralenti de choix de carte (SlowMult / SlowUntil, base GetServerTimeNow), stat MoveSpeed (remote Build),
 -- pas de dégâts de chute, onde d'atterrissage locale.
 -- Un seul écrivain de Humanoid.WalkSpeed : marche(classe) x stat x bunny-hop x ralenti x contrecoup.
+-- Poses de glissade / charge / atterrissage lourd : PlayerAnimator (démarré ici).
 -- API : MovementController.isSliding() -> boolean · getHopBonus() -> number · getDebug() -> table
 
 local Players = game:GetService("Players")
@@ -26,6 +27,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared:WaitForChild("Net"))
 local Registry = require(Shared:WaitForChild("Registry"))
 local M = require(Shared:WaitForChild("Config"):WaitForChild("Movement"))
+local PlayerAnimator = require(script.Parent:WaitForChild("PlayerAnimator"))
 
 type ClassMove = typeof(M.profile(nil))
 
@@ -356,6 +358,14 @@ end
 
 -- ---------------------------------------------------------------- sauts
 
+local function feetPosition(): Vector3?
+	local h, r = humanoid, root
+	if not h or not r then
+		return nil
+	end
+	return r.Position - Vector3.new(0, feetReach(h, r) - 0.1, 0)
+end
+
 local function launch(heightMult: number)
 	local h, r = humanoid, root
 	if not h or not r then
@@ -402,7 +412,14 @@ local function groundJump()
 		local flat = Vector3.new(v.X, 0, v.Z).Magnitude
 		if flat >= h.WalkSpeed * M.BhopKeepSpeed then
 			hopCount += 1
+			local wasMax = hopBonus >= M.BhopMaxBonus - 1e-6
 			hopBonus = math.min(M.BhopMaxBonus, hopBonus + M.BhopGainPerHop)
+			if not wasMax and hopBonus >= M.BhopMaxBonus - 1e-6 then
+				local feet = feetPosition()
+				if feet then
+					shockwave(feet, 5) -- plafond atteint
+				end
+			end
 			dlog(`hop dtLand={string.format("%.3f", now - landedAt)} bonus={string.format("%.2f", hopBonus)}`)
 			send("Hop")
 		else
@@ -418,6 +435,10 @@ end
 local function airJump()
 	airJumpsLeft -= 1
 	dlog("airJump")
+	local feet = feetPosition()
+	if feet then
+		shockwave(feet, 3) -- petit anneau sous les pieds : le double saut se voit
+	end
 	launch(M.AirJumpMult)
 end
 
@@ -432,8 +453,12 @@ local function onJumpAction(pressed: boolean)
 		return
 	end
 	local now = os.clock()
-	jumpPressedAt = now
 	local state = h:GetState()
+	if state == HST.Swimming then
+		h.Jump = true -- nage vers le haut (comportement Roblox), pas de saut piloté dans l'eau
+		return
+	end
+	jumpPressedAt = now
 	if not isAirState(state) then
 		groundJump()
 	elseif not jumpedSinceGrounded and now - leftGroundAt <= M.CoyoteTime then
@@ -472,7 +497,7 @@ local function onLanded()
 		return
 	end
 	local now = os.clock()
-	if now - ourJumpAt < 0.15 then
+	if now - ourJumpAt < M.LandIgnoreAfterJump then
 		return -- l'Humanoid repasse parfois une image au sol juste après notre saut : pas un atterrissage
 	end
 	airborne = false
@@ -493,6 +518,7 @@ local function onLanded()
 	if hl and fall >= hl.minFall then
 		landSlowUntil = now + hl.slowTime
 		landSlowMult = hl.slowMult
+		PlayerAnimator.heavyLand(player, math.clamp(fall / (hl.minFall * 2), 0.5, 1))
 		shockwave(feet, M.ShockwaveMaxRadius * math.clamp(fall / (hl.minFall * 3), 0.5, 1))
 		cameraShake(hl.shake * math.clamp(fall / (hl.minFall * 2), 0.5, 1))
 	elseif fall >= M.ShockwaveMinFall then
@@ -517,7 +543,7 @@ local function onStateChanged(old: Enum.HumanoidStateType, new: Enum.HumanoidSta
 			if r then
 				peakY = r.Position.Y
 			end
-			if new == HST.Freefall and not jumpedSinceGrounded and now - ourJumpAt > 0.1 then
+			if new == HST.Freefall and not jumpedSinceGrounded and now - ourJumpAt > M.CoyoteIgnoreAfterJump then
 				leftGroundAt = now -- quitté un rebord sans sauter : horloge du coyote time
 			end
 		end
@@ -562,12 +588,12 @@ local function step(dt: number)
 		-- Recharge du double saut et du plané une fois vraiment au sol (rayon vérifié, normale du sol).
 		local maxAir = prof.airJumps or 0
 		local maxGlide = if prof.glide then prof.glide.duration else 0
-		if (airJumpsLeft < maxAir or glideLeft < maxGlide) and now - ourJumpAt > 0.2 and verifiedGround() then
+		if (airJumpsLeft < maxAir or glideLeft < maxGlide) and now - ourJumpAt > M.HopResetDelay and verifiedGround() then
 			airJumpsLeft = maxAir
 			glideLeft = maxGlide
 		end
 	end
-	if not isAirState(state) and (hopBonus > 0 or hopCount > 0) and now - ourJumpAt > 0.2 then
+	if not isAirState(state) and (hopBonus > 0 or hopCount > 0) and now - ourJumpAt > M.HopResetDelay then
 		-- Bonus perdu après la fenêtre au sol, ou sans entrée de déplacement.
 		if (now - landedAt > M.BhopWindow and not sliding) or h.MoveDirection.Magnitude < 0.1 then
 			resetHops()
@@ -738,6 +764,7 @@ function MovementController.start()
 	end
 
 	RunService.PreSimulation:Connect(step)
+	PlayerAnimator.start(MovementController)
 
 	if IS_STUDIO then
 		-- Point d'inspection pour les tests MCP : ("state") / ("log") / ("trigger", action, pressed) /

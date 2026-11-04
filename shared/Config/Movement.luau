@@ -68,6 +68,9 @@ local Movement = {
 	SlideCooldown = 0.35, -- s entre la fin d'une glissade et la suivante
 	SlideBuffer = 0.15, -- s : Glisser pressé en l'air juste avant l'atterrissage = glissade à l'atterrissage
 	SlideJumpGrace = 0.2, -- s après la fin d'une glissade où un saut convertit encore l'élan
+	LandIgnoreAfterJump = 0.15, -- s : un retour au sol aussi tôt après notre saut n'est pas un atterrissage
+	CoyoteIgnoreAfterJump = 0.1, -- s : une chute aussi tôt après notre saut n'ouvre pas le coyote time
+	HopResetDelay = 0.2, -- s après un saut avant de pouvoir perdre le bonus au sol
 	SlideTouchTap = true, -- tactile : un appui lance toute la glissade (relâcher ne l'arrête pas)
 
 	-- Atterrissage (visuel local)
@@ -193,6 +196,13 @@ local Movement = {
 		Enforce = true, -- false = log seulement pour vitesse et téléport aussi
 		LogEvery = 5,
 		HeavyFall = 8, -- chute mesurée par le serveur pour l'attribut HeavyLandAt (classes à atterrissage lourd)
+		PadRadius = 6, -- studs autour d'un tremplin du plan partagé
+		PadGrace = 2.5, -- s de vitesse relevée après un tremplin (le client applique le lancer)
+		PadMaxSpeed = 30, -- studs/s permis pendant cette grâce (lancer latéral 22 + marche) ; téléport toujours contrôlé
+		SandstormPush = 8, -- studs/s ajoutés pendant la tempête de sable (pushSpeed 6 + marge)
+		SlideCooldownSlack = 0.6, -- part de SlideCooldown exigée entre SlideEnd et SlideStart reçus (gigue réseau)
+		SlideProtectExtra = 0.3, -- s : une glissade lancée juste après un saut garde la chaîne de hops maxFlatTime + ça
+		StallMinVelocity = 2, -- studs/s : le gel ne compte que si la vitesse répliquée dit que le joueur bouge
 	},
 }
 

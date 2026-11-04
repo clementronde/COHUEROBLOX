@@ -139,13 +139,8 @@ function InputController.getVector(name: string): Vector2
 	if not enabled or not action or SPECS[name].kind ~= "Direction2D" then
 		return Vector2.zero
 	end
-	local ok, value = pcall(function()
-		return action:GetState()
-	end)
-	if ok and typeof(value) == "Vector2" then
-		return value
-	end
-	return Vector2.zero
+	local value = action:GetState()
+	return if typeof(value) == "Vector2" then value else Vector2.zero
 end
 
 local function deviceName(): string

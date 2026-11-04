@@ -65,6 +65,12 @@ rayParams.RespectCanCollide = true
 
 local fadeParts: { BasePart } = {}
 local fadeValue = 0
+local fadeConn: RBXScriptConnection? = nil
+
+-- Filtre des lancers : les personnages (copie gardée ici pour ne pas relire la propriété à chaque image),
+-- et une liste réutilisée pour ignorer les obstacles fins.
+local filterBase: { Instance } = {}
+local filterWithProps: { Instance } = {}
 
 -- ---------------------------------------------------------------- helpers
 
@@ -102,13 +108,13 @@ local function deviceKind(): string
 end
 
 local function refreshFilter()
-	local list: { Instance } = {}
+	table.clear(filterBase)
 	for _, p in Players:GetPlayers() do
 		if p.Character then
-			table.insert(list, p.Character)
+			table.insert(filterBase, p.Character)
 		end
 	end
-	rayParams.FilterDescendantsInstances = list
+	rayParams.FilterDescendantsInstances = filterBase
 end
 
 local function refreshFadeParts(character: Model?)
@@ -151,8 +157,8 @@ end
 
 -- Distance libre entre l'origine (dans la tête du personnage) et la caméra voulue.
 local function freeDistance(origin: Vector3, dir: Vector3, want: number): number
-	local ignored: { Instance }? = nil
-	local base = rayParams.FilterDescendantsInstances
+	local ignoring = false
+	local result = want
 	for _ = 1, 4 do
 		local hit = Workspace:Spherecast(origin, C.CollisionRadius, dir * want, rayParams)
 		if not hit then
@@ -160,22 +166,22 @@ local function freeDistance(origin: Vector3, dir: Vector3, want: number): number
 		end
 		local part = hit.Instance
 		if part:IsA("BasePart") and isThinProp(part) then
-			if not ignored then
-				ignored = table.clone(base)
+			if not ignoring then
+				ignoring = true
+				table.clear(filterWithProps)
+				table.move(filterBase, 1, #filterBase, 1, filterWithProps)
 			end
-			table.insert(ignored :: { Instance }, part)
-			rayParams.FilterDescendantsInstances = ignored :: { Instance }
+			table.insert(filterWithProps, part)
+			rayParams.FilterDescendantsInstances = filterWithProps
 		else
-			if ignored then
-				rayParams.FilterDescendantsInstances = base
-			end
-			return math.max(hit.Distance - C.CollisionMargin, C.CollisionMinDistance)
+			result = math.max(hit.Distance - C.CollisionMargin, C.CollisionMinDistance)
+			break
 		end
 	end
-	if ignored then
-		rayParams.FilterDescendantsInstances = base
+	if ignoring then
+		rayParams.FilterDescendantsInstances = filterBase
 	end
-	return want
+	return result
 end
 
 -- ---------------------------------------------------------------- input
@@ -494,7 +500,10 @@ local function onCharacter(character: Model)
 		end
 		refreshFadeParts(character)
 	end)
-	character.DescendantAdded:Connect(function(d)
+	if fadeConn then
+		fadeConn:Disconnect()
+	end
+	fadeConn = character.DescendantAdded:Connect(function(d)
 		if d:IsA("BasePart") then
 			table.insert(fadeParts, d)
 			d.LocalTransparencyModifier = fadeValue

@@ -35,11 +35,6 @@ local Heightmap = require(Shared:WaitForChild("Heightmap"))
 
 local G = Movement.Guard
 
--- Lancers appliqués par le client que le serveur doit tolérer : tremplins du plan partagé, et la poussée
--- de la tempête de sable (pushSpeed du monde = 6).
-local PAD_RADIUS = 6
-local PAD_GRACE = 2.5
-local SANDSTORM_PUSH = 8
 local IS_STUDIO = RunService:IsStudio()
 
 type State = {
@@ -64,6 +59,8 @@ type State = {
 	slideSlopeGain: number,
 	slideEndAt: number,
 	lastSlideStart: number,
+	slideProtectUntil: number, -- la glissade garde la chaîne de hops jusque-là
+	padUntil: number, -- vitesse relevée après un tremplin
 	-- en l'air
 	wasAirborne: boolean,
 	landPeakY: number, -- pour l'atterrissage lourd
@@ -191,6 +188,8 @@ local function newState(root: BasePart): State
 		slideSlopeGain = 0,
 		slideEndAt = -math.huge,
 		lastSlideStart = -math.huge,
+		slideProtectUntil = -math.huge,
+		padUntil = 0,
 		wasAirborne = false,
 		landPeakY = pos.Y,
 		airborneFor = 0,
@@ -204,9 +203,9 @@ end
 
 local MAX_CREDITS = math.ceil(Movement.BhopMaxBonus / Movement.BhopGainPerHop - 1e-6)
 
--- Fin de glissade. Comme le client, un saut en fin de glissade garde le bonus d'entrée, ajoute un hop, et
--- convertit seulement l'élan gagné en pente (le boost de départ ne compte pas : sinon glisser en boucle au
--- plat ferait monter le bonus permis).
+-- Fin de glissade. Comme le client, un saut en fin de glissade garde le bonus d'entrée et convertit seulement
+-- l'élan gagné en pente (le boost de départ ne compte pas : sinon glisser en boucle au plat ferait monter le
+-- bonus permis). Le hop du saut lui-même arrive par l'événement Hop, qui vérifie le temps en l'air.
 local function endSlide(player: Player, s: State, now: number)
 	if s.slideUntil > 0 then
 		s.slideUntil = 0
@@ -214,7 +213,7 @@ local function endSlide(player: Player, s: State, now: number)
 		local L = limits(player)
 		local gain = Movement.BhopGainPerHop
 		local slopeBonus = s.slideSlopeGain / math.max(L.base, 1)
-		local target = s.slideEntryBonus + slopeBonus + gain
+		local target = s.slideEntryBonus + slopeBonus
 		local credits = math.min(math.ceil(target / gain - 1e-6), MAX_CREDITS)
 		if credits > s.hopCredits then
 			if s.hopCredits <= 0 then
@@ -224,6 +223,7 @@ local function endSlide(player: Player, s: State, now: number)
 			-- La part gagnée en pente arrive d'un coup : elle ne passe pas par la limite de temps.
 			s.chainStart = math.min(s.chainStart, now - math.ceil(slopeBonus / gain - 1e-6) * G.MinHopTime)
 		end
+		s.slideProtectUntil = math.min(s.slideProtectUntil, now)
 	end
 	player:SetAttribute("Sliding", false)
 	player:SetAttribute("SlideCharge", false)
@@ -244,9 +244,11 @@ local function trackAir(player: Player, s: State, onGround: boolean, pos: Vector
 		end
 	end
 	s.wasAirborne = not onGround
-	-- Au sol depuis trop longtemps (et pas en glissade) : la chaîne de hops est perdue.
-	if onGround and s.slideUntil == 0 and now - s.lastAirAt > G.AirMemory then
+	-- Au sol depuis trop longtemps : la chaîne de hops est perdue. Une glissade lancée juste après un saut la
+	-- garde un temps limité (enchaîner des glissades au sol ne la prolonge pas).
+	if onGround and s.hopCredits > 0 and now - math.max(s.lastAirAt, s.slideProtectUntil) > G.AirMemory then
 		s.hopCredits = 0
+		player:SetAttribute("HopChain", 0)
 	end
 end
 
@@ -274,6 +276,10 @@ local function sample(player: Player, dt: number)
 	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
 	local root = humanoid and humanoid.RootPart
 	if not character or not humanoid or not root or humanoid.Health <= 0 then
+		local dead = states[player]
+		if dead and dead.slideUntil > 0 then
+			endSlide(player, dead, os.clock())
+		end
 		return
 	end
 
@@ -300,28 +306,28 @@ local function sample(player: Player, dt: number)
 	local L = limits(player)
 	trackSlide(s, L, hit, dt)
 
-	-- Sur un tremplin : courte exemption (le client applique le lancer).
+	-- Près d'un tremplin : vitesse permise relevée un moment (le client applique le lancer). Ce n'est pas
+	-- une exemption : le téléport et le seau restent contrôlés.
 	local layout = Heightmap.getLayout()
 	if layout then
 		for _, pad in layout.pads do
 			local dx, dz = pos.X - pad.x, pos.Z - pad.z
-			if dx * dx + dz * dz < PAD_RADIUS * PAD_RADIUS then
-				s.exemptUntil = math.max(s.exemptUntil, now + PAD_GRACE)
+			if dx * dx + dz * dz < G.PadRadius * G.PadRadius then
+				s.padUntil = now + G.PadGrace
 				break
 			end
 		end
 	end
-	-- Recaler la base seulement : exemptions, siège, ancré, à-coup serveur.
+	-- Recaler la base seulement : exemptions (mouvement causé par le serveur), siège, ancré, à-coup serveur.
+	-- La position valide n'avance pas pendant une exemption.
 	if isExempt(player, s, now) or root.Anchored or humanoid.SeatPart ~= nil or dt > G.HitchFactor * G.Interval then
 		s.lastPos = pos
 		s.bucket = 0
 		s.stall = 0
 		s.airborneFor = 0
-		if onGround then
-			s.lastValid = root.CFrame
-		end
 		return
 	end
+	local onPad = now < s.padUntil
 
 	local bonus = hopBonusAllowed(s, now)
 	local vlim = L.base * (1 + bonus)
@@ -329,8 +335,11 @@ local function sample(player: Player, dt: number)
 	if sliding then
 		vlim = math.max(vlim, s.slideSpeed)
 	end
+	if onPad then
+		vlim = math.max(vlim, G.PadMaxSpeed)
+	end
 	if Workspace:GetAttribute("CohueHazard") == "Sandstorm" then
-		vlim += SANDSTORM_PUSH
+		vlim += G.SandstormPush
 	end
 	local ping = math.clamp(player:GetNetworkPing(), 0, G.PingCap)
 	local horizontal = Vector3.new(pos.X - s.lastPos.X, 0, pos.Z - s.lastPos.Z).Magnitude
@@ -361,8 +370,9 @@ local function sample(player: Player, dt: number)
 		s.ratioPeak = math.max(s.ratioPeak, horizontal / math.max(vlim * span, 0.01))
 		s.dbg = string.format("step=%.2f allowed=%.2f vlim=%.1f bonus=%.2f credits=%d slide=%s/%.1f bucket=%.1f ground=%s", horizontal, allowed, vlim, bonus, s.hopCredits, tostring(sliding), s.slideSpeed, s.bucket, tostring(onGround))
 	end
-	if horizontal < G.StallMoveStuds then
-		s.stall += dt
+	local v = root.AssemblyLinearVelocity
+	if horizontal < G.StallMoveStuds and Vector3.new(v.X, 0, v.Z).Magnitude > G.StallMinVelocity then
+		s.stall += dt -- immobile pour le serveur mais en mouvement d'après la vitesse : réplication gelée
 	else
 		s.stall = 0
 	end
@@ -378,7 +388,7 @@ local function sample(player: Player, dt: number)
 
 	-- 3. Vol stationnaire et vol : en l'air longtemps sans amplitude verticale (un bunny-hop oscille de
 	-- plusieurs studs, le plané descend), ou monté bien plus haut qu'un saut de la classe. Mode ombre par défaut.
-	if onGround then
+	if onGround or onPad then
 		s.airborneFor = 0
 		s.airStartY = pos.Y
 	else
@@ -447,15 +457,20 @@ local function onMoveEvent(player: Player, kind: any)
 	local now = os.clock()
 	if kind == "SlideStart" then
 		-- Depuis le sol seulement, et pas en rafale. La vitesse plausible part de la course actuelle x boost.
-		if now - s.lastSlideStart >= G.SlideMinInterval and s.slideUntil == 0 and groundHit(root, humanoid) then
+		local cooled = now - s.slideEndAt >= Movement.SlideCooldown * G.SlideCooldownSlack
+		if now - s.lastSlideStart >= G.SlideMinInterval and cooled and s.slideUntil == 0 and groundHit(root, humanoid) then
 			local L = limits(player)
+			local prof = Movement.profile(player:GetAttribute("ClassId"))
+			local maxFlat = if prof.slide and prof.slide.maxFlatTime then prof.slide.maxFlatTime else Movement.SlideMaxFlatTime
+			if now - s.lastAirAt <= G.AirMemory then
+				s.slideProtectUntil = now + maxFlat + G.SlideProtectExtra
+			end
 			s.lastSlideStart = now
 			s.slideUntil = now + Movement.SlidingAttrTimeout
 			s.slideEntryBonus = hopBonusAllowed(s, now)
 			s.slideSlopeGain = 0
 			s.slideSpeed = math.min(L.base * (1 + s.slideEntryBonus) * L.boost * G.SlideStartSlack, L.slideCap)
 			player:SetAttribute("Sliding", true)
-			local prof = Movement.profile(player:GetAttribute("ClassId"))
 			player:SetAttribute("SlideCharge", prof.slide ~= nil and prof.slide.charge == true)
 		end
 	elseif kind == "SlideEnd" then
@@ -466,12 +481,13 @@ local function onMoveEvent(player: Player, kind: any)
 		end
 		s.lastHopAt = now
 		-- Un hop ne crédite le bonus que si le serveur a vu le joueur en l'air récemment.
-		if now - s.lastAirAt <= G.AirMemory + G.HopAirSlack then
-			if s.hopCredits <= 0 then
-				s.chainStart = now - G.MinHopTime
-			end
-			s.hopCredits = math.min(s.hopCredits + 1, math.ceil(Movement.BhopMaxBonus / Movement.BhopGainPerHop))
+		if now - s.lastAirAt > G.AirMemory + G.HopAirSlack then
+			return -- pas vu en l'air : ni crédit, ni statistique
 		end
+		if s.hopCredits <= 0 then
+			s.chainStart = now - G.MinHopTime
+		end
+		s.hopCredits = math.min(s.hopCredits + 1, MAX_CREDITS)
 		local chain = player:GetAttribute("HopChain")
 		player:SetAttribute("HopChain", (if type(chain) == "number" then chain else 0) + 1)
 		local ProgressionService = Registry.find("ProgressionService")
