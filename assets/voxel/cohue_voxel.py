@@ -295,19 +295,83 @@ def mesh_data(vox: Vox, origin, voxel: float = VOXEL):
     else:
         o = origin
     quads = greedy_quads(vox.c)
+    lines = _corner_lines(quads)
     verts, index = [], {}
     faces, colors = [], []
+
+    def vid(p, d, side):
+        key = (p, d, side)  # sommets séparés par direction : ombrage plat garanti
+        if key not in index:
+            index[key] = len(verts)
+            verts.append(tuple(round((p[i] - o[i]) * voxel, 5) for i in range(3)))
+        return index[key]
+
     for corners, col, d, side in quads:
-        ids = []
-        for c in corners:
-            key = (c, d, side)  # sommets séparés par direction : ombrage plat garanti
-            if key not in index:
-                index[key] = len(verts)
-                verts.append(tuple(round((c[i] - o[i]) * voxel, 5) for i in range(3)))
-            ids.append(index[key])
-        faces.append(ids)
-        colors.append(face_color(col, d, side))
-    return {"verts": verts, "quads": faces, "colors": colors, "tris": 2 * len(faces)}
+        # Mode étanche : on insère dans chaque arête les coins des faces voisines qui tombent dessus
+        # (jonctions en T), sinon la maille a des fentes topologiques et des points qui scintillent.
+        poly, edge_of, extras = [], [], []
+        for i in range(4):
+            a, b = corners[i], corners[(i + 1) % 4]
+            inner = _points_between(lines, a, b)
+            poly.append(a)
+            edge_of.append(-1)                    # coin
+            poly.extend(inner)
+            edge_of.extend([i] * len(inner))      # point posé sur l'arête i
+            extras.append(len(inner))
+        rgb = face_color(col, d, side)
+        ids = [vid(p, d, side) for p in poly]
+        n = len(ids)
+        # Choix du sommet d'éventail sans triangle plat (n - 2 triangles) :
+        #  - un coin dont les deux arêtes voisines n'ont aucun point ajouté ;
+        #  - sinon un point ajouté seul sur son arête ;
+        #  - sinon le centre du rectangle (n triangles).
+        apex = None
+        for k in range(n):
+            if edge_of[k] == -1:
+                ci = sum(1 for j in range(k) if edge_of[j] == -1)
+                if extras[ci] == 0 and extras[(ci - 1) % 4] == 0:
+                    apex = k
+                    break
+        if apex is None:
+            apex = next((k for k in range(n) if edge_of[k] >= 0 and extras[edge_of[k]] == 1), None)
+        if apex is not None:
+            for j in range(1, n - 1):
+                a, b = (apex + j) % n, (apex + j + 1) % n
+                faces.append([ids[apex], ids[a], ids[b]])
+                colors.append(rgb)
+        else:
+            ctr = tuple(sum(c[k] for c in corners) / 4 for k in range(3))
+            cid = vid(ctr, d, side)
+            for j in range(n):
+                faces.append([cid, ids[j], ids[(j + 1) % n]])
+                colors.append(rgb)
+    return {"verts": verts, "tris_idx": faces, "colors": colors, "tris": len(faces)}
+
+
+def _corner_lines(quads):
+    """Pour chaque droite parallèle à un axe, les coordonnées des coins qui s'y trouvent (triées)."""
+    lines: dict = {}
+    pts = {c for corners, *_ in quads for c in corners}
+    for p in pts:
+        for k in range(3):
+            key = (k,) + tuple(p[j] for j in range(3) if j != k)
+            lines.setdefault(key, set()).add(p[k])
+    return {key: sorted(v) for key, v in lines.items()}
+
+
+def _points_between(lines, a, b):
+    k = next(i for i in range(3) if a[i] != b[i])
+    key = (k,) + tuple(a[j] for j in range(3) if j != k)
+    lo, hi = sorted((a[k], b[k]))
+    inner = [t for t in lines.get(key, ()) if lo < t < hi]
+    if a[k] > b[k]:
+        inner.reverse()
+    out = []
+    for t in inner:
+        p = list(a)
+        p[k] = t
+        out.append(tuple(p))
+    return out
 
 
 # ---------------------------------------------------------------------------------------------
@@ -320,7 +384,7 @@ def to_blender(vox: Vox, origin="bottom", name: str | None = None, collection=No
     data = mesh_data(vox, origin, voxel)
     name = name or vox.name
     me = bpy.data.meshes.new(name)
-    me.from_pydata(data["verts"], [], data["quads"])
+    me.from_pydata(data["verts"], [], data["tris_idx"])
     me.update()
     for p in me.polygons:
         p.use_smooth = False
@@ -396,4 +460,4 @@ def luau_mesh(vox: Vox, origin="bottom", voxel: float = VOXEL) -> str:
         h = rgb_hex(c)
         pal.setdefault(h, len(pal) + 1)
         cols.append(pal[h])
-    return json.dumps({"v": v, "q": data["quads"], "c": cols, "p": list(pal.keys())}, separators=(",", ":"))
+    return json.dumps({"v": v, "t": data["tris_idx"], "c": cols, "p": list(pal.keys())}, separators=(",", ":"))

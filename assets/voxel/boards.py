@@ -214,6 +214,23 @@ def equipment_views(outdir):
                 B.render(sc, os.path.join(outdir, f"{cls}_T{tier}_{side}.png"), res=(520, 640), transparent=True, samples=32)
 
 
+def lineup_weapons(out):
+    """Les 8 armes de départ debout, de 3/4, avec le mannequin pour l'échelle."""
+    sc = fresh()
+    ground(sc, 160, 40, "Cream.d")
+    B.diorama_light(sc, world="F3E3C8")
+    x = -14.0
+    for fn in M.WEAPONS:
+        vox, origin, meta = fn()
+        ob = cv.to_blender(vox, "bottom")
+        ob.location = (x, 0, 0)
+        ob.rotation_euler.z = math.radians(-35)
+        x += 3.6
+    B.place(M.mannequin, (x + 1.0, 0, 0), rot_z=math.radians(-20))
+    B.camera(sc, (0, -40, 9), (1.0, 0, 2.6), lens=50)
+    B.render(sc, out, res=(2000, 760))
+
+
 def diorama(out):
     """Planche 3 : tuile de forêt flottante, coupe de terrain, horde, joueur Knight, lumière chaude."""
     import random

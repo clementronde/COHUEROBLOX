@@ -380,6 +380,137 @@ def mage_cape():
 
 
 # =============================================================================================
+# Armes de départ (A01-05). Origine = centre de la prise ; l'arme pointe vers +Z (Blender), soit +Y
+# dans Roblox. Lame ou manche épais d'au moins 2 voxels pour rester lisible de loin.
+
+WEAPON = {"kind": "weapon"}
+
+
+def weapon_broadsword():
+    """Knight : épée large ; le pommeau est un canard (clin d'œil à la cape)."""
+    v = Vox("Weapon_Broadsword")
+    v.box(-1, 0, -1, 0, -2, 1, "Leather")          # prise
+    v.box(-1, 0, -1, 0, -1, -1, "Leather.d")
+    v.box(-4, 3, -1, 0, 2, 2, "Royal")             # garde
+    v.box(-4, -4, -1, 0, 3, 3, "Royal.l")
+    v.box(3, 3, -1, 0, 3, 3, "Royal.l")
+    v.box(-2, 1, -1, -1, 3, 14, "Steel")           # lame 1 x 0,25 stud
+    v.box(-1, 0, -1, -1, 15, 15, "Steel")          # pointe
+    v.box(-1, 0, 0, 0, 3, 13, "Steel.d")           # gorge au dos de la lame
+    v.box(-1, 0, -2, 0, -4, -3, "Gold")            # pommeau-canard
+    v.set(-1, -3, -3, "Ember")                     # bec
+    v.set(0, -2, -3, "Ink")                        # œil
+    return v, (0, 0, 0), {**WEAPON, "class": "Knight", "weapon": "Broadsword", "gag": "pommeau en canard"}
+
+
+def weapon_longbow():
+    """Archer : arc long ; une feuille pousse au bout de la branche."""
+    v = Vox("Weapon_Longbow")
+    arc = [(-1, -9, -6), (-2, -5, -3), (-2, -2, 2), (-2, 3, 5), (-1, 6, 9)]
+    for y, z0, z1 in arc:
+        v.box(0, 0, y, y, z0, z1, "Bark")
+        v.box(-1, -1, y, y, z0, z1, "Bark")
+    v.box(-1, 0, -3, -2, -1, 1, "Leaf")            # poignée enroulée
+    v.box(-1, 0, 0, 0, -9, 9, "Cream")             # corde
+    v.box(-1, 0, -1, -1, 10, 10, "Leaf")           # la feuille qui pousse
+    v.set(0, -2, 11, "Leaf.l")
+    return v, (0, -2, 0), {**WEAPON, "class": "Archer", "weapon": "Longbow", "gag": "une feuille pousse au bout"}
+
+
+def weapon_firestaff():
+    """Mage : bâton de feu ; une guimauve grille sous la flamme."""
+    v = Vox("Weapon_FireStaff")
+    v.box(-1, 0, -1, 0, -8, 9, "Bark")
+    v.box(-1, 0, -1, 0, -8, -8, "Bark.d")
+    v.box(-2, 1, -2, 1, 10, 10, "Gold")            # griffe
+    for x, y in ((-2, -2), (1, -2), (-2, 1), (1, 1)):
+        v.set(x, y, 11, "Gold")
+        v.set(x, y, 12, "Gold")
+    v.box(-1, 0, -1, 0, 11, 13, "Ember")           # cristal de feu (cube Neon dans Studio)
+    v.box(-1, 0, -1, 0, 14, 14, "Gold.l")
+    v.box(1, 2, -1, 0, 7, 8, "Cream")              # la guimauve piquée sur une branche
+    v.set(1, -1, 9, "Bark")
+    v.set(1, 0, 8, "Leather.l")                    # côté grillé
+    return v, (0, 0, 0), {**WEAPON, "class": "Mage", "weapon": "FireStaff", "gag": "guimauve qui grille",
+                           "neon_core_at": [0, 0, 12], "neon_core_size": 0.5}
+
+
+def weapon_quakehammer():
+    """Guardian : marteau sismique ; un pansement sur la tête du marteau."""
+    v = Vox("Weapon_QuakeHammer")
+    v.box(-1, 0, -1, 0, -8, 7, "Bark")
+    v.box(-1, 0, -1, 0, -8, -8, "Steel.d")
+    v.box(-4, 3, -2, 1, 8, 12, "Stone")            # tête 2 x 1 x 1,25 studs
+    v.paint(-4, 3, -2, 1, 8, 8, "Stone.d")
+    v.box(-5, -5, -2, 1, 8, 12, "Steel")           # faces de frappe
+    v.box(4, 4, -2, 1, 8, 12, "Steel")
+    v.box(-2, 1, -3, -3, 10, 10, "Cream")          # pansement en croix
+    v.box(-1, 0, -3, -3, 9, 11, "Cream")
+    return v, (0, 0, 0), {**WEAPON, "class": "Guardian", "weapon": "QuakeHammer", "gag": "pansement sur le marteau"}
+
+
+def weapon_throwingdagger():
+    """Rogue : dague de lancer (projectile) ; ruban rouge noué au pommeau."""
+    v = Vox("Weapon_ThrowingDagger")
+    v.box(-1, 0, -1, 0, -1, 0, "Plum")             # prise
+    v.box(-2, 1, -1, 0, 1, 1, "Steel.d")           # garde
+    v.box(-1, 0, -1, -1, 2, 5, "Steel")            # lame
+    v.set(-1, -1, 6, "Steel.l")
+    v.box(0, 1, 0, 0, -2, -2, "Tomato")            # ruban
+    v.set(1, 1, -3, "Tomato")
+    return v, (0, 0, 0), {**WEAPON, "class": "Rogue", "weapon": "ThrowingDaggers", "gag": "ruban noué"}
+
+
+def weapon_holybell():
+    """Cleric : l'Aura sacrée sonne avec une cloche de cantine en porcelaine."""
+    v = Vox("Weapon_HolyBell")
+    v.box(-1, 0, -1, 0, -4, 1, "Leather")          # manche
+    v.box(-1, 0, -1, 0, 2, 2, "Gold")
+    for z, r in ((3, 2), (4, 2), (5, 3), (6, 3), (7, 4)):
+        v.box(-r, r - 1, -r, r - 1, z, z, "Cream")
+    v.carve(-3, 2, -3, 2, 6, 7)
+    v.paint(-4, 3, -4, 3, 7, 7, "Gold")            # bord doré
+    v.box(-1, 0, -1, 0, 6, 8, "Sky")               # battant
+    return v, (0, 0, 0), {**WEAPON, "class": "Cleric", "weapon": "HolyAura", "gag": "cloche de cantine"}
+
+
+def weapon_spinningaxe():
+    """Barbarian : hache de jet ; un smiley gravé sur le fer."""
+    v = Vox("Weapon_SpinningAxe")
+    v.box(-1, 0, -1, 0, -5, 5, "Bark")
+    v.box(-1, 0, -1, 0, -5, -5, "Tomato")          # bout de manche peint
+    v.box(1, 4, -1, 0, 2, 6, "Steel")              # fer
+    v.box(5, 5, -1, 0, 1, 7, "Steel.l")            # tranchant
+    v.box(-3, -2, -1, 0, 3, 5, "Steel.d")          # contre-poids
+    v.set(2, -2, 5, "Ink")                         # smiley gravé
+    v.set(4, -2, 5, "Ink")
+    v.box(2, 4, -2, -2, 3, 3, "Ink")
+    return v, (0, 0, 0), {**WEAPON, "class": "Barbarian", "weapon": "SpinningAxes", "gag": "smiley gravé"}
+
+
+def weapon_beastwhip():
+    """Tamer : fouet enroulé ; un pompon de cirque au bout."""
+    v = Vox("Weapon_BeastWhip")
+    v.box(-1, 0, -1, 0, -4, 1, "Leather")          # manche
+    v.box(-1, 0, -1, 0, 2, 2, "Ember")
+    v.box(-1, 0, -1, 0, -5, -5, "Ember")
+    # lanière enroulée en anneaux carrés autour du manche
+    for z in (2, 4, 6):
+        for x in range(-3, 3):
+            for y in range(-3, 3):
+                if max(abs(x + 0.5), abs(y + 0.5)) == 2.5:
+                    v.set(x, y, z, "Bark" if z != 4 else "Leather.d")
+    v.line((2, -3, 7), (3, -4, 10), "Bark")
+    v.box(3, 4, -5, -4, 11, 12, "Tomato")          # pompon
+    v.set(4, -5, 13, "Gold")
+    return v, (0, 0, 0), {**WEAPON, "class": "Tamer", "weapon": "BeastWhip", "gag": "pompon de cirque"}
+
+
+WEAPONS = [weapon_broadsword, weapon_longbow, weapon_firestaff, weapon_quakehammer, weapon_throwingdagger,
+           weapon_holybell, weapon_spinningaxe, weapon_beastwhip]
+
+
+# =============================================================================================
 # Ébauches (planche des silhouettes uniquement, pas des livrables)
 
 
@@ -562,4 +693,4 @@ EQUIPMENT = [knight_helm, knight_pauldron, knight_cape, archer_hood, archer_brac
 BLOCKOUTS = [zombie_shambler, zombie_runner, zombie_bloater, zombie_gravedigger,
              ghost_wisp, ghost_poltergeist, ghost_banshee, ghost_armor]
 PROPS = [lambda: prop_tree(0), lambda: prop_tree(1), prop_rock]
-DELIVERABLES = ENEMIES + FX + EQUIPMENT
+DELIVERABLES = ENEMIES + FX + EQUIPMENT + WEAPONS
