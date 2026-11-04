@@ -2,9 +2,13 @@
 -- Réglages du mouvement, de la caméra et de MovementGuard (A06, domaine avatar).
 -- Design : docs/dossier/50-classes-avatar-mouvement.md sections 4 à 7. Tous les nombres du domaine sont ici.
 --
--- Profils de classe : `Movement.Classes[classId]`, lu par MovementController (client) et MovementGuard
+-- Profils de classe : `Movement.profile(classId)`, lu par MovementController (client) et MovementGuard
 -- (serveur) à partir de l'attribut serveur `Player.ClassId`. La classe donne les stats de mouvement,
--- jamais l'apparence de l'avatar. Une classe absente de la table reçoit le profil par défaut.
+-- jamais l'apparence de l'avatar.
+-- Deux sources, sans doublon : `Config/Classes` (A04) donne les nombres de base et les drapeaux
+-- (walkSpeed, jumpHeight, airJumps, glide + glideSeconds, heavyLanding, slideBoost) ; `Movement.Classes`
+-- ci-dessous ne donne que les réglages fins du mouvement (vitesse de plané, contrecoup d'atterrissage,
+-- gravité, frottement de glissade...). Une classe inconnue reçoit le profil normal.
 
 export type Glide = {
 	fallSpeed: number, -- studs/s de chute max en planant
@@ -85,25 +89,21 @@ local Movement = {
 	SlidingAttrTimeout = 2.5, -- s avant que le serveur efface Sliding de lui-même
 	HopMinInterval = 0.2, -- s entre deux hops comptés
 
-	-- Profils de mouvement par classe (ids de 01-decisions-v2.md section 3)
+	-- Réglages fins par classe (ids de 01-decisions-v2.md section 3). Les nombres de base et les drapeaux
+	-- viennent de Config/Classes (A04) : voir Movement.profile.
 	Classes = {
-		Knight = {},
-		Cleric = {},
-		Tamer = {},
-		Archer = { jumpHeight = 11 }, -- saut haut (x1,5)
-		Rogue = { airJumps = 1 }, -- double saut
-		Mage = { glide = { fallSpeed = 6, duration = 1.1 } }, -- plané court (Saut maintenu en descente)
+		Mage = { glide = { fallSpeed = 6, duration = 1.1 } }, -- vitesse du plané ; durée : glideSeconds d'A04
 		Guardian = {
-			walkSpeed = 13.6, -- -15 %
-			jumpHeight = 6.5,
-			gravityMult = 1.2,
+			gravityMult = 1.2, -- tombe plus vite : sauts courts, atterrissages lourds
 			heavyLanding = { minFall = 8, slowMult = 0.6, slowTime = 0.25, shake = 0.7 },
 		},
 		Barbarian = {
-			-- glissade qui charge : plus rapide, plus longue, braque mieux
-			slide = { boost = 1.45, friction = 6, endMult = 0.5, maxFlatTime = 2.2, maxMult = 2.4, steer = 4, charge = true },
+			-- glissade qui charge : plus longue, braque mieux (boost : slideBoost d'A04)
+			slide = { friction = 6, endMult = 0.5, maxFlatTime = 2.2, maxMult = 2.4, steer = 4, charge = true },
 		},
 	} :: { [string]: ClassMove },
+	HeavyLandingDefault = { minFall = 8, slowMult = 0.6, slowTime = 0.25, shake = 0.7 } :: HeavyLanding,
+	GlideFallSpeedDefault = 6,
 
 	-- Croissance du trait (lu par TraitService, domaine A04). Gardé tel quel en attendant que A04
 	-- remplace TraitService par l'équipement voxel ; à déplacer chez A04 à ce moment-là.
@@ -192,7 +192,7 @@ local Movement = {
 		HoverLimit = 3.5, -- s en l'air...
 		HoverRange = 2, -- ...avec moins de 2 studs d'amplitude verticale = vol stationnaire
 		FlyMargin = 8, -- studs au-dessus de la plus haute hauteur de saut de la classe = vol
-		HoverEnforce = false, -- mode ombre : log seulement
+		HoverEnforce = true, -- vol stationnaire, vol, montée trop rapide, trop haut trop longtemps : recalage
 		Enforce = true, -- false = log seulement pour vitesse et téléport aussi
 		LogEvery = 5,
 		HeavyFall = 8, -- chute mesurée par le serveur pour l'attribut HeavyLandAt (classes à atterrissage lourd)
@@ -203,18 +203,67 @@ local Movement = {
 		SlideCooldownSlack = 0.6, -- part de SlideCooldown exigée entre SlideEnd et SlideStart reçus (gigue réseau)
 		SlideProtectExtra = 0.3, -- s : une glissade lancée juste après un saut garde la chaîne de hops maxFlatTime + ça
 		StallMinVelocity = 2, -- studs/s : le gel ne compte que si la vitesse répliquée dit que le joueur bouge
+		-- Règles v2 (docs/security/regles-v2.md §1)
+		FlyHeight = 12, -- studs de root au-dessus de Heightmap.getY, hors sol vu par le serveur...
+		FlyTime = 2, -- ...pendant plus de ça : recalage (S-01)
+		RiseMargin = 1.2, -- montée par échantillon <= vitesse de saut de la classe x ça x temps (S-01)
+		RiseSlackStuds = 1,
+		ExemptBoundFactor = 3, -- pendant une exemption, pas <= vitesse max x temps x ça + portée de lancement (S-02)
+		ExemptLaunchStuds = 12,
+		SlideValidateInterval = 1.5, -- s entre deux glissades validées (attribut Sliding, Shadowstep) (S-08)
+		SlideMinMeasured = 0.8, -- part de SlideMinSpeed exigée sur la vitesse mesurée par le serveur
+		HopLandWindow = 0.3, -- s : un Hop n'est crédité que si le serveur a vu le sol aussi récemment (S-08)
 	},
 }
 
--- Profil résolu d'une classe (valeurs par défaut comprises). Ne renvoie jamais nil.
+local profileCache: { [string]: ClassMove } = {}
+local EMPTY: ClassMove = {}
+
+-- Profil résolu d'une classe : nombres de base et drapeaux de Config/Classes (A04), réglages fins de
+-- Movement.Classes. Mis en cache par id. Ne renvoie jamais nil.
 function Movement.profile(classId: any): ClassMove
-	if type(classId) == "string" then
-		local p = Movement.Classes[classId]
-		if p then
-			return p
-		end
+	if type(classId) ~= "string" then
+		return EMPTY
 	end
-	return {}
+	local cached = profileCache[classId]
+	if cached then
+		return cached
+	end
+	local okClasses, Classes = pcall(function()
+		return (require :: any)(script.Parent:WaitForChild("Classes", 5))
+	end)
+	local def = if okClasses and type(Classes) == "table" then Classes[classId] else nil
+	if type(def) ~= "table" then
+		def = nil
+	end
+	local id = if def and type(def.id) == "string" then def.id else classId
+	local tune: ClassMove = Movement.Classes[id] or EMPTY
+	local p: ClassMove = {
+		walkSpeed = if def and type(def.walkSpeed) == "number" then def.walkSpeed else tune.walkSpeed,
+		jumpHeight = if def and type(def.jumpHeight) == "number" then def.jumpHeight else tune.jumpHeight,
+		gravityMult = tune.gravityMult,
+		airJumps = if def and type(def.airJumps) == "number" then def.airJumps else tune.airJumps,
+		glide = tune.glide,
+		heavyLanding = tune.heavyLanding,
+		slide = tune.slide,
+	}
+	if def and def.glide == true then
+		local base = tune.glide
+		p.glide = {
+			fallSpeed = if base then base.fallSpeed else Movement.GlideFallSpeedDefault,
+			duration = if type(def.glideSeconds) == "number" then def.glideSeconds elseif base then base.duration else 1.1,
+		}
+	end
+	if def and def.heavyLanding == true and not p.heavyLanding then
+		p.heavyLanding = Movement.HeavyLandingDefault
+	end
+	if def and type(def.slideBoost) == "number" then
+		local slide = table.clone(tune.slide or {})
+		slide.boost = def.slideBoost
+		p.slide = slide
+	end
+	profileCache[classId] = p
+	return p
 end
 
 function Movement.walkSpeed(p: ClassMove): number
