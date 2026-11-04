@@ -96,7 +96,15 @@ local function activePlayers(): { { player: Player, x: number, z: number, feet: 
 			end
 			if active then
 				local p = root.Position
-				table.insert(out, { player = player, x = p.X, z = p.Z, feet = p.Y - hum.HipHeight - root.Size.Y / 2 })
+				-- S-01 : hauteur des pieds retenue par RunManager (au sol après 1,5 s en l'air)
+				local feet = p.Y - hum.HipHeight - root.Size.Y / 2
+				if run and run.getDamageFeetY then
+					local ok, y = pcall(run.getDamageFeetY, player)
+					if ok and type(y) == "number" then
+						feet = y
+					end
+				end
+				table.insert(out, { player = player, x = p.X, z = p.Z, feet = feet })
 			end
 		end
 	end

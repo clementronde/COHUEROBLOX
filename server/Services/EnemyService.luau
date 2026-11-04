@@ -277,7 +277,15 @@ local function gatherTargets(): ({ Target }, { Player })
 			end
 			if active then
 				local p = root.Position
-				table.insert(list, { player = player, x = p.X, y = p.Y - 3, z = p.Z })
+				-- S-01 : hauteur des pieds retenue par RunManager (au sol après 1,5 s en l'air)
+				local feet = p.Y - 3
+				if run and run.getDamageFeetY then
+					local ok, y = pcall(run.getDamageFeetY, player)
+					if ok and type(y) == "number" then
+						feet = y
+					end
+				end
+				table.insert(list, { player = player, x = p.X, y = feet, z = p.Z })
 			end
 		end
 	end
@@ -377,6 +385,10 @@ local function spawnScaled(kind: number, x: number, z: number, elite: boolean, h
 		hp *= Run.EliteHpMult
 	end
 	local dmg = scaledDamage() * (if elite then Run.Player.EliteDamageMult else 1)
+	-- Règles anti-triche §5.2 : jamais inf ni NaN, même après des heures d'Overtime.
+	local cap = Run.Overtime.ValueCap
+	hp = if hp == hp then math.min(hp, cap) else cap
+	dmg = if dmg == dmg then math.min(dmg, cap) else cap
 	return insertEnemy(kind, x, z, hp, dmg, elite, false, noLoot)
 end
 
