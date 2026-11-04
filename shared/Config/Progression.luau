@@ -109,7 +109,7 @@ Progression.ItemSilverByRarity = {
 -- Worlds: tier 1 unlock rule; tier n+1 needs stats["Win_<world>_T<n>"] >= 1.
 Progression.WorldUnlock = {
 	BoisGrognon = { free = true },
-	DunesCroustillantes = { stat = "ShrinesTrialCompleted", goal = 10 },
+	DunesCroustillantes = { stat = "TrialShrinesCompleted", goal = 10 },
 	RecreFantome = { stat = "Win_DunesCroustillantes_T2", goal = 1 },
 } :: { [string]: { free: boolean?, stat: string?, goal: number? } }
 
@@ -120,12 +120,15 @@ Progression.Silver = {
 	VictoryByTier = { 10, 25, 60 } :: { number },
 	DefeatShare = 0.4,
 	DefeatMin = 2,
+	-- Anti-farm (review finding 1): a defeat pays nothing, and RunsPlayed / mastery / bond are not
+	-- credited, unless the player started the run and lasted at least this long.
+	MinRunSecondsForRewards = 120,
 	FinalWavePer30sByTier = { 2, 5, 12 } :: { number },
 	FinalWaveMaxSteps = 20,
 }
 
 -- Silver shop (doc 11.1): levels and prices. getMetaBonuses returns totals.
-Progression.MetaBase = { weaponSlots = 4, grimoireSlots = 4, banish = 0, skip = 0, reroll = 1 }
+Progression.MetaBase = { weaponSlots = 4, grimoireSlots = 4, banish = 1, skip = 1, reroll = 2 }
 Progression.ShopUpgrades = {
 	Shop_GrimoireSlot = { field = "grimoireSlots", prices = { 300, 800 } },
 	Shop_Banish = { field = "banish", prices = { 100, 250, 500 } },
@@ -168,13 +171,15 @@ Progression.Bond = {
 	StatBonusStep = 0.01,
 	StatBonusMax = 0.10,
 	EggAtLevel = 10, -- one free egg the first time each line reaches it
+	-- Aligned with Config.Companions.Bond (companion domain): tints 4/10/20/28, pose 12, title 30.
+	-- Start techniques are read by CompanionService from the bond level (StartTechUnlock).
 	Rewards = { -- "<L>" = line id
-		[5] = "CompanionTint_<L>_B5",
-		[10] = "AltTech_<L>_B10",
-		[15] = "CompanionTint_<L>_B15",
-		[20] = "AltTech_<L>_B20",
-		[25] = "CompanionTint_<L>_B25",
-		[30] = "Pose_<L>_B30",
+		[4] = "CompanionTint_<L>_B4",
+		[10] = "CompanionTint_<L>_B10",
+		[12] = "Pose_<L>_B12",
+		[20] = "CompanionTint_<L>_B20",
+		[28] = "CompanionTint_<L>_B28",
+		[30] = "Title_<L>_B30",
 	} :: { [number]: string },
 }
 

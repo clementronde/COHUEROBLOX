@@ -94,7 +94,12 @@ end
 local function fallbackPress(name: string, pressed: boolean)
 	if name == "Ultimate" then
 		if pressed then
-			Net.event("CompanionUltimate"):FireServer()
+			local cr = Registry.find("CompanionRenderer")
+			if cr and type(cr.requestUltimate) == "function" then
+				cr.requestUltimate()
+			else
+				Net.event("CompanionUltimate"):FireServer()
+			end
 		end
 	elseif name == "Jump" then
 		local character = Players.LocalPlayer.Character
@@ -129,8 +134,8 @@ end
 function UIInput.bindButton(name: string, button: GuiButton, onPress: ((pressed: boolean) -> ())?): string
 	local ic = controller()
 	if ic and type(ic.bindButton) == "function" then
-		local ok = pcall(ic.bindButton, name, button)
-		if ok then
+		local ok, binding = pcall(ic.bindButton, name, button)
+		if ok and binding ~= nil then
 			if onPress then
 				button.InputBegan:Connect(function(input)
 					if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then

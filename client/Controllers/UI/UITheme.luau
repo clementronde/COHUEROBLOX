@@ -622,7 +622,7 @@ function UITheme.def(configName: string, id: string): any
 	if type(direct) == "table" then
 		return direct
 	end
-	for _, key in { "Defs", "Lines", "List", "All", "ById", configName } do
+	for _, key in { "Defs", "Lines", "Techs", "Treats", "Kinds", "List", "All", "ById", configName } do
 		local sub = cfg[key]
 		if type(sub) == "table" then
 			if type(sub[id]) == "table" then

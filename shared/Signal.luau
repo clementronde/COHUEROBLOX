@@ -1,5 +1,9 @@
 --!strict
--- Minimal in-VM signal. Each handler runs in its own thread so one error cannot break others.
+-- Minimal in-VM signal (EnemyKilled can fire hundreds of times a second).
+-- Each handler runs in its own thread (task.spawn): errors and yields stay isolated, because some
+-- handlers yield (DataStore, waits). Copy-on-write: connect/disconnect replace the handler array,
+-- so fire() iterates without cloning. TODO(perf): once every handler is verified non-yielding,
+-- switch hot events to synchronous pcall calls (review finding 7).
 
 export type Connection = {
 	disconnect: () -> (),
@@ -17,20 +21,25 @@ function Signal.new(): Signal
 	local self = {}
 
 	function self.connect(_: any, handler: (...any) -> ()): Connection
-		table.insert(handlers, handler)
+		local copy = table.clone(handlers)
+		table.insert(copy, handler)
+		handlers = copy
 		return {
 			disconnect = function()
 				local i = table.find(handlers, handler)
 				if i then
-					table.remove(handlers, i)
+					local next = table.clone(handlers)
+					table.remove(next, i)
+					handlers = next
 				end
 			end,
 		}
 	end
 
 	function self.fire(_: any, ...: any)
-		for _, handler in table.clone(handlers) do
-			task.spawn(handler, ...)
+		local list = handlers
+		for i = 1, #list do
+			task.spawn(list[i], ...)
 		end
 	end
 

@@ -48,21 +48,23 @@ Valeurs de base : `WalkSpeed` 16 studs/s, `JumpHeight` 7,2 studs (`UseJumpPower 
 | Cristallin | 1 cristal 0,4 × 0,9 par épaule | 2 cristaux | 3 cristaux | 4 cristaux + `PointLight` |
 | Tentaculos | 4 tentacules de 3 boules (≈ 1,8) | 6 tentacules | Ventouses lumineuses | 8 tentacules |
 
-Teintes : 3 teintes gratuites par classe (`tints`), index lu dans `profile.equipped.TraitTint` (domaine data, défaut 1).
+Teintes : 3 teintes gratuites par classe (`tints`), index lu dans `profile.equipped.TraitTint` s'il vaut un nombre (domaine data, défaut 1). Échelles de stade et seuils de niveau : `Config.Movement.Trait` (Classes reste une table `{ [classId]: ClassDef }`, triable par `order`).
 
 ### 2.2 Déblocage (à coordonner avec le domaine data)
 
-Gratuites : Cornu, Plumeline, Mecano (`unlock = "Free"`). Les autres : `unlock = "Q_<ClassId>"`. **Proposition** d'ids et d'objectifs pour `shared/Config/Quests.luau` (domaine data, qui reste maître des ids et des clés) :
+Gratuites : Cornu, Plumeline, Mecano (`unlock = "Free"`). Les autres : `unlock = "Q_<ClassId>"`. Les objectifs sont fixés par le domaine data (`70-donnees-progression-monetisation.md`, section Classes) ; rappel :
 
-| Quête | Objectif proposé | Clé de stat proposée |
-| --- | --- | --- |
-| `Q_Felyne` | 500 bunny-hops réussis au total | `Hops` (envoyée par MovementGuard) |
-| `Q_Rocailleux` | Encaisser 50 000 dégâts au total | `DamageTaken` |
-| `Q_Sporelin` | Tuer 5 000 ennemis | `Kills` |
-| `Q_Ecaille` | Atteindre le niveau 30 dans une run | `MaxLevel` |
-| `Q_Astrel` | Ouvrir 100 coffres | `ChestsOpened` |
-| `Q_Cristallin` | Charger 50 autels | `ShrinesCompleted` |
-| `Q_Tentaculos` | Finir un stage avec 5 armes | `StageWith5Weapons` |
+| Quête | Objectif (domaine data) |
+| --- | --- |
+| `Q_Felyne` | `Kills` ≥ 5 000 |
+| `Q_Rocailleux` | `DamageTaken` ≥ 50 000 |
+| `Q_Sporelin` | `ShrinesCompleted` ≥ 25 |
+| `Q_Ecaille` | `BossesDefeated` ≥ 5 |
+| `Q_Astrel` | `ChestsOpened` ≥ 100 |
+| `Q_Cristallin` | `BestRunLevel` ≥ 30 |
+| `Q_Tentaculos` | `FullBuildStageClears` ≥ 1 |
+
+Le domaine avatar envoie en plus la clé `Hops` (`ProgressionService.recordStat(player, "Hops", 1)` par hop validé) pour de futures quêtes de mouvement.
 
 Le serveur vérifie le déblocage (`ProgressionService.isUnlocked(player, "Class", id)`) ; jamais vendu en Robux.
 

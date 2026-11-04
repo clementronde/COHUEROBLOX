@@ -1,0 +1,36 @@
+{
+  "name": "COHUE-test",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "Shared": { "$path": "../shared" },
+      "Assets": {
+        "$className": "Folder",
+        "Creatures": { "$path": "../assets/creatures" }
+      }
+    },
+    "ServerScriptService": {
+      "Server": { "$path": "../server" }
+    },
+    "StarterPlayer": {
+      "$properties": {
+        "CharacterUseJumpPower": false,
+        "CharacterJumpHeight": 7.2
+      },
+      "StarterPlayerScripts": {
+        "Client": { "$path": "../client" }
+      }
+    },
+    "Workspace": {
+      "SpawnLocation": {
+        "$className": "SpawnLocation",
+        "$properties": {
+          "Anchored": true,
+          "Size": [12, 1, 12],
+          "Position": [0, 0.5, 0],
+          "Neutral": true
+        }
+      }
+    }
+  }
+}

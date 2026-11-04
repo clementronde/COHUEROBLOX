@@ -6,16 +6,16 @@
 export type Source = "Free" | "Mastery" | "Bond" | "Tokens" | "Quest" | "Weekly" | "Pass" | "Product"
 export type CosmeticDef = {
 	id: string,
-	-- base slot: Tint | Pose | CompanionTint | CompanionPose | AltTech | Title | Emote | Footstep | Aura
+	-- base slot: Tint | Pose | CompanionTint | CompanionPose | Title | Emote | Footstep | Aura
 	-- Equip slots: "Tint:<classId>", "Pose:<classId>", "CompanionTint:<line>", "CompanionPose:<line>",
-	-- "AltTech:<line>", "Title", "Emote", "Footstep", "Aura".
+	-- "Title", "Emote", "Footstep", "Aura". ("StartTech:<line>" takes a technique id, not a cosmetic.)
 	slot: string,
 	name: { fr: string, en: string },
 	source: Source,
 	price: number?, -- quest tokens, when source == "Tokens"
 	pass: string?, -- pass key, when source == "Pass"
 	classId: string?, -- restricts Tint/Pose to one class
-	line: string?, -- restricts CompanionTint/AltTech/Pose to one companion line
+	line: string?, -- restricts CompanionTint/CompanionPose (and line titles) to one companion line
 	color: Color3?, -- tints: display colour (no asset ids)
 }
 
@@ -101,9 +101,9 @@ for _, classId in CLASSES do
 	})
 end
 
--- Per companion line: bond tints (5/15/25), alternative start techniques (10/20), pose (30)
+-- Per companion line (levels match Config.Companions.Bond): tints 4/10/20/28, pose 12, title 30
 for _, line in LINES do
-	for _, lvl in { 5, 15, 25 } do
+	for _, lvl in { 4, 10, 20, 28 } do
 		add({
 			id = `CompanionTint_{line}_B{lvl}`,
 			slot = "CompanionTint",
@@ -112,26 +112,24 @@ for _, line in LINES do
 			line = line,
 		})
 	end
-	for _, lvl in { 10, 20 } do
-		add({
-			id = `AltTech_{line}_B{lvl}`,
-			slot = "AltTech",
-			name = { fr = `Technique de départ {lvl}`, en = `Start technique {lvl}` },
-			source = "Bond",
-			line = line,
-		})
-	end
 	add({
-		id = `Pose_{line}_B30`,
+		id = `Pose_{line}_B12`,
 		slot = "CompanionPose",
 		name = { fr = "Pose complice", en = "Partner pose" },
+		source = "Bond",
+		line = line,
+	})
+	add({
+		id = `Title_{line}_B30`,
+		slot = "Title",
+		name = { fr = "Inséparable", en = "Inseparable" },
 		source = "Bond",
 		line = line,
 	})
 end
 
 -- Quest-token shop
-local TOKEN_ITEMS: { { string, string, string, string, number } } = {
+local TOKEN_ITEMS: { { any } } = {
 	{ "Title_Explorateur", "Title", "Explorateur", "Explorer", 60 },
 	{ "Title_Chasseur", "Title", "Chasseur", "Hunter", 60 },
 	{ "Title_Increvable", "Title", "Increvable", "Unbreakable", 120 },
@@ -152,7 +150,7 @@ for _, t in TOKEN_ITEMS do
 end
 
 -- Quest and weekly rewards
-local QUEST_ITEMS: { { string, string, string, string } } = {
+local QUEST_ITEMS: { { any } } = {
 	{ "Title_Centurion", "Title", "Centurion", "Centurion" },
 	{ "Title_Survivant", "Title", "Survivant", "Survivor" },
 	{ "Title_Collectionneur", "Title", "Collectionneur", "Collector" },
@@ -168,7 +166,7 @@ end
 add({ id = "Title_Weekly", slot = "Title", name = { fr = "Défieur", en = "Challenger" }, source = "Weekly" })
 
 -- Game passes (Products.luau owns the pass ids)
-local PREMIUM_TINTS: { { string, string, string, Color3 } } = {
+local PREMIUM_TINTS: { { any } } = {
 	{ "Or", "Or pur", "Pure gold", Color3.fromRGB(255, 205, 60) },
 	{ "Nacre", "Nacre", "Pearl", Color3.fromRGB(240, 235, 250) },
 	{ "Neon", "Néon", "Neon", Color3.fromRGB(60, 255, 160) },
@@ -186,7 +184,7 @@ for _, t in PREMIUM_TINTS do
 		color = t[4],
 	})
 end
-local EMOTES: { { string, string, string } } = {
+local EMOTES: { { any } } = {
 	{ "Danse", "Petite danse", "Little dance" },
 	{ "Salut", "Révérence", "Bow" },
 	{ "Flex", "Muscles", "Flex" },
@@ -200,7 +198,7 @@ end
 add({ id = "Title_VIP", slot = "Title", name = { fr = "VIP", en = "VIP" }, source = "Pass", pass = "VIP" })
 
 -- Developer products (permanent cosmetic packs; Products.luau maps product -> cosmetics)
-local PRODUCT_ITEMS: { { string, string, string, string } } = {
+local PRODUCT_ITEMS: { { any } } = {
 	{ "Tint_Pack_Braise", "Tint", "Braise", "Ember" },
 	{ "Tint_Pack_Magma", "Tint", "Magma", "Magma" },
 	{ "Tint_Pack_Soleil", "Tint", "Soleil", "Sun" },

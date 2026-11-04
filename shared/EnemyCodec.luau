@@ -104,4 +104,87 @@ function Codec.forEach(b: buffer, count: number, fn: (id: number, x: number, z: 
 	end
 end
 
+-- Enemy projectiles (dossier 20 section 4.5), reliable remote, one buffer per server tick:
+--   header: spawnCount u16 | removedCount u16
+--   spawn:  id u16 | x f32 | y f32 | z f32 | angle f32 | speed f32 | life f32 | radius f32 | t0 f64 | color u8 u8 u8
+--   removed: id u16
+-- The client replays motion in closed form: pos = origin + dir * speed * (serverNow - t0).
+export type Projectile = {
+	id: number,
+	x: number,
+	y: number,
+	z: number,
+	angle: number,
+	speed: number,
+	life: number,
+	radius: number,
+	t0: number,
+	color: Color3,
+}
+
+local P_HEADER = 4
+local P_SPAWN = 2 + 4 * 7 + 8 + 3
+
+function Codec.encodeProjectiles(spawns: { Projectile }, removed: { number }): buffer
+	local b = buffer.create(P_HEADER + #spawns * P_SPAWN + #removed * 2)
+	buffer.writeu16(b, 0, #spawns)
+	buffer.writeu16(b, 2, #removed)
+	local o = P_HEADER
+	for _, p in spawns do
+		buffer.writeu16(b, o, p.id)
+		buffer.writef32(b, o + 2, p.x)
+		buffer.writef32(b, o + 6, p.y)
+		buffer.writef32(b, o + 10, p.z)
+		buffer.writef32(b, o + 14, p.angle)
+		buffer.writef32(b, o + 18, p.speed)
+		buffer.writef32(b, o + 22, p.life)
+		buffer.writef32(b, o + 26, p.radius)
+		buffer.writef64(b, o + 30, p.t0)
+		buffer.writeu8(b, o + 38, math.floor(p.color.R * 255 + 0.5))
+		buffer.writeu8(b, o + 39, math.floor(p.color.G * 255 + 0.5))
+		buffer.writeu8(b, o + 40, math.floor(p.color.B * 255 + 0.5))
+		o += P_SPAWN
+	end
+	for _, id in removed do
+		buffer.writeu16(b, o, id)
+		o += 2
+	end
+	return b
+end
+
+-- Returns nil for anything malformed.
+function Codec.decodeProjectiles(b: buffer): ({ Projectile }?, { number }?)
+	local len = buffer.len(b)
+	if len < P_HEADER then
+		return nil, nil
+	end
+	local ns, nr = buffer.readu16(b, 0), buffer.readu16(b, 2)
+	if len ~= P_HEADER + ns * P_SPAWN + nr * 2 then
+		return nil, nil
+	end
+	local spawns: { Projectile } = table.create(ns)
+	local o = P_HEADER
+	for k = 1, ns do
+		spawns[k] = {
+			id = buffer.readu16(b, o),
+			x = buffer.readf32(b, o + 2),
+			y = buffer.readf32(b, o + 6),
+			z = buffer.readf32(b, o + 10),
+			angle = buffer.readf32(b, o + 14),
+			speed = buffer.readf32(b, o + 18),
+			life = buffer.readf32(b, o + 22),
+			radius = buffer.readf32(b, o + 26),
+			t0 = buffer.readf64(b, o + 30),
+			color = Color3.fromRGB(buffer.readu8(b, o + 38), buffer.readu8(b, o + 39), buffer.readu8(b, o + 40)),
+		}
+		o += P_SPAWN
+	end
+	local removed: { number } = table.create(nr)
+	for k = 1, nr do
+		removed[k] = buffer.readu16(b, o)
+		o += 2
+	end
+	return spawns, removed
+end
+
 return Codec

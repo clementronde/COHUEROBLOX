@@ -21,8 +21,15 @@ local Registry = require(Shared:WaitForChild("Registry"))
 local Config = Shared:WaitForChild("Config")
 local Classes = require(Config:WaitForChild("Classes"))
 local Movement = require(Config:WaitForChild("Movement"))
+local Heightmap = require(Shared:WaitForChild("Heightmap"))
 
 local G = Movement.Guard
+
+-- Launches applied by the client that the server must tolerate (integration fix):
+-- jump pads from the shared stage layout, and the sandstorm push (Worlds hazard pushSpeed = 6).
+local PAD_RADIUS = 6 -- studs around a pad centre that start the grace window
+local PAD_GRACE = 2.5 -- seconds: covers the launch arc onto the plateau
+local SANDSTORM_PUSH = 8 -- studs/s added while CohueHazard == "Sandstorm" (pushSpeed + margin)
 
 type State = {
 	lastPos: Vector3,
@@ -150,6 +157,17 @@ local function sample(player: Player, dt: number)
 	end
 
 	local now = os.clock()
+	-- Standing on a jump pad starts a short exemption (the client applies the launch).
+	local layout = Heightmap.getLayout()
+	if layout then
+		for _, pad in layout.pads do
+			local dx, dz = pos.X - pad.x, pos.Z - pad.z
+			if dx * dx + dz * dz < PAD_RADIUS * PAD_RADIUS then
+				s.exemptUntil = math.max(s.exemptUntil, now + PAD_GRACE)
+				break
+			end
+		end
+	end
 	-- Rebase only: exemptions, seats, anchored, server hitch.
 	if isExempt(player, s, now) or root.Anchored or humanoid.SeatPart ~= nil or dt > G.HitchFactor * G.Interval then
 		s.lastPos = pos
@@ -162,6 +180,9 @@ local function sample(player: Player, dt: number)
 	end
 
 	local vmax = maxSpeed(player)
+	if Workspace:GetAttribute("CohueHazard") == "Sandstorm" then
+		vmax += SANDSTORM_PUSH
+	end
 	local ping = math.clamp(player:GetNetworkPing(), 0, G.PingCap)
 	local horizontal = Vector3.new(pos.X - s.lastPos.X, 0, pos.Z - s.lastPos.Z).Magnitude
 

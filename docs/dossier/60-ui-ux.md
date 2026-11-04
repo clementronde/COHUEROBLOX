@@ -33,7 +33,7 @@ Classement par capacité, pas par devinette (Responsive UI, section 1) :
 - **tablette** = `TouchEnabled` et petit côté ≥ 520 px ;
 - **PC / console** = le reste (`PreferredInput` choisit les indications de touches).
 
-Les tailles de ce document sont en **pixels logiques à l'échelle 1** (référence : téléphone 844×390). Chaque zone d'écran a son propre `UIScale` (jamais imbriqué : double réduction, AI Pitfalls) : échelle = clamp(petit côté / 420, 1, 1,6). Téléphone = 1 (plancher : pas de texte à 6 px), tablette 768 → 1,6 plafonné, PC 1080 → 1,6. Recalculé quand `ViewportSize` change.
+Les tailles de ce document sont en **pixels logiques à l'échelle 1** (référence : téléphone 844×390). Chaque zone d'écran a son propre `UIScale` (jamais imbriqué : double réduction, AI Pitfalls) : échelle = clamp(petit côté / 420, 1, 1,4). Téléphone = 1 (plancher : pas de texte à 6 px), tablette 768 → 1,4 plafonné (1024 px de large = 731 px logiques, assez pour les zones du haut : 220 + 300 + 140), PC 1080 → 1,4. Recalculé quand `ViewportSize` change.
 
 ### 1.2 Thème : module de code plutôt que `StyleSheet`
 
@@ -47,7 +47,8 @@ Le vault (UI Design Systems §4) décrit le style moteur (`StyleSheet` / `StyleR
 | --- | --- | --- | --- | --- |
 | `COHUE_HUD` | HUD | 10 | CoreUISafeInsets | phase Running / Boss / BossDefeated / FinalWave |
 | `COHUE_Minimap` | Minimap | 11 | CoreUISafeInsets | idem (gui séparée : elle bouge à 10 Hz) |
-| `COHUE_PingWorld` | PingUI | 12 | CoreUISafeInsets | toujours en run (flèches de bord) |
+| `COHUE_PingWorld` | PingUI | 12 | None (non interactif, espace de la vue) | toujours en run (flèches de bord) |
+| `COHUE_SettingsGear` | SettingsUI | 13 | CoreUISafeInsets | en run (sous la mini-carte) |
 | `COHUE_Mobile` | MobileButtons | 15 | CoreUISafeInsets | en run |
 | `COHUE_Vignette` | HUD | 24 | None (décor) | à terre |
 | `COHUE_Downed` | HUD | 25 | CoreUISafeInsets | à terre / fantôme |
@@ -191,7 +192,7 @@ Le mode daltonien **change de palette**, pas de filtre (`ColorCorrectionEffect` 
 | Marque | Couleur défaut | Daltonien | Forme (2e canal) | Source |
 | --- | --- | --- | --- | --- |
 | Moi | blanc | blanc | flèche orientée | personnage local |
-| Coéquipier | vert `#4CD964` | vert-bleu `#009E73` | triangle ; croix « + » si à terre | personnages + `PlayerVitals.team` |
+| Coéquipier | vert `#4CD964` | vert-bleu `#009E73` | chevron orienté ; croix « + » si à terre | personnages + `PlayerVitals.team` |
 | Autel | bleu `#3C8CFF` | bleu `#0072B2` | losange (plein si prêt, creux si utilisé) | `ShrineState` |
 | Coffre | jaune `#FFD447` | jaune `#F0E442` | carré | `LootRenderer.getChests()` (demande de contrat) |
 | Boss | rouge `#FF3B30` | vermillon `#D55E00` | grand rond « ! » | `RunState.bossPosition` / `BossState.position` |
@@ -218,7 +219,7 @@ Appui long 0,5 s sur la mini-carte (tactile) → roue de pings à l'endroit touc
 
 | Appareil | Ping rapide (contextuel) | Roue des 6 |
 | --- | --- | --- |
-| PC | clic molette (action `Ping`) au point visé par la souris | maintenir l'action `Ping` 0,3 s, puis cliquer une option |
+| PC | clic molette ou G (action `Ping`) au point visé par la souris | maintenir l'action `Ping` 0,3 s, puis cliquer une option |
 | Téléphone / tablette | bouton Ping (48 px) : point au centre de l'écran | appui long sur la mini-carte (point touché) ou appui long sur le bouton Ping |
 | Manette | croix haut (action `Ping`) au centre de l'écran | maintenir 0,3 s ; sélection manette sur la roue (`SelectedObject`), B ferme |
 

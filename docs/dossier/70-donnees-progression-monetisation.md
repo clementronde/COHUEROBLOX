@@ -33,15 +33,19 @@ Le **Profil** (`Data`), valeurs par défaut d'un nouveau joueur (nouvelle table 
 | `questsDone` | `{[questId]: number}` | `{}` | Quêtes terminées → horodatage. Les récompenses sont données une seule fois, au passage à « terminé » |
 | `unlocks` | `{ Weapon, Grimoire, Item, Companion: {[id]: true} }` | tables vides | Déblocages **achetés** (argent) ou **gagnés** (œufs). Les déblocages gratuits et par quête sont dérivés (section 5), pas stockés |
 | `shop` | `{ grimoireSlots, banish, skip, reroll: number }` | tous 0 | Niveaux achetés dans la boutique d'argent |
-| `mastery` | `{[classId]: number}` | `{}` | XP de maîtrise **totale** par classe ; le niveau 1-20 est calculé |
-| `bond` | `{[line]: number}` | `{}` | XP de Lien **totale** par lignée ; niveau 1-30 calculé |
+| `mastery` | `{[classId]: number}` | `{}` | Niveau de maîtrise 1-20 (dérivé de `masteryXp`, stocké pour les lecteurs) |
+| `masteryXp` | `{[classId]: number}` | `{}` | XP de maîtrise totale |
+| `bond` | `{[line]: number}` | `{}` | Niveau de Lien 1-30 (lu par CompanionService) |
+| `bondXp` | `{[line]: number}` | `{}` | XP de Lien totale |
+| `bondEggs` | `{[line]: true}` | `{}` | Œuf du niveau 10 déjà donné pour cette lignée |
+| `companionStartTech` | `{[line]: techId}` | `{}` | Technique de départ choisie (validée par le niveau de Lien, lue par CompanionService) |
 | `eggs` | number | 0 | Œufs gratuits non éclos |
 | `eggsHatched` | number | 0 | Compteur |
 | `cosmetics` | `{[cosmeticId]: true}` | `{}` | Cosmétiques possédés (hors gratuits et pass, dérivés) |
 | `equipped` | `{[slot]: cosmeticId}` | `{}` | Équipement cosmétique |
 | `settings` | `{ keepHat, colorblind, reduceFlashes: boolean, textScale: number }` | `false, false, false, 1` | Réglages |
 | `loadout` | `{ classId, companionId }` | `Cornu`, `Braise` | Dernier choix |
-| `weekly` | `{ week, done, bestSeconds }` | `-1, false, 0` | Défi hebdo (section 10) |
+| `weekly` | `{ week, done, bestSeconds, everDone }` | `-1, false, 0, false` | Défi hebdo (section 10) |
 | `boards` | `{ week, kills, bestFinalWave }` | `-1, 0, 0` | Compteurs de la semaine pour les classements |
 | `receipts` | `{[PurchaseId]: number}` | `{}` | Marqueurs de reçus traités (même document que l'objet accordé) |
 | `receiptOrder` | `{string}` | `{}` | Ordre d'arrivée, pour garder les 100 plus récents |
@@ -144,10 +148,10 @@ Le domaine combat possède `Config.Items`. Règle : un objet sans champ `unlock`
 ### Compagnons (7.3)
 - Départ : `Braise`, `Ronce`, `Maree`.
 - `Volt` : quête `Q_Volt` (`DamageDealt` ≥ 250 000) ; `Givre` : `Q_Givre` (`FinalWaveSecondsTotal` ≥ 600) ; `Echo` : `Q_Echo` (`RunsPlayed` ≥ 25).
-- Ou **œuf gratuit** : éclosion uniforme parmi les lignées non possédées (taux affichés = 1/N, calculés par le serveur et envoyés dans `Profile.eggOdds`). Si tout est possédé : 40 jetons. Œufs gagnés par quêtes, Lien niveau 10 (première fois par lignée) et défi hebdo. **Aucun œuf n'est jamais vendu**, ni en Robux, ni en argent, ni en jetons.
+- Ou **œuf gratuit** : éclosion uniforme parmi les lignées de `Config.Companions.Eggs.EggLines` non possédées (taux affichés = 1/N, calculés par le serveur et envoyés dans `Profile.eggOdds`). Si tout est possédé : 40 jetons. Œufs gagnés par quêtes, Lien niveau 10 (première fois par lignée) et défi hebdo. **Aucun œuf n'est jamais vendu**, ni en Robux, ni en argent, ni en jetons.
 
 ### Mondes et tiers
-- `BoisGrognon` : départ. `DunesCroustillantes` : `ShrinesTrialCompleted` ≥ 10 (autels d'épreuve, tous mondes). `RecreFantome` : `Win_DunesCroustillantes_T2` ≥ 1.
+- `BoisGrognon` : départ. `DunesCroustillantes` : `TrialShrinesCompleted` ≥ 10 (autels d'épreuve, tous mondes, enregistré par ShrineService). `RecreFantome` : `Win_DunesCroustillantes_T2` ≥ 1.
 - Tier n+1 d'un monde : `Win_<monde>_T<n>` ≥ 1. API interne `ProgressionService.isWorldUnlocked(player, worldId, tier)` (demande de contrat).
 
 ## 6. Boutique d'argent (`ShopBuy`, offre `id`)
@@ -163,17 +167,17 @@ Le domaine combat possède `Config.Items`. Règle : un objet sans champ `unlock`
 | `Shop_Item_<id>` | Objet dans le pool | voir 5 |
 | `Cosmetic_<id>` | Cosmétique en jetons | voir 8 |
 
-`getMetaBonuses(player)` renvoie des **totaux** pour la run : `weaponSlots = 4` (le +1 de Tentaculos est le passif du domaine combat), `grimoireSlots = 4 + niveaux`, `banish = 0 + niveaux`, `skip = 0 + niveaux`, `reroll = 1 + niveaux`. Le domaine combat les prend comme valeurs de départ (pas d'ajout à ses propres bases).
+`getMetaBonuses(player)` renvoie des **totaux** pour la run : `weaponSlots = 4` (le +1 de Tentaculos est le passif du domaine combat), `grimoireSlots = 4 + niveaux`, `banish = 1 + niveaux`, `skip = 1 + niveaux`, `reroll = 2 + niveaux`. Le domaine combat les prend comme valeurs de départ (remplacent `Cards.DefaultMeta`, qui n'est que le repli sans ProgressionService).
 
 ## 7. Maîtrise (1-20) et Lien (1-30)
 
 **Maîtrise par classe** — XP par run : `20 + 10 × stageReached + 30 si victoire + floor(kills / 50)`, plafond 150. XP pour passer du niveau n à n+1 : `100 + 25 × (n − 1)` ; total 1 → 20 = 6 175 (≈ 80-100 runs). Récompenses (cosmétiques, aucune stat) : teinte de trait aux niveaux 3, 6, 9, 12 (`Tint_<classe>_M3`…), pose de victoire aux niveaux 5 et 15 (`Pose_<classe>_M5`, `_M15`), titre aux niveaux 10 et 20 (`Title_<classe>_M10`, `Title_<classe>_M20`).
 
-**Lien par lignée** — XP par run : `20 + 10 × companionStage + 20 si victoire`, plafond 120. Passage n → n+1 : `60 + 10 × (n − 1)` ; total 1 → 30 = 5 800. Récompenses : **+1 % de stats du compagnon tous les 3 niveaux, plafond +10 % au niveau 30** ; technique de départ alternative aux niveaux 10 et 20 (`AltTech_<lignée>_B10`, `_B20`, sidegrade géré par le domaine compagnon) ; teinte de compagnon aux niveaux 5, 15, 25 ; pose au niveau 30 ; un œuf gratuit au premier niveau 10 de chaque lignée. API interne `ProgressionService.getBond(player, line) -> (level, statBonus)` (demande de contrat).
+**Lien par lignée** — XP par run : `20 + 10 × companionStage + 20 si victoire`, plafond 120. Passage n → n+1 : `60 + 10 × (n − 1)` ; total 1 → 30 = 5 800. Récompenses alignées sur `Config.Companions.Bond` (domaine compagnon) : **+1 % de dégâts du compagnon tous les 3 niveaux, plafond +10 % au niveau 30** (appliqué par CompanionService) ; techniques de départ alternatives aux niveaux 1/5/15/25 (`StartTechUnlock`), choisies via `EquipCosmetic("StartTech:<lignée>", techId)` ; teintes de compagnon aux niveaux 4, 10, 20, 28 (`CompanionTint_<lignée>_B4`…) ; pose au niveau 12 (`Pose_<lignée>_B12`) ; titre « Inséparable » au niveau 30 (`Title_<lignée>_B30`) ; un œuf gratuit au premier niveau 10 de chaque lignée. API interne `ProgressionService.getBond(player, line) -> (level, statBonus)` (demande de contrat).
 
 ## 8. Cosmétiques (`Config.Cosmetics`)
 
-Emplacements (`slot`) : `Tint:<classId>`, `Pose:<classId>`, `CompanionTint:<line>`, `CompanionPose:<line>`, `AltTech:<line>`, `Title`, `Emote`, `Footstep`, `Aura`. Un cosmétique a `slot` de base (`Tint`, `Pose`, `CompanionTint`, `CompanionPose`, `AltTech`, `Title`, `Emote`, `Footstep`, `Aura`), une `source` et une restriction optionnelle `classId`/`line`. Sources : `Free` (3 teintes par classe, `Tint_<classe>_Base1..3`), `Mastery`, `Bond`, `Tokens` (prix en jetons), `Quest`, `Weekly`, `Pass` (`TeintesPremium`, `Emotes`, `VIP`), `Product`. Les teintes premium s'appliquent à n'importe quelle classe. `EquipCosmetic(slot, id?)` : `nil` déséquipe ; sinon le serveur vérifie que l'emplacement existe, que l'objet est possédé et compatible.
+Emplacements (`slot`) : `Tint:<classId>`, `Pose:<classId>`, `CompanionTint:<line>`, `CompanionPose:<line>`, `Title`, `Emote`, `Footstep`, `Aura` (+ `StartTech:<line>` qui prend un id de technique, pas un cosmétique). Un cosmétique a `slot` de base (`Tint`, `Pose`, `CompanionTint`, `CompanionPose`, `Title`, `Emote`, `Footstep`, `Aura`), une `source` et une restriction optionnelle `classId`/`line`. Sources : `Free` (3 teintes par classe, `Tint_<classe>_Base1..3`), `Mastery`, `Bond`, `Tokens` (prix en jetons), `Quest`, `Weekly`, `Pass` (`TeintesPremium`, `Emotes`, `VIP`), `Product`. Les teintes premium s'appliquent à n'importe quelle classe. `EquipCosmetic(slot, id?)` : `nil` déséquipe ; sinon le serveur vérifie que l'emplacement existe, que l'objet est possédé et compatible.
 
 ## 9. Monétisation (`Config.Products`) — conforme 11.3
 
@@ -201,7 +205,7 @@ Règles :
 
 Semaine `week = floor((os.time() − 345 600) / 604 800)` (réinitialisation le lundi 00:00 UTC), **une seule formule** (`Config.Progression.weekIndex`) pour le défi et les classements. Le défi est tiré de façon déterministe de `week` : classe (parmi les 10), compagnon (parmi les 6), modificateur (`NoJump`, `OneHitDown`, `LavaFloor`, `DoubleElites`, `GlassCannon`, `Fog`), monde `BoisGrognon` tier 1. Réussite = victoire avec la classe et le compagnon imposés ; récompense une fois par semaine : 1 œuf + 50 jetons + titre `Title_Weekly` la première fois. L'application du modificateur en run appartient au domaine run (demande de contrat : lire `ProgressionService.getWeeklyChallenge()`).
 
-## 11. Quêtes (`Config.Quests`) — 163 quêtes
+## 11. Quêtes (`Config.Quests`) — 164 quêtes
 
 Chaque quête : `id` stable, `category`, `stat` (clé), `goal`, `reward = { tokens?, silver?, egg?, unlock = { kind, id }?, cosmetic? }`, nom FR/EN. Progression = `stats[stat]` (somme à vie ou record) ; terminée au passage de l'objectif, récompense donnée automatiquement (pas de remote de réclamation, pas d'exploit possible). Toutes les quêtes sont actives dès le départ ; on voit toujours ce qu'on va gagner.
 
@@ -216,7 +220,7 @@ Chaque quête : `id` stable, `category`, `stat` (clé), `goal`, `reward = { toke
 | `Class` | `Q_Class_<classe>_Level30` (record de niveau 30), `Q_Class_<classe>_Win_1` (1), `Q_Class_<classe>_Win_2` (10) | 30 |
 | `Companion` | `Q_Comp_<lignée>_Stage3` (6), `Q_Comp_<lignée>_Bond10` (6), `Q_Comp_Evolve_1..2` (10/50), `Q_Comp_Ultimate_1..2` (10/100) | 16 |
 | `Coop` | `Q_Coop_Revive_1..3` (1/10/50), `Q_Coop_Runs_1..3` (1/10/50), `Q_Coop_Full_1..2` (victoires à 4 : 1/10), `Q_Coop_Shrine_1..2` (autels chargés à plusieurs : 10/50) | 10 |
-| **Total** | | **163** (≈ 150 du 00) |
+| **Total** | | **164** (≈ 150 du 00) |
 
 Récompenses typiques : 10 → 100 jetons selon le palier, argent sur certains paliers de survie, œufs sur `Q_Runs_2`, `Q_Wins_2`, `Q_Comp_Evolve_1`, `Q_Coop_Runs_2`, cosmétiques (`Title_*`, `Footstep_*`) sur les derniers paliers. La config fait foi.
 
@@ -224,20 +228,19 @@ Récompenses typiques : 10 → 100 jetons selon le palier, argent sur certains p
 
 `ProgressionService.recordStat(player, key, amount)` : `amount` nombre fini > 0 (borné à 1 000 000 par appel). **Clé inconnue → ignorée + avertissement une fois par clé.** Clé **automatique** (enregistrée par le domaine data lui-même) appelée depuis un autre domaine → ignorée + avertissement une fois (évite le double comptage).
 
-**Clés à enregistrer par les autres domaines** (`Config.Quests.ExternalKeys`) :
-| Clé | Qui | Quand |
-| --- | --- | --- |
-| `WeaponsFused` | combat | Une arme fusionne en version ultime |
-| `CardsPicked` | combat | Carte choisie |
-| `BossFast30` | run (BossService) | Boss tué moins de 30 s après le début du combat, pour chaque joueur actif |
-| `UltimatesUsed` | companion | Ultime déclenché |
-| `CompanionTreats` | companion | Friandise prise |
-| `PingsSent` | ui | Ping envoyé |
-| `DistanceTraveled` | avatar | Studs parcourus (par lots, ex. toutes les 5 s) |
-| `SlideCharges` | avatar | Charge de glissade (Cornu) |
+**Clés à enregistrer par les autres domaines** (`Config.Quests.ExternalKeys`, alignées sur ce que les services appellent déjà) :
+| Domaine | Clés |
+| --- | --- |
+| loot (LootService) | `ChestsOpened`, `CoinsCollected`, `PotsBroken`, `ChestsBought`, `MerchantPurchases` |
+| loot (ShrineService) | `TrialShrinesCompleted`, `ShrinesCharged`, `GoldenShrinesCharged`, `AllShrinesCharged`, `BossChallengesAccepted`, `RecessBellsRung`, `TeamTotemsActivated`, `PiggyBanksBroken`, `PranksterUses` |
+| companion | `CompanionEvolved`, `CompanionStage3`, `UltimatesUsed`, `CompanionKills`, `CompanionTechsLearned`, `CompanionTreats` |
+| avatar | `Hops`, `DistanceTraveled` (par lots), `SlideCharges` |
+| combat | `WeaponsFused` (fusion en arme ultime), `CardsPicked` |
+| run (BossService) | `BossFast30` (boss tué < 30 s après le début du combat, pour chaque joueur actif) |
+| ui | `PingsSent` |
 
-**Clés automatiques** (le domaine data écoute le Bus et le `RunSummary` ; **ne pas appeler**) :
-`Kills`, `KillsElite`, `KillsFamily_<Swarm|Jumper|Shooter|Armored>` (Bus.EnemyKilled + `Config.Enemies[kind].family`), `DamageTaken` (PlayerDamaged), `Revives` (PlayerRevived, sauveteur), `ChestsOpened` (ChestOpened), `ShrinesCompleted`, `ShrinesTrialCompleted` (kinds `Trial`/`Epreuve`), `ShrinesCoop` (ShrineCompleted à ≥ 2), `BossesDefeated`, `BossesDefeated_<monde>`, `StagesCleared`, `FullBuildStageClears` (BossDefeated + `StatsService.getBuild`), `BossNoDamage` (phase Boss sans PlayerDamaged), `CompanionEvolutions`, `Companion_<lignée>_Stage3` (CompanionEvolved), `CoopRuns` (RunStarted à ≥ 2), puis en fin de run : `RunsPlayed`, `Wins`, `WinsTier3`, `Win_<monde>_T<n>`, `WinNoDown`, `CoopFullWins`, `FinalWaveSecondsTotal`, `BestFinalWave` (record), `BestRunLevel` (record), `CoinsEarned`, `DamageDealt`, `DamageWeapon_<arme>`, `Class_<classe>_Wins`, `Class_<classe>_BestLevel` (record), `Bond_<lignée>` (record du niveau de Lien).
+**Clés automatiques** (`Config.Quests.AutoKeys` + préfixes ; le domaine data écoute le Bus et le `RunSummary` ; **ne pas appeler**) :
+`Kills`, `KillsElite`, `KillsFamily_<Swarm|Jumper|Shooter|Armored>` (Bus.EnemyKilled + `Config.Enemies[kind].family`, agrégés par seconde), `DamageTaken` (PlayerDamaged), `Revives` (PlayerRevived, sauveteur), `ShrinesCompleted`, `ShrinesCoop` (ShrineCompleted, à ≥ 2 pour Coop), `BossesDefeated`, `BossesDefeated_<monde>`, `StagesCleared`, `FullBuildStageClears` (BossDefeated + `StatsService.getBuild`), `BossNoDamage` (phase `Boss` sans PlayerDamaged), `Companion_<lignée>_Stage3` (CompanionEvolved stade 3), `CoopRuns` (RunStarted à ≥ 2), puis en fin de run (`grantRunRewards`) : `RunsPlayed`, `Wins`, `WinsTier3`, `Win_<monde>_T<n>`, `WinNoDown`, `CoopFullWins`, `FinalWaveSecondsTotal`, `BestFinalWave` (record), `BestRunLevel` (record), `DamageDealt`, `DamageWeapon_<arme>`, `Class_<classe>_Wins`, `Class_<classe>_BestLevel` (record), `Bond_<lignée>` (record du niveau de Lien).
 
 ## 13. Classements (OrderedDataStore)
 

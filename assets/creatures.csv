@@ -1,0 +1,16 @@
+name,mesh,texture,sx,sy,sz
+Boss_GrandCheneRonchon,rbxassetid://109549281507082,rbxassetid://81540294671854,16.000,17.423,13.366
+Companion_Braise_1,rbxassetid://84366935316014,rbxassetid://84198904589931,1.169,1.777,2.600
+Companion_Braise_2,rbxassetid://120158096303779,rbxassetid://77909987526951,1.925,1.930,3.800
+Companion_Braise_3,rbxassetid://80297437681339,rbxassetid://81884963670174,4.174,3.573,5.000
+Companion_Maree_1,rbxassetid://83804477030648,rbxassetid://102531078252592,1.813,2.000,1.754
+Companion_Maree_2,rbxassetid://109322980477479,rbxassetid://118405941066042,2.805,3.000,2.654
+Companion_Maree_3,rbxassetid://121240750789051,rbxassetid://123683355974523,5.000,0.993,3.893
+Companion_Ronce_1,rbxassetid://136515346696847,rbxassetid://102647716190384,1.378,2.200,1.149
+Companion_Ronce_2,rbxassetid://86826930264752,rbxassetid://120878200257778,2.815,3.200,1.922
+Companion_Ronce_3,rbxassetid://82746768713799,rbxassetid://83281274872957,3.586,4.500,3.358
+Enemy_BogueBlindee,rbxassetid://73799985530466,rbxassetid://107289530725758,3.246,3.500,3.238
+Enemy_ChampignonSauteur,rbxassetid://138489448717007,rbxassetid://91628082394670,2.985,3.452,3.000
+Enemy_GlandGrincheux,rbxassetid://92646376570861,rbxassetid://75707012737493,3.000,3.302,2.660
+Enemy_HibouPlongeur,rbxassetid://86592598214232,rbxassetid://78216554065575,2.689,3.000,2.401
+Enemy_SoucheGeante,rbxassetid://83796879264377,rbxassetid://90657091644680,7.737,7.000,6.825

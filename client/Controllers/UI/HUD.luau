@@ -404,6 +404,7 @@ local function arrowStep()
 	local rel = camera.CFrame:VectorToObjectSpace(target - camera.CFrame.Position)
 	arrowHolder.Rotation = math.deg(math.atan2(rel.X, -rel.Z))
 	local character = LOCAL.Character
+	-- lihfolk-ignore: findfirstchild-chain (nil-checked below)
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if root then
 		local d = math.floor((target - root.Position).Magnitude)
@@ -443,6 +444,10 @@ local function onRunState(state: any)
 	if type(state.tier) == "number" then
 		run.tier = state.tier
 	end
+	-- A new run (Replay keeps stage 1) must also reset the boss bar (review finding 10).
+	if state.phase == "Loadout" or (state.phase == "Running" and run.phase == "Ended") then
+		bossDefeated = false
+	end
 	if type(state.stage) == "number" then
 		if state.stage ~= run.stage then
 			bossDefeated = false
@@ -471,7 +476,10 @@ local function onVitals(v: any)
 	end
 	if type(v.team) == "table" then
 		HUD.setTeam(v.team)
-		return
+		-- RunManager sends own vitals and team in the same payload: only stop if there is no own hp.
+		if v.hp == nil then
+			return
+		end
 	end
 	local hp = tonumber(v.hp) or 0
 	local maxHp = math.max(1, tonumber(v.maxHp) or 1)
@@ -520,7 +528,6 @@ local function onVitals(v: any)
 	end
 end
 
-local feedToken = 0
 local feedEntries: { { text: any, args: { [string]: any }?, at: number } } = {}
 
 local function renderFeed()
@@ -540,8 +547,6 @@ function HUD.feed(text: any, args: { [string]: any }?)
 		table.remove(feedEntries)
 	end
 	renderFeed()
-	feedToken += 1
-	local token = feedToken
 	task.delay(Config.Hud.FeedSeconds, function()
 		local now = os.clock()
 		for i = #feedEntries, 1, -1 do
@@ -549,11 +554,7 @@ function HUD.feed(text: any, args: { [string]: any }?)
 				table.remove(feedEntries, i)
 			end
 		end
-		if token == feedToken or #feedEntries == 0 then
-			renderFeed()
-		else
-			renderFeed()
-		end
+		renderFeed()
 	end)
 end
 
@@ -599,6 +600,7 @@ local function fillTiles(tiles: { Frame }, list: any, slots: number, configName:
 	for i, tile in tiles do
 		local entry = if type(list) == "table" then list[i] else nil
 		tile.Visible = i <= shown
+		-- lihfolk-ignore: findfirstchild-chain (both nil-checked below)
 		local lvl = tile:FindFirstChild("Lvl") :: TextLabel?
 		local letters = tile:FindFirstChild("Letters") :: TextLabel?
 		if type(entry) == "table" and type(entry.id) == "string" then
@@ -668,6 +670,11 @@ end
 
 local function onBoss(b: any)
 	if type(b) ~= "table" or bossDefeated then
+		return
+	end
+	-- Despawn / defeat payloads carry no name or hp: hide instead of flashing a raw id at 0 %.
+	if b.removed or b.defeated then
+		bossBox.Visible = false
 		return
 	end
 	bossSeenAt = os.clock()

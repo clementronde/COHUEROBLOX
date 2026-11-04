@@ -1033,6 +1033,30 @@ end
 
 -- Boot -------------------------------------------------------------------------------------------
 
+-- Creates a companion for every active run player who has none (late joiners).
+local function ensureRunPlayers()
+	local run = Registry.find("RunManager")
+	if not run then
+		return
+	end
+	local ok, players = pcall(run.getRunPlayers)
+	if not ok or type(players) ~= "table" then
+		return
+	end
+	for _, player in players do
+		if typeof(player) == "Instance" and player:IsA("Player") and player.Parent and not byPlayer[player] then
+			createCompanion(player)
+		end
+	end
+end
+
+-- Public: lets RunManager attach a companion to a player who joins mid-stage.
+function CompanionService.ensure(player: Player)
+	if player.Parent and not byPlayer[player] then
+		createCompanion(player)
+	end
+end
+
 function CompanionService.init()
 	stateRemote = Net.event("CompanionState")
 	snapshotRemote = Net.unreliable("CompanionSnapshot")
@@ -1053,6 +1077,18 @@ function CompanionService.init()
 	end)
 	Bus.RunEnded:connect(function()
 		clearAll()
+	end)
+	-- Review findings 3 and 4: RunManager brings ghosts back at each new stage without firing
+	-- PlayerRevived, and late joiners never get RunStarted. On every stage start, revive existing
+	-- companions and create missing ones for run players.
+	Bus.StageStarted:connect(function()
+		for _, c in byPlayer do
+			c.dead = false
+			c.downed = false
+			c.stunnedUntil = 0
+			c.stateDirty = true
+		end
+		ensureRunPlayers()
 	end)
 	Bus.PlayerLeveledUp:connect(function(player: Player, level: number)
 		local c = byPlayer[player]

@@ -11,6 +11,7 @@ local Controllers = script.Parent:WaitForChild("Controllers")
 
 -- Fixed order (docs/ARCHITECTURE.md section 2). Searched recursively under Controllers.
 local ORDER = {
+	"CameraController",
 	"InputController",
 	"MovementController",
 	"EnemyRenderer",

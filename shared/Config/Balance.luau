@@ -40,7 +40,7 @@ local Balance = {
 	-- Debug / perf gate (doc 14, phase 0: 150 enemies at 60 fps on a mid-range phone)
 	Debug = {
 		ForceAlive = nil :: number?, -- set to e.g. 150 to hold a fixed count for the perf test
-		ShowStats = true,
+		ShowStats = game:GetService("RunService"):IsStudio(), -- never on live servers
 	},
 }
 

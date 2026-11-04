@@ -1,0 +1,27 @@
+name,pack_path,role
+Weapon_HacheBoomerang,Models/Kits/Weapons/Axe_01.glb,HacheBoomerang projectile
+Weapon_GriffesEclair,Models/Kits/Weapons/Dagger_01.glb,GriffesEclair slash
+Weapon_PlumesDards,Models/Kits/Weapons/Dagger_02.glb,PlumesDards dart
+Weapon_ParapluieBouclier,Models/Kits/Weapons/RoundShield_01.glb,ParapluieBouclier shield
+Weapon_Baton,Models/Kits/Weapons/Staff_01.glb,Meteorite / CerfVolantLaser caster
+Weapon_Katana,Models/Kits/Weapons/Katana_01.glb,fusion slash
+Nature_Pine1,Models/Kits/Nature/PineTree_01.glb,BoisGrognon tree
+Nature_Pine2,Models/Kits/Nature/PineTree_02.glb,BoisGrognon tree
+Nature_Pine3,Models/Kits/Nature/PineTree_03.glb,BoisGrognon tree
+Nature_Rock1,Models/Kits/Nature/Rock_01.glb,rock
+Nature_Rock2,Models/Kits/Nature/Rock_02.glb,rock
+Nature_Rock3,Models/Kits/Nature/Rock_03.glb,rock
+Nature_Boulder1,Models/Kits/Nature/Boulder_01.glb,boulder
+Nature_Boulder2,Models/Kits/Nature/Boulder_04.glb,boulder
+Loot_Chest,Models/Kits/Furniture/Chest_01.glb,normal chest
+Loot_ChestRare,Models/Kits/Furniture/Chest_03.glb,elite / boss chest
+Loot_Barrel,Models/Kits/Props/Barrel_01.glb,breakable pot
+Loot_Crate,Models/Kits/Props/Crate_01.glb,breakable pot
+Loot_Bottle,Models/Kits/Props/Bottle_01.glb,breakable pot
+Loot_Merchant,Models/Kits/Furniture/Cauldron_01.glb,wandering merchant
+Struct_Arche,Models/Kits/Modular/Arch_01.glb,boss arch
+Struct_Pillar,Models/Kits/Modular/Pillar_01.glb,arena pillar
+Struct_Lantern,Models/Kits/Props/Lantern_01.glb,lamp (RecreFantome blackout)
+Struct_Fence,Models/Kits/Modular/Fence_01.glb,map border
+Struct_Banner,Models/Kits/Furniture/Banner_01.glb,shrine banner
+Struct_Sign,Models/Kits/Props/Sign_01.glb,decor sign

@@ -10,7 +10,7 @@ UI.Scale = {
 	PhoneShortSide = 520, -- TouchEnabled and short side < this = phone (vault: Responsive UI)
 	ReferenceShortSide = 420, -- scale = clamp(shortSide / ref, Min, Max)
 	Min = 1,
-	Max = 1.6,
+	Max = 1.4,
 }
 
 UI.TextScales = { 1, 1.15, 1.3 }
@@ -265,8 +265,8 @@ UI.Strings = {
 	Close = { fr = "Fermer", en = "Close" },
 	Legend = { fr = "Légende de la carte", en = "Map legend" },
 	LegendText = {
-		fr = "Flèche blanche : toi · Triangle vert : coéquipier (+ = à terre) · Losange bleu : autel · Carré jaune : coffre · Rond rouge ! : boss",
-		en = "White arrow: you · Green triangle: teammate (+ = down) · Blue diamond: shrine · Yellow square: chest · Red circle !: boss",
+		fr = "Flèche blanche : toi · Chevron vert : coéquipier (+ = à terre) · Losange bleu : autel · Carré jaune : coffre · Rond rouge ! : boss",
+		en = "White arrow: you · Green chevron: teammate (+ = down) · Blue diamond: shrine · Yellow square: chest · Red circle !: boss",
 	},
 }
 

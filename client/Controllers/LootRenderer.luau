@@ -488,6 +488,17 @@ function LootRenderer.getVisibleCount(): number
 	return visibleCount
 end
 
+-- Positions of this player's visible chests (for Minimap and contextual pings).
+function LootRenderer.getChests(): { Vector3 }
+	local out: { Vector3 } = {}
+	for _, e in entries do
+		if e.kind == K.ChestNormal or e.kind == K.ChestElite or e.kind == K.ChestBoss or e.kind == K.ChestShrine then
+			table.insert(out, Vector3.new(e.x, e.y, e.z))
+		end
+	end
+	return out
+end
+
 function LootRenderer.getChestCost(): number
 	return chestCost
 end

@@ -12,4 +12,6 @@ for f in "${FILES[@]}"; do
   cat "$f" >> "$TMP"
   printf '\n]=======], "%s") print(if f then "ok  %s" else ("ERR " .. tostring(e))) end\n' "$f" "$f" >> "$TMP"
 done
-"$LUAU" "$TMP" | tee /dev/stderr | grep -q "^ERR" && exit 1 || exit 0
+OUT="$("$LUAU" "$TMP")"
+echo "$OUT"
+echo "$OUT" | grep -q "^ERR" && exit 1 || exit 0

@@ -9,7 +9,6 @@
 --   * UI button: Registry.get("CompanionRenderer").requestUltimate()
 -- HUD data: CompanionRenderer.getState() / CompanionRenderer.onStateChanged(fn) (CompanionState payload).
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -20,6 +19,7 @@ local Config = Shared:WaitForChild("Config")
 local Companions = require(Config:WaitForChild("Companions"))
 local Net = require(Shared:WaitForChild("Net"))
 local Registry = require(Shared:WaitForChild("Registry"))
+local ArtLibrary = require(Shared:WaitForChild("ArtLibrary"))
 
 type LineDef = Companions.LineDef
 
@@ -254,7 +254,6 @@ end
 Builders.Maree = function(b, stage, c)
 	if stage == 1 then
 		-- Gouttelot: tadpole inside a water bubble
-		local bubble = makeBuilder(b.s, b.body.height)
 		b:add("Ball", V(1.6, 1.6, 1.6), CF(0, 1.0, 0), c.glow)
 		local shell = b.body.parts[#b.body.parts]
 		shell.Transparency = 0.6
@@ -262,9 +261,6 @@ Builders.Maree = function(b, stage, c)
 		b:add("Ball", V(0.9, 0.8, 0.9), CF(0, 1.0, -0.1), c.primary)
 		b:add("Wedge", V(0.12, 0.5, 0.9), CF(0, 1.0, 0.9), c.secondary)
 		eyes(b, 1.15, -0.5, 0.2, 0.17)
-		for _, p in bubble.body.parts do
-			p:Destroy()
-		end
 	elseif stage == 2 then
 		-- Ondelin: round amphibian with a wave crest and fin hands
 		b:add("Ball", V(1.6, 1.4, 1.5), CF(0, 0.9, 0), c.primary)
@@ -413,6 +409,13 @@ end
 
 local function buildBody(line: LineDef, stage: number): Body
 	local def = line.stages[stage]
+	-- Generated mesh first (ReplicatedStorage.Assets.Creatures.Companion_<line>_<stage>).
+	local mesh = ArtLibrary.clonePart(`Companion_{line.id}_{stage}`, def.height * 1.3)
+	if mesh then
+		mesh.CFrame = HIDDEN
+		mesh.Parent = container
+		return { parts = { mesh }, offsets = { CFrame.new(0, mesh.Size.Y / 2, 0) }, height = mesh.Size.Y } :: any
+	end
 	local s = def.height / 2
 	local b = makeBuilder(s, def.height)
 	local build = Builders[line.id]
@@ -841,7 +844,6 @@ function CompanionRenderer.start()
 	Net.event("CompanionState").OnClientEvent:Connect(onState)
 	RunService.PreRender:Connect(render)
 	bindInput()
-	local _ = Players.LocalPlayer
 end
 
 return CompanionRenderer

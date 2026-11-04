@@ -3,7 +3,7 @@
 Domaine **combat**. Source : `00-vision.md` §5.2, §6.2, §8.1–8.3, §12.3. Contrat : `docs/ARCHITECTURE.md`.
 Tous les nombres ci-dessous vivent dans `shared/Config/{Weapons,Grimoires,Items,Cards,Rarities}.luau` : ce document décrit, la config fait foi en cas d'écart.
 
-Fichiers : `server/Services/{StatsService,CardService,WeaponService,PassiveService}.luau`, `server/Services/Weapons/{Pool,FxQueue}.luau`, `shared/WeaponFxCodec.luau`, `client/Controllers/WeaponFX.luau`.
+Fichiers : `server/Services/{StatsService,CardService,WeaponService,PassiveService}.luau`, `shared/WeaponFxCodec.luau`, `client/Controllers/WeaponFX.luau`, configs `shared/Config/{Weapons,Grimoires,Items,Cards,Rarities}.luau` (les nombres des passifs de classe sont dans `Weapons.Passives`).
 
 ---
 
@@ -22,7 +22,7 @@ Sémantique (Types.StatName) : stats « pourcent » = bonus additifs, multiplica
 | CritChance | 0,05 | 1 | WeaponService |
 | CritDamage | 0 | — | crit = ×(2 + CritDamage) |
 | Luck | 0 | 100 (effet rareté) | CardService, LootService |
-| XpGain | 0 | — | StatsService.addXp |
+| XpGain | 0 | — | LootService (avant addXp) |
 | Magnet | 0 | — | LootService (studs ajoutés au rayon) |
 | MaxHp | 100 | — | RunManager |
 | Armor | 0 | — | RunManager (courbe conseillée `Armor/(Armor+50)`) |
@@ -60,8 +60,7 @@ Paramètres envoyés à `EnemyService.applyStatus` (le domaine run les interprè
 ## 3. XP et niveaux
 
 - XP pour passer du niveau L à L+1 : `floor(6 + 4·L + 0,35·L²)` → L1 : 10, L5 : 34, L10 : 81, L20 : 226, L30 : 441. Cumul jusqu'au niveau 30 ≈ 4 900 XP (≈ une run réussie, le trait grandit à 10/20/30).
-- Niveau max 99. `addXp(player, n)` applique `× (1 + XpGain)`.
-- **Partage coop** (§5.2) : fait **dans** `StatsService.addXp` : chaque coéquipier actif à ≤ 40 studs reçoit 50 % du montant de base (avec son propre XpGain). Le domaine loot appelle `addXp` une seule fois pour le ramasseur, sans partager lui-même.
+- Niveau max 99. `addXp(player, n)` prend `n` tel quel : **LootService** applique déjà `× (1 + XpGain)` et le **partage coop** (§5.2 : 50 % aux coéquipiers actifs à ≤ 40 studs) avant d'appeler `addXp` pour chacun. Les autres sources (fusion Prisme du Savant) appellent `addXp` directement.
 - Plusieurs niveaux d'un coup : chaque niveau tire `Bus.PlayerLeveledUp` ; CardService les met en file.
 
 ## 4. Cartes de niveau (§5.2, §8)
@@ -259,7 +258,7 @@ Les Épines (stat Thorns) de tous les joueurs suivent la même règle que Rocail
 
 ## 9. Coop (§5.2)
 
-- XP individuelle, partage 50 % à 40 studs (section 3). Build, cartes et niveaux individuels.
+- XP individuelle, partage 50 % à 40 studs (fait par LootService, section 3). Build, cartes et niveaux individuels.
 - Aucune pause : invulnérable + ralenti 50 % pendant le choix.
 - Les armes de chaque joueur touchent tous les ennemis ; les dégâts sont crédités au tireur (`EnemyService.damage(id, n, player)`) pour le kill et les stats de fin.
 - Rien n'est tiré quand `RunManager.isActive(player)` est faux (à terre, fantôme, hors run).
@@ -268,7 +267,8 @@ Les Épines (stat Thorns) de tous les joueurs suivent la même règle que Rocail
 ## 10. Réseau et budgets mobile
 
 - **WeaponFx** (UnreliableRemoteEvent) : `WeaponFxCodec`, en-tête 6 octets (version u8, tick u32, nombre u8), enregistrement fixe 14 octets, ≤ 900 octets par paquet (63 évènements). Les évènements sont cosmétiques : en perdre un ne change rien au jeu (note vault *RemoteEvents RemoteFunctions and Unreliable Remotes*).
-- Types d'évènement : Projectile (le client le simule), Fin de projectile, Zone (onde, cône, explosion avec délai), Segment (rayon, rebond), Attaché (scies, nuage, cerf-volant qui suivent un joueur, identifié par l'attribut `FxSlot` du Player).
+- Types d'évènement : Projectile (le client le simule), Fin de projectile, Zone (onde, cône, explosion avec délai), Segment (rayon, rebond), Attaché (scies, nuage, cerf-volant qui suivent un joueur, identifié par l'attribut `FxSlot` du Player ; tourelles fixes avec le bit 128 du champ nombre).
+- Les textes des cartes (`Card.title`/`desc`) sont des chaînes simples (type du contrat) : langue choisie par `Cards.Locale` (fr par défaut).
 - Intérêt : chaque joueur reçoit les évènements à ≤ 160 studs ; max 126 évènements par joueur et par tick (2 paquets), le surplus est jeté.
 - **Serveur** : ≤ 400 projectiles vivants, ≤ 96 zones ; enregistrements réutilisés (pool), aucune table créée par ennemi dans les boucles, cibles par grille (`queryRadius`).
 - **Client** : pools de Parts par style, un `BulkMoveTo` par image, qualité auto : téléphone → *Bas* (60 projectiles, 12 zones, 16 segments, SmoothPlastic, sans fondu), tablette/PC moyen → *Moyen* (150/28/40), PC → *Haut* (300/56/80, Neon). Les zones de gameplay lisibles (télégraphes de météore) ne sont jamais coupées, seulement simplifiées.

@@ -38,8 +38,8 @@ local Cards = {
 		Base = 6,
 		Linear = 4,
 		Quad = 0.35,
-		ShareRadius = 40, -- studs (doc 5.2)
-		ShareFraction = 0.5,
+		-- LootService already applies XpGain and the 50 % / 40 studs coop share before calling
+		-- StatsService.addXp, so addXp takes the amount as final.
 	},
 
 	Text = {
