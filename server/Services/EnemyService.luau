@@ -559,8 +559,10 @@ local function spawnTick(targets: { Target }, now: number)
 	local toSpawn = math.min(want, Balance.MaxSpawnsPerTick)
 	if director.burstLeft > 0 then
 		local extra = math.min(director.burstLeft, math.max(director.burstPerTick, 1), Balance.MaxEnemies - count)
-		director.burstLeft -= math.max(extra, 1)
-		toSpawn = math.max(toSpawn, 0) + math.max(extra, 0)
+		if extra > 0 then -- au plafond, la vague attend qu'une place se libère
+			director.burstLeft -= extra
+			toSpawn = math.max(toSpawn, 0) + extra
+		end
 	end
 	for s = 1, toSpawn do
 		local t = targets[(simTick + s) % n + 1] -- round robin: ~equal share per player
@@ -802,9 +804,13 @@ function EnemyService.damage(id: number, amount: number, source: Player?): boole
 	hps[i] -= amount
 	if hps[i] <= 0 then
 		local kind, x, z = kinds[i], xs[i], zs[i]
-		local isElite = lootElite[i] -- élite à butin (voir lootElite)
+		-- isElite = élite à butin (coffre). hordeElite = élite de l'Overtime au-delà du plafond
+		-- classique : PV, taille et couronne d'élite, XP et quêtes d'élite côté domaines qui le lisent,
+		-- mais pas de coffre (contract request loot : XP / pièces d'élite pour isElite or hordeElite).
+		local isElite = lootElite[i]
+		local hordeElite = not isElite and bit32.band(states[i], BIT_ELITE) ~= 0 and not external[i]
 		removeAt(i)
-		Bus.EnemyKilled:fire(id, kind, x, z, source, isElite)
+		Bus.EnemyKilled:fire(id, kind, x, z, source, isElite, hordeElite)
 		return true
 	end
 	return false
@@ -865,21 +871,32 @@ local function makeRoom(): boolean
 	if count < Balance.MaxEnemies then
 		return true
 	end
-	local best, bestD2 = 0, -1
+	local px: { number }, pz: { number } = {}, {}
+	for _, player in Players:GetPlayers() do
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if root and root:IsA("BasePart") then
+			table.insert(px, root.Position.X)
+			table.insert(pz, root.Position.Z)
+		end
+	end
+	-- 1er choix : ennemi ordinaire ; sinon (Overtime très avancé) une élite sans butin.
+	local best, bestD2, bestRank = 0, -1, 0
 	for i = 1, count do
-		if not external[i] and bit32.band(states[i], BIT_ELITE) == 0 then
-			local nearest2 = math.huge
-			for _, player in Players:GetPlayers() do
-				local character = player.Character
-				local root = character and character:FindFirstChild("HumanoidRootPart")
-				if root and root:IsA("BasePart") then
-					local dx, dz = xs[i] - root.Position.X, zs[i] - root.Position.Z
-					nearest2 = math.min(nearest2, dx * dx + dz * dz)
-				end
-			end
-			if nearest2 > bestD2 then
-				best, bestD2 = i, nearest2
-			end
+		if external[i] or lootElite[i] then
+			continue
+		end
+		local rank = if bit32.band(states[i], BIT_ELITE) == 0 then 2 else 1
+		if rank < bestRank then
+			continue
+		end
+		local nearest2 = math.huge
+		for k = 1, #px do
+			local dx, dz = xs[i] - px[k], zs[i] - pz[k]
+			nearest2 = math.min(nearest2, dx * dx + dz * dz)
+		end
+		if rank > bestRank or nearest2 > bestD2 then
+			best, bestD2, bestRank = i, nearest2, rank
 		end
 	end
 	if best == 0 then

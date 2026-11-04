@@ -618,6 +618,12 @@ local function endRun(victory: boolean)
 		end
 	end
 	Bus.RunEnded:fire(summaries)
+	for _, player in runPlayers do
+		local rec = records[player]
+		if rec then
+			rec.inRun = false -- le choix de classe redevient possible jusqu'au Replay
+		end
+	end
 	for player, summary in summaries do
 		if player.Parent then
 			remotes.RunSummary:FireClient(player, summary)
@@ -628,6 +634,9 @@ end
 
 local function resetToLoadout()
 	state.runId += 1
+	for _, rec in records do
+		rec.inRun = false
+	end
 	setPhase("Loadout")
 	director({ active = false })
 	local boss = find("BossService")

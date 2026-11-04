@@ -389,7 +389,7 @@ function StatsService.getRunKills(): { [Player]: number }
 	return out
 end
 
-local function onEnemyKilled(_id: number, kind: number, _x: number, _z: number, killer: unknown, isElite: unknown)
+local function onEnemyKilled(_id: number, kind: number, _x: number, _z: number, killer: unknown, isElite: unknown, hordeElite: unknown)
 	if typeof(killer) ~= "Instance" or not (killer :: Instance):IsA("Player") then
 		return
 	end
@@ -398,13 +398,14 @@ local function onEnemyKilled(_id: number, kind: number, _x: number, _z: number, 
 	if not s then
 		return
 	end
+	local elite = isElite == true or hordeElite == true
 	s.kills += 1
-	if isElite == true then
+	if elite then
 		s.eliteKills += 1
 	end
 	s.killsDirty = true
 	s.progressDirty = true
-	Bus.KOScored:fire(player, s.kills, kind, isElite == true)
+	Bus.KOScored:fire(player, s.kills, kind, elite)
 end
 
 -- Domain API (combat only) -------------------------------------------------------------

@@ -6,8 +6,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Signal = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Signal"))
 
 return {
-	-- EnemyService: (id: number, kind: number, x: number, z: number, killer: Player?, isElite: boolean)
-	-- isElite = élite « à butin » (coffre) ; les élites en plus de l'Overtime arrivent avec false.
+	-- EnemyService: (id: number, kind: number, x: number, z: number, killer: Player?, isElite: boolean, hordeElite: boolean)
+	-- isElite = élite « à butin » (coffre). hordeElite = élite de l'Overtime au-delà du plafond
+	-- classique : une vraie élite (XP, quêtes) mais sans coffre. Une élite est isElite or hordeElite.
 	EnemyKilled = Signal.new(),
 	-- StatsService: (player: Player, level: number)
 	PlayerLeveledUp = Signal.new(),
