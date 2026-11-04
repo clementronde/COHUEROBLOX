@@ -1,6 +1,6 @@
 # 65 — Lobby : hub 3D et menus (domaine A09)
 
-Statut : **proposition à valider par Clément** (tâches A09-02 et A09-01). Rien n'est construit en vague 1.
+Statut : **plan du hub et structure des 8 écrans validés par Clément le 4 nov. 2026** (A09-02, A09-03). Habillage glossy des écrans à faire avec le design system de A08 (fin de A09-01). Rien n'est construit en vague 1.
 Sources : `01-decisions-v2.md` (fait foi), `00-vision.md` §5.1, §11.3, §12.1, `70-donnees-progression-monetisation.md` §13 et §15, `60-ui-ux.md`.
 Schéma : [img/65-lobby-plan.svg](img/65-lobby-plan.svg) (vue de dessus à l'échelle, 1 stud = 3 px).
 
@@ -346,6 +346,8 @@ Checklist anti-AI-slop du doc de suivi, appliquée à ce qui existe (un plan et 
 | 8 | Budget de perf | Budget du hub fixé (§8), à mesurer en vague 2 |
 
 ## 12. Questions ouvertes pour Clément
+
+**Retour de Clément (4 nov. 2026)** : « Je valide » le plan du hub et la structure des 8 écrans, sans autre retour. Il n'a pas répondu une à une aux 6 questions ci-dessous : les propositions écrites dans ce dossier servent de valeur par défaut pour la vague 2. Clément peut encore les changer.
 
 1. **Nom du village en jeu** : « Hubbub Village » en attendant le nom du jeu (A12 cherche le nom anglais) ? Les noms anglais des mondes (« Grumpy Woods » pour Bois Grognon) sont des exemples à remplacer.
 2. **1re run en Solo mis en avant** (le plus rapide pour apprendre), puis Public mis en avant dès la 2e visite : d'accord ?
