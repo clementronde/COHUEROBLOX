@@ -70,13 +70,19 @@ local function newOfferId(): number
 	return nextOfferId
 end
 
+-- Une arme ou une Rune non verrouillée (unlock "Free", le défaut v2) est toujours dans le tirage.
+-- Les autres demandent ProgressionService.isUnlocked (bloquées s'il manque). Les règles du domaine
+-- data (Config/Progression) portent encore les ids v1 : voir la contract request du rapport A04.
 local function isUnlocked(player: Player, kind: string, id: string, gated: boolean?): boolean
+	if not gated then
+		return true
+	end
 	local progression = Registry.find("ProgressionService")
 	if progression and progression.isUnlocked then
 		local ok, result = pcall(progression.isUnlocked, player, kind, id)
 		return ok and result == true
 	end
-	return not gated
+	return false
 end
 
 local function isActive(player: Player): boolean
@@ -90,10 +96,10 @@ end
 
 -- Card text ---------------------------------------------------------------------------
 
+-- Texte joueur (anglais) d'un delta de niveau d'arme : "+5 damage, +15% area".
 local function formatDelta(delta: { [string]: number }): string
 	local parts = {}
 	for k, v in delta do
-		local label: string
 		local pct = false
 		local key = k
 		if string.sub(k, -3) == "Pct" then
@@ -103,7 +109,10 @@ local function formatDelta(delta: { [string]: number }): string
 		if key == "dmgMult" then
 			key, pct = "damage", true
 		end
-		label = key
+		local label = Cards.WeaponStatWords[key]
+		if not label then
+			continue
+		end
 		if pct then
 			table.insert(parts, string.format("%+d%% %s", math.round(v * 100), label))
 		elseif key == "critChance" or key == "critDamage" or key == "lifesteal" then
@@ -157,11 +166,11 @@ local function buildCandidates(player: Player, exclude: { [string]: boolean }): 
 				table.insert(list, { kind = "WeaponUp", id = id, weight = Cards.PoolWeight.WeaponUp })
 			elseif level == Weapons.MaxLevel then
 				local fusion = Weapons.Defs[id].fusion
-				if stats.getGrimoireLevel(player, fusion.grimoire) >= fusion.minGrimoireLevel then
+				if Weapons.FusionEnabled and fusion and stats.getGrimoireLevel(player, fusion.grimoire) >= fusion.minGrimoireLevel then
 					table.insert(list, { kind = "Fusion", id = id, weight = Cards.PoolWeight.Fusion })
 				end
 			end
-		elseif #s.weapons < s.weaponSlots and isUnlocked(player, "Weapon", id) then
+		elseif #s.weapons < s.weaponSlots and isUnlocked(player, "Weapon", id, Weapons.Defs[id].unlock ~= nil and Weapons.Defs[id].unlock ~= "Free") then
 			table.insert(list, { kind = "NewWeapon", id = id, weight = Cards.PoolWeight.NewWeapon })
 		end
 	end
@@ -210,13 +219,14 @@ local function makeCard(player: Player, cand: Candidate, minRank: number?): (Car
 	local luck = stats.get(player).Luck or 0
 	if cand.kind == "Fusion" then
 		local def = Weapons.Defs[cand.id]
+		local fusion = def.fusion :: any
 		return {
 			kind = "WeaponUp",
 			id = cand.id,
 			rarity = "Legendary",
 			level = Weapons.FusionLevel,
-			title = `{L(Cards.Text.Fusion)} : {L(def.fusion.name)}`,
-			desc = L(def.fusion.desc),
+			title = `{L(Cards.Text.Fusion)}: {L(fusion.name)}`,
+			desc = L(fusion.desc),
 			icon = nil,
 		}, { source = "weapon", toLevel = Weapons.FusionLevel, bonus = 0 }
 	end
@@ -237,9 +247,9 @@ local function makeCard(player: Player, cand: Candidate, minRank: number?): (Car
 			desc = table.concat(deltas, " | ")
 		end
 		if bonus > 0 then
-			desc ..= string.format(" (+%d%% %s)", math.round(bonus * 100), if Cards.Locale == "en" then "damage" else "dégâts")
+			desc ..= string.format(" (+%d%% %s)", math.round(bonus * 100), L(Cards.Text.Damage))
 		end
-		local title = if cur == 0 then `{L(Cards.Text.NewWeapon)} : {L(def.name)}` else `{L(def.name)} niv. {toLevel}`
+		local title = if cur == 0 then `{L(Cards.Text.NewWeapon)}: {L(def.name)}` else `{L(def.name)} {L(Cards.Text.Level)} {toLevel}`
 		return {
 			kind = if cur == 0 then "NewWeapon" else "WeaponUp",
 			id = cand.id,
@@ -258,7 +268,7 @@ local function makeCard(player: Player, cand: Candidate, minRank: number?): (Car
 		id = cand.id,
 		rarity = rarity :: any,
 		level = toLevel,
-		title = if cur == 0 then `{L(Cards.Text.NewGrimoire)} : {L(def.name)}` else `{L(def.name)} niv. {toLevel}`,
+		title = if cur == 0 then `{L(Cards.Text.NewGrimoire)}: {L(def.name)}` else `{L(def.name)} {L(Cards.Text.Level)} {toLevel}`,
 		desc = grimoireDesc(def, cur, toLevel),
 		icon = nil,
 	}, { source = "grimoire", toLevel = toLevel, bonus = 0 }
@@ -287,7 +297,7 @@ local function companionOptions(player: Player): { Card }
 	return {}
 end
 
--- Builds `count` cards, skipping ids in `exclude`. Astrel guarantee via `forceRare`.
+-- Construit `count` cartes en sautant les ids de `exclude`. `forceRare` : garantie du passif Mage.
 local function drawCards(player: Player, count: number, exclude: { [string]: boolean }, forceRare: boolean): ({ Card }, { Meta })
 	local candidates = buildCandidates(player, exclude)
 	local companions = companionOptions(player)
@@ -375,7 +385,7 @@ local function tryOpen(player: Player)
 	local run = Registry.find("RunManager")
 	if run then
 		if run.setInvulnerable then
-			pcall(run.setInvulnerable, player, Cards.OfferSeconds)
+			pcall(run.setInvulnerable, player, Cards.OfferSeconds, "Card")
 		end
 		if run.setSlow then
 			pcall(run.setSlow, player, Cards.SlowMultiplier, Cards.OfferSeconds)
@@ -391,6 +401,12 @@ local function closeOffer(player: Player, d: PlayerCards)
 	end
 	d.offer = nil
 	d.pending = math.max(0, d.pending - 1)
+	-- S-05 : l'invulnérabilité du choix s'arrête avec le choix (l'offre suivante la redonne,
+	-- dans la limite du plafond de RunManager).
+	local run = Registry.find("RunManager")
+	if run and run.clearInvulnerable then
+		pcall(run.clearInvulnerable, player, "Card")
+	end
 	offerRemote:FireClient(player, { offerId = offer.offerId, closed = true })
 	tryOpen(player)
 end
