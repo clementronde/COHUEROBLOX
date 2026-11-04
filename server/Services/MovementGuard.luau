@@ -1,14 +1,26 @@
 --!strict
--- MovementGuard (avatar domain): server plausibility checks for client-owned characters (classic mode).
--- Design: docs/dossier/50-classes-avatar-mouvement.md section 6. Vault: "Exploits and Anti-Cheat",
--- "Detecting Movement Exploits - Speed Fly Noclip Teleport".
--- Horizontal leaky-bucket speed check + teleport step check + hover check (shadow mode by default).
--- Mitigation = rubber-band to the last grounded valid position. Never kicks. Logs with ping.
--- Also validates the MoveEvent remote and sets server attributes Sliding / HopChain / Airborne.
+-- MovementGuard (A06, domaine avatar) : contrôles de plausibilité serveur pour des personnages pilotés par
+-- le client (mode classique). Design : docs/dossier/50-classes-avatar-mouvement.md section 7.
+-- Vault fwjelaa : « Exploits and Anti-Cheat », « Detecting Movement Exploits - Speed Fly Noclip Teleport ».
 --
--- Exemptions (server-caused movement: jump pads, geysers, ziplines, teleports, knockback):
---   MovementGuard.exempt(player, seconds, reason?)            (contract request: add to section 4)
---   or set the server attribute Player.MoveExemptUntil = workspace:GetServerTimeNow() + seconds
+-- Échantillon toutes les 0,25 s, déplacement horizontal seulement. La vitesse permise dépend de ce que le
+-- serveur voit lui-même (jamais Humanoid.WalkSpeed) :
+--   marche                 marche(classe) x (1 + MoveSpeed serveur)
+--   bunny-hop              + 3 % par hop reçu (MoveEvent Hop) pendant que le serveur voit le joueur en l'air,
+--                          au plus un hop par MinHopTime ; perdu après AirMemory au sol
+--   glissade               vitesse suivie par le serveur : départ = course permise x boost de la classe, puis
+--                          gain de pente seulement si le serveur voit une pente sous le joueur ; plafond de classe.
+--                          Un saut en fin de glissade crédite le bonus correspondant.
+-- Seau percé sur l'excès + contrôle de téléport + vol stationnaire (mode ombre). Un gel de réplication
+-- (le serveur ne voit plus bouger le joueur, puis un rattrapage) est pris en compte : la distance permise
+-- couvre le temps gelé. Sanction = recalage sur la dernière position valide au sol. Jamais de kick.
+-- Valide aussi le remote MoveEvent et pose les attributs serveur Sliding / SlideCharge / HopChain / Airborne /
+-- HeavyLandAt sur le Player (lecture seule pour les autres domaines).
+--
+-- Exemptions (mouvement causé par le serveur : tremplins, geysers, tyroliennes, téléports, recul) :
+--   MovementGuard.exempt(player, seconds, reason?)
+--   ou attribut serveur Player.MoveExemptUntil = workspace:GetServerTimeNow() + seconds
+-- Lecture : MovementGuard.getStrikes(player) -> number
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,30 +30,49 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared:WaitForChild("Net"))
 local Registry = require(Shared:WaitForChild("Registry"))
-local Config = Shared:WaitForChild("Config")
-local Classes = require(Config:WaitForChild("Classes"))
-local Movement = require(Config:WaitForChild("Movement"))
+local Movement = require(Shared:WaitForChild("Config"):WaitForChild("Movement"))
 local Heightmap = require(Shared:WaitForChild("Heightmap"))
 
 local G = Movement.Guard
 
--- Launches applied by the client that the server must tolerate (integration fix):
--- jump pads from the shared stage layout, and the sandstorm push (Worlds hazard pushSpeed = 6).
-local PAD_RADIUS = 6 -- studs around a pad centre that start the grace window
-local PAD_GRACE = 2.5 -- seconds: covers the launch arc onto the plateau
-local SANDSTORM_PUSH = 8 -- studs/s added while CohueHazard == "Sandstorm" (pushSpeed + margin)
+-- Lancers appliqués par le client que le serveur doit tolérer : tremplins du plan partagé, et la poussée
+-- de la tempête de sable (pushSpeed du monde = 6).
+local PAD_RADIUS = 6
+local PAD_GRACE = 2.5
+local SANDSTORM_PUSH = 8
+local IS_STUDIO = RunService:IsStudio()
 
 type State = {
 	lastPos: Vector3,
 	lastValid: CFrame,
 	bucket: number,
+	bucketPeak: number,
+	ratioPeak: number, -- pire pas / (vitesse permise x temps), Studio
 	exemptUntil: number, -- os.clock()
 	strikes: number,
+	rubberBands: number,
+	stall: number, -- s pendant lesquels le serveur n'a vu aucun déplacement
+	-- bunny-hop : crédits gagnés par des hops reçus pendant qu'on voit le joueur en l'air, plafonnés par le temps
+	hopCredits: number,
+	chainStart: number,
+	lastAirAt: number,
+	lastHopAt: number,
+	-- glissade : vitesse max plausible suivie par le serveur (départ + pente vue sous le joueur)
+	slideUntil: number, -- > 0 = glissade en cours (attribut Sliding)
+	slideSpeed: number,
+	slideEntryBonus: number,
+	slideSlopeGain: number,
+	slideEndAt: number,
+	lastSlideStart: number,
+	-- en l'air
+	wasAirborne: boolean,
+	landPeakY: number, -- pour l'atterrissage lourd
 	airborneFor: number,
 	airStartY: number,
+	airTopY: number,
+	airLowY: number,
 	lastLog: number,
-	slideUntil: number,
-	lastHopAt: number,
+	dbg: string, -- dernier échantillon (Studio : CohueGuardDebug)
 }
 
 local MovementGuard = {}
@@ -61,28 +92,43 @@ local function refreshFilter()
 	rayParams.FilterDescendantsInstances = exclude
 end
 
-local function getState(player: Player): State?
-	return states[player]
-end
-
--- Server-known max plausible horizontal speed (studs/s). Never reads Humanoid.WalkSpeed.
-local function maxSpeed(player: Player): number
-	local classId = player:GetAttribute("ClassId")
-	local def = if type(classId) == "string" then Classes[classId] else nil
-	local base = if def then def.walkSpeed else Movement.DefaultWalkSpeed
-
-	local moveSpeed = 0
+local function moveSpeedStat(player: Player): number
 	local StatsService = Registry.find("StatsService")
 	if StatsService then
 		local ok, stats = pcall(StatsService.get, player)
-		if ok and type(stats) == "table" and type(stats.MoveSpeed) == "number" then
-			moveSpeed = math.max(0, stats.MoveSpeed)
+		if ok and type(stats) == "table" and type(stats.MoveSpeed) == "number" and stats.MoveSpeed == stats.MoveSpeed then
+			return math.max(0, stats.MoveSpeed)
 		end
 	end
+	return 0
+end
 
-	local slideBoost = if def and type(def.slideBoost) == "number" then def.slideBoost else Movement.SlideBoostDefault
-	local burst = math.max(1 + Movement.BhopMaxBonus, Movement.SlideMaxMult, slideBoost * (1 + Movement.BhopMaxBonus))
-	return base * (1 + moveSpeed) * burst
+type Limits = { base: number, slideCap: number, maxPossible: number, boost: number, friction: number, gravity: number }
+
+-- Vitesses de référence côté serveur (studs/s), depuis la classe et les stats serveur.
+local function limits(player: Player): Limits
+	local prof = Movement.profile(player:GetAttribute("ClassId"))
+	local base = Movement.walkSpeed(prof) * (1 + moveSpeedStat(player))
+	local slideCap = base * Movement.slideMaxMult(prof)
+	local slide = prof.slide
+	return {
+		base = base,
+		slideCap = slideCap,
+		maxPossible = math.max(slideCap, base * (1 + Movement.BhopMaxBonus)),
+		boost = if slide and slide.boost then slide.boost else Movement.SlideBoost,
+		friction = if slide and slide.friction then slide.friction else Movement.SlideFriction,
+		gravity = Workspace.Gravity * (prof.gravityMult or 1),
+	}
+end
+
+-- Bonus de bunny-hop que le serveur accepte : au plus un hop reçu par crédit, et au plus un hop par MinHopTime.
+local function hopBonusAllowed(s: State, now: number): number
+	if s.hopCredits <= 0 then
+		return 0
+	end
+	local byCredits = Movement.BhopGainPerHop * s.hopCredits
+	local byTime = Movement.BhopGainPerHop * (now - s.chainStart) / G.MinHopTime
+	return math.min(Movement.BhopMaxBonus, byCredits, byTime)
 end
 
 local function isExempt(player: Player, s: State, now: number): boolean
@@ -103,18 +149,124 @@ local function log(player: Player, s: State, kind: string, data: string)
 end
 
 local function rubberBand(character: Model, root: BasePart, s: State, player: Player)
+	s.rubberBands += 1
 	character:PivotTo(s.lastValid)
 	root.AssemblyLinearVelocity = Vector3.zero
 	s.lastPos = s.lastValid.Position
 	s.bucket = 0
+	s.stall = 0
 	s.airborneFor = 0
 	s.exemptUntil = os.clock() + G.GraceAfterRubberBand + math.clamp(player:GetNetworkPing(), 0, G.PingCap)
 end
 
-local function grounded(root: BasePart, humanoid: Humanoid): boolean
+-- Sol sous le joueur vu par le serveur (rayon indulgent : 1,5 stud sous les pieds).
+local function groundHit(root: BasePart, humanoid: Humanoid): RaycastResult?
 	local reach = humanoid.HipHeight + root.Size.Y / 2 + 1.5
 	local hit = Workspace:Raycast(root.Position, Vector3.new(0, -reach, 0), rayParams)
-	return hit ~= nil and hit.Normal.Y >= Movement.GroundNormalMinY
+	if hit and hit.Normal.Y >= Movement.GroundNormalMinY then
+		return hit
+	end
+	return nil
+end
+
+local function newState(root: BasePart): State
+	local pos = root.Position
+	return {
+		lastPos = pos,
+		lastValid = root.CFrame,
+		bucket = 0,
+		bucketPeak = 0,
+		ratioPeak = 0,
+		exemptUntil = os.clock() + G.SpawnGrace,
+		strikes = 0,
+		rubberBands = 0,
+		stall = 0,
+		hopCredits = 0,
+		chainStart = 0,
+		lastAirAt = -math.huge,
+		lastHopAt = -math.huge,
+		slideUntil = 0,
+		slideSpeed = 0,
+		slideEntryBonus = 0,
+		slideSlopeGain = 0,
+		slideEndAt = -math.huge,
+		lastSlideStart = -math.huge,
+		wasAirborne = false,
+		landPeakY = pos.Y,
+		airborneFor = 0,
+		airStartY = pos.Y,
+		airTopY = pos.Y,
+		airLowY = pos.Y,
+		lastLog = 0,
+		dbg = "",
+	}
+end
+
+local MAX_CREDITS = math.ceil(Movement.BhopMaxBonus / Movement.BhopGainPerHop - 1e-6)
+
+-- Fin de glissade. Comme le client, un saut en fin de glissade garde le bonus d'entrée, ajoute un hop, et
+-- convertit seulement l'élan gagné en pente (le boost de départ ne compte pas : sinon glisser en boucle au
+-- plat ferait monter le bonus permis).
+local function endSlide(player: Player, s: State, now: number)
+	if s.slideUntil > 0 then
+		s.slideUntil = 0
+		s.slideEndAt = now
+		local L = limits(player)
+		local gain = Movement.BhopGainPerHop
+		local slopeBonus = s.slideSlopeGain / math.max(L.base, 1)
+		local target = s.slideEntryBonus + slopeBonus + gain
+		local credits = math.min(math.ceil(target / gain - 1e-6), MAX_CREDITS)
+		if credits > s.hopCredits then
+			if s.hopCredits <= 0 then
+				s.chainStart = now - G.MinHopTime
+			end
+			s.hopCredits = credits
+			-- La part gagnée en pente arrive d'un coup : elle ne passe pas par la limite de temps.
+			s.chainStart = math.min(s.chainStart, now - math.ceil(slopeBonus / gain - 1e-6) * G.MinHopTime)
+		end
+	end
+	player:SetAttribute("Sliding", false)
+	player:SetAttribute("SlideCharge", false)
+end
+
+-- Suivi en l'air : crédits de bunny-hop, chute pour l'atterrissage lourd.
+local function trackAir(player: Player, s: State, onGround: boolean, pos: Vector3, now: number)
+	if not onGround then
+		if not s.wasAirborne then
+			s.landPeakY = pos.Y
+		end
+		s.landPeakY = math.max(s.landPeakY, pos.Y)
+		s.lastAirAt = now
+	elseif s.wasAirborne then
+		local prof = Movement.profile(player:GetAttribute("ClassId"))
+		if prof.heavyLanding and s.landPeakY - pos.Y >= G.HeavyFall then
+			player:SetAttribute("HeavyLandAt", Workspace:GetServerTimeNow())
+		end
+	end
+	s.wasAirborne = not onGround
+	-- Au sol depuis trop longtemps (et pas en glissade) : la chaîne de hops est perdue.
+	if onGround and s.slideUntil == 0 and now - s.lastAirAt > G.AirMemory then
+		s.hopCredits = 0
+	end
+end
+
+-- Glissade : la vitesse plausible monte seulement sur une pente vue par le serveur.
+local function trackSlide(s: State, L: Limits, hit: RaycastResult?, dt: number)
+	if s.slideUntil <= 0 or not hit then
+		return
+	end
+	local n = hit.Normal
+	local slopeSin = Vector3.new(n.X, 0, n.Z).Magnitude
+	if slopeSin > Movement.SlideSlopeMin then
+		local gain = L.gravity * Movement.SlideSlopeGain * slopeSin * dt * G.SlopeLeniency
+		s.slideSpeed += gain
+		s.slideSlopeGain += gain
+	else
+		-- Au plat, une glissade perd de la vitesse (frottement compté à moitié par prudence).
+		local floor = L.base * (1 + s.slideEntryBonus)
+		s.slideSpeed = math.max(floor, s.slideSpeed - L.friction * G.SlideFrictionLeniency * dt)
+	end
+	s.slideSpeed = math.min(s.slideSpeed, L.slideCap)
 end
 
 local function sample(player: Player, dt: number)
@@ -125,39 +277,30 @@ local function sample(player: Player, dt: number)
 		return
 	end
 
-	local pos = root.Position
-	local s = getState(player)
+	local s = states[player]
 	if not s then
-		states[player] = {
-			lastPos = pos,
-			lastValid = root.CFrame,
-			bucket = 0,
-			exemptUntil = os.clock() + G.SpawnGrace,
-			strikes = 0,
-			airborneFor = 0,
-			airStartY = pos.Y,
-			lastLog = 0,
-			slideUntil = 0,
-			lastHopAt = 0,
-		}
+		states[player] = newState(root)
 		return
 	end
 
-	-- NaN guard
+	local pos = root.Position
 	if pos.X ~= pos.X or pos.Y ~= pos.Y or pos.Z ~= pos.Z then
 		rubberBand(character, root, s, player)
 		return
 	end
 
-	local onGround = grounded(root, humanoid)
-	player:SetAttribute("Airborne", not onGround)
-	if s.slideUntil > 0 and os.clock() > s.slideUntil then
-		s.slideUntil = 0
-		player:SetAttribute("Sliding", false)
-	end
-
 	local now = os.clock()
-	-- Standing on a jump pad starts a short exemption (the client applies the launch).
+	local hit = groundHit(root, humanoid)
+	local onGround = hit ~= nil
+	player:SetAttribute("Airborne", not onGround)
+	if s.slideUntil > 0 and now > s.slideUntil then
+		endSlide(player, s, now)
+	end
+	trackAir(player, s, onGround, pos, now)
+	local L = limits(player)
+	trackSlide(s, L, hit, dt)
+
+	-- Sur un tremplin : courte exemption (le client applique le lancer).
 	local layout = Heightmap.getLayout()
 	if layout then
 		for _, pad in layout.pads do
@@ -168,10 +311,11 @@ local function sample(player: Player, dt: number)
 			end
 		end
 	end
-	-- Rebase only: exemptions, seats, anchored, server hitch.
+	-- Recaler la base seulement : exemptions, siège, ancré, à-coup serveur.
 	if isExempt(player, s, now) or root.Anchored or humanoid.SeatPart ~= nil or dt > G.HitchFactor * G.Interval then
 		s.lastPos = pos
 		s.bucket = 0
+		s.stall = 0
 		s.airborneFor = 0
 		if onGround then
 			s.lastValid = root.CFrame
@@ -179,15 +323,23 @@ local function sample(player: Player, dt: number)
 		return
 	end
 
-	local vmax = maxSpeed(player)
+	local bonus = hopBonusAllowed(s, now)
+	local vlim = L.base * (1 + bonus)
+	local sliding = s.slideUntil > 0 or now - s.slideEndAt <= G.SlideMemory
+	if sliding then
+		vlim = math.max(vlim, s.slideSpeed)
+	end
 	if Workspace:GetAttribute("CohueHazard") == "Sandstorm" then
-		vmax += SANDSTORM_PUSH
+		vlim += SANDSTORM_PUSH
 	end
 	local ping = math.clamp(player:GetNetworkPing(), 0, G.PingCap)
 	local horizontal = Vector3.new(pos.X - s.lastPos.X, 0, pos.Z - s.lastPos.Z).Magnitude
 
-	-- 1. Teleport: one step far beyond anything plausible, even with a lag burst.
-	local teleportLimit = math.max(G.TeleportMinStuds, vmax * (dt + ping + 0.5) * 2)
+	-- Temps couvert par cet échantillon : dt + le gel qui le précède (rattrapage de réplication).
+	local span = dt + math.min(s.stall, G.StallCap)
+
+	-- 1. Téléport : un pas très au-delà de tout ce qui est possible, même après un gel.
+	local teleportLimit = math.max(G.TeleportMinStuds, L.maxPossible * (span + ping) * G.TeleportFactor)
 	if horizontal > teleportLimit then
 		s.strikes += 1
 		log(player, s, "teleport", `step={math.floor(horizontal)} limit={math.floor(teleportLimit)}`)
@@ -195,17 +347,28 @@ local function sample(player: Player, dt: number)
 			rubberBand(character, root, s, player)
 		else
 			s.lastPos = pos
+			s.stall = 0
 		end
 		return
 	end
 
-	-- 2. Speed: leaky bucket of excess distance, with ping slack.
-	local allowed = vmax * G.SpeedMargin * dt + vmax * ping * 0.25 -- ping slack per sample
+	-- 2. Vitesse : seau percé de l'excès de distance.
+	local allowed = vlim * G.Margin * span + G.SlackStuds + vlim * ping * G.JitterPing
 	local excess = math.max(0, horizontal - allowed)
 	s.bucket = math.max(0, s.bucket + excess - G.LeakPerSecond * dt)
+	s.bucketPeak = math.max(s.bucketPeak, s.bucket)
+	if IS_STUDIO then
+		s.ratioPeak = math.max(s.ratioPeak, horizontal / math.max(vlim * span, 0.01))
+		s.dbg = string.format("step=%.2f allowed=%.2f vlim=%.1f bonus=%.2f credits=%d slide=%s/%.1f bucket=%.1f ground=%s", horizontal, allowed, vlim, bonus, s.hopCredits, tostring(sliding), s.slideSpeed, s.bucket, tostring(onGround))
+	end
+	if horizontal < G.StallMoveStuds then
+		s.stall += dt
+	else
+		s.stall = 0
+	end
 	if s.bucket > G.BucketMax then
 		s.strikes += 1
-		log(player, s, "speed", `step={string.format("%.1f", horizontal)} allowed={string.format("%.1f", allowed)} vmax={string.format("%.1f", vmax)}`)
+		log(player, s, "speed", `step={string.format("%.1f", horizontal)} allowed={string.format("%.1f", allowed)} vlim={string.format("%.1f", vlim)} bonus={string.format("%.2f", bonus)}`)
 		if G.Enforce then
 			rubberBand(character, root, s, player)
 			return
@@ -213,18 +376,28 @@ local function sample(player: Player, dt: number)
 		s.bucket = 0
 	end
 
-	-- 3. Hover: airborne without descending below take-off height (glide and climb do descend).
+	-- 3. Vol stationnaire et vol : en l'air longtemps sans amplitude verticale (un bunny-hop oscille de
+	-- plusieurs studs, le plané descend), ou monté bien plus haut qu'un saut de la classe. Mode ombre par défaut.
 	if onGround then
 		s.airborneFor = 0
 		s.airStartY = pos.Y
 	else
 		if s.airborneFor == 0 then
 			s.airStartY = s.lastPos.Y
+			s.airTopY = math.max(pos.Y, s.lastPos.Y)
+			s.airLowY = math.min(pos.Y, s.lastPos.Y)
 		end
 		s.airborneFor += dt
-		if s.airborneFor > G.HoverLimit and (s.airStartY - pos.Y) < G.HoverDescend then
+		s.airTopY = math.max(s.airTopY, pos.Y)
+		s.airLowY = math.min(s.airLowY, pos.Y)
+		local prof = Movement.profile(player:GetAttribute("ClassId"))
+		local jumps = 1 + (prof.airJumps or 0) * Movement.AirJumpMult
+		local flyLimit = Movement.jumpHeight(prof) * jumps + G.FlyMargin
+		local hovering = s.airborneFor > G.HoverLimit and (s.airTopY - s.airLowY) < G.HoverRange
+		local flying = pos.Y - s.airStartY > flyLimit
+		if hovering or flying then
 			s.strikes += 1
-			log(player, s, "hover", `air={string.format("%.1f", s.airborneFor)}s`)
+			log(player, s, if flying then "fly" else "hover", `air={string.format("%.1f", s.airborneFor)}s rise={string.format("%.1f", pos.Y - s.airStartY)} range={string.format("%.1f", s.airTopY - s.airLowY)}`)
 			if G.HoverEnforce then
 				rubberBand(character, root, s, player)
 				return
@@ -234,7 +407,7 @@ local function sample(player: Player, dt: number)
 	end
 
 	s.lastPos = pos
-	-- Only grounded, plausible positions become rubber-band targets.
+	-- Seules les positions au sol et plausibles deviennent des cibles de recalage.
 	if onGround and excess == 0 then
 		s.lastValid = root.CFrame
 	end
@@ -242,7 +415,7 @@ end
 
 -- ---------------------------------------------------------------- API
 
--- Call before any server-caused movement (jump pads, geysers, ziplines, teleports, knockback).
+-- À appeler avant tout mouvement causé par le serveur (tremplin, geyser, tyrolienne, téléport, recul).
 function MovementGuard.exempt(player: Player, seconds: number, _reason: string?)
 	local s = states[player]
 	if s and type(seconds) == "number" then
@@ -273,19 +446,32 @@ local function onMoveEvent(player: Player, kind: any)
 	end
 	local now = os.clock()
 	if kind == "SlideStart" then
-		-- Only from the ground (the server ray is lenient: 1.5 studs below the feet).
-		if grounded(root, humanoid) then
+		-- Depuis le sol seulement, et pas en rafale. La vitesse plausible part de la course actuelle x boost.
+		if now - s.lastSlideStart >= G.SlideMinInterval and s.slideUntil == 0 and groundHit(root, humanoid) then
+			local L = limits(player)
+			s.lastSlideStart = now
 			s.slideUntil = now + Movement.SlidingAttrTimeout
+			s.slideEntryBonus = hopBonusAllowed(s, now)
+			s.slideSlopeGain = 0
+			s.slideSpeed = math.min(L.base * (1 + s.slideEntryBonus) * L.boost * G.SlideStartSlack, L.slideCap)
 			player:SetAttribute("Sliding", true)
+			local prof = Movement.profile(player:GetAttribute("ClassId"))
+			player:SetAttribute("SlideCharge", prof.slide ~= nil and prof.slide.charge == true)
 		end
 	elseif kind == "SlideEnd" then
-		s.slideUntil = 0
-		player:SetAttribute("Sliding", false)
+		endSlide(player, s, now)
 	elseif kind == "Hop" then
 		if now - s.lastHopAt < Movement.HopMinInterval then
 			return
 		end
 		s.lastHopAt = now
+		-- Un hop ne crédite le bonus que si le serveur a vu le joueur en l'air récemment.
+		if now - s.lastAirAt <= G.AirMemory + G.HopAirSlack then
+			if s.hopCredits <= 0 then
+				s.chainStart = now - G.MinHopTime
+			end
+			s.hopCredits = math.min(s.hopCredits + 1, math.ceil(Movement.BhopMaxBonus / Movement.BhopGainPerHop))
+		end
 		local chain = player:GetAttribute("HopChain")
 		player:SetAttribute("HopChain", (if type(chain) == "number" then chain else 0) + 1)
 		local ProgressionService = Registry.find("ProgressionService")
@@ -293,16 +479,18 @@ local function onMoveEvent(player: Player, kind: any)
 			pcall(ProgressionService.recordStat, player, "Hops", 1)
 		end
 	elseif kind == "HopReset" then
+		s.hopCredits = 0
 		player:SetAttribute("HopChain", 0)
 	end
 end
 
--- ---------------------------------------------------------------- lifecycle
+-- ---------------------------------------------------------------- cycle de vie
 
 local function watchPlayer(player: Player)
 	player.CharacterAdded:Connect(function()
-		states[player] = nil -- fresh state (with spawn grace) on the next sample
+		states[player] = nil -- état neuf (avec la grâce d'apparition) au prochain échantillon
 		player:SetAttribute("Sliding", false)
+		player:SetAttribute("SlideCharge", false)
 		player:SetAttribute("HopChain", 0)
 		task.defer(refreshFilter)
 	end)
@@ -321,6 +509,22 @@ function MovementGuard.init()
 end
 
 function MovementGuard.start()
+	if IS_STUDIO then
+		-- Point d'inspection pour les tests MCP : état du garde par joueur.
+		local bf = Instance.new("BindableFunction")
+		bf.Name = "CohueGuardDebug"
+		bf.OnInvoke = function(cmd: any): any
+			local out = {}
+			for p, st in states do
+				if cmd == "reset" then
+					st.bucketPeak, st.ratioPeak, st.strikes, st.rubberBands = 0, 0, 0, 0
+				end
+				out[p.Name] = { strikes = st.strikes, rubberBands = st.rubberBands, bucket = st.bucket, bucketPeak = st.bucketPeak, ratioPeak = st.ratioPeak, credits = st.hopCredits, last = st.dbg }
+			end
+			return out
+		end
+		bf.Parent = game:GetService("ServerScriptService")
+	end
 	for _, player in Players:GetPlayers() do
 		watchPlayer(player)
 	end
@@ -331,10 +535,10 @@ function MovementGuard.start()
 		if acc < G.Interval then
 			return
 		end
-		local step = acc
+		local stepDt = acc
 		acc = 0
 		for _, player in Players:GetPlayers() do
-			local ok, err = pcall(sample, player, step)
+			local ok, err = pcall(sample, player, stepDt)
 			if not ok then
 				warn(`[MovementGuard] sample failed for {player.Name}: {err}`)
 			end
