@@ -41,7 +41,7 @@ type Style = {
 	spin: boolean,
 	rolls: boolean,
 	boomerang: boolean,
-	outTime: number,
+	outRatio: number, -- boomerang : part du temps de vol avant le retour (outTime / life)
 	orbit: boolean,
 	aura: boolean,
 	beamHeight: number,
@@ -62,7 +62,7 @@ local function style(shape: Enum.PartType, color: Color3, size: Vector3): Style
 		spin = false,
 		rolls = false,
 		boomerang = false,
-		outTime = 0,
+		outRatio = 0,
 		orbit = false,
 		aura = false,
 		beamHeight = PROJ_HEIGHT,
@@ -88,7 +88,9 @@ for _, def in Weapons.List do
 	st.spin = fx.spin == true
 	st.rolls = fx.rolls == true
 	st.boomerang = fx.boomerang == true
-	st.outTime = def.base.outTime or 0
+	-- Le serveur multiplie outTime et life par la même Durée : le rapport suffit au client.
+	local life = def.base.life or 0
+	st.outRatio = if life > 0 then (def.base.outTime or 0) / life else 0
 	st.orbit = fx.orbit == true
 	st.aura = fx.aura == true
 	st.beamHeight = fx.beamHeight or PROJ_HEIGHT
@@ -281,7 +283,7 @@ local function onProjectile(scale: number, visual: number, id: number, x: number
 	local part = acquire(key, style)
 	part.Size = style.size * scale / math.max(style.projDiv, 0.1)
 	local boomerang = style.boomerang
-	local outTime = style.outTime
+	local outTime = (p3 / 10) * style.outRatio
 	projs[id] = {
 		part = part,
 		key = key,
@@ -370,6 +372,17 @@ local function onAttach(visual: number, slot: number, x: number, z: number, p1: 
 	if not fixed then
 		for i, e in attaches do
 			if e.slot == slot and e.visual == visual and not e.fixed then
+				local radius = p1 / Codec.Scale
+				local st = styleOf(visual)
+				if #e.parts == (if st.orbit then count else 1) then
+					-- Rafraîchissement d'une zone permanente : on garde l'angle (pas de saut)
+					e.radius, e.count, e.spin = radius, count, p4 / 20
+					if st.aura then
+						e.parts[1].Size = Vector3.new(0.4, radius * 2, radius * 2)
+					end
+					e.life = (os.clock() - e.t0) + p2 / 100
+					return
+				end
 				releaseAttach(e)
 				table.remove(attaches, i)
 				break

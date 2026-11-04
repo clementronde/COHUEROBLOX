@@ -24,6 +24,7 @@ local Registry = require(Shared:WaitForChild("Registry"))
 local Bus = require(script.Parent.Parent:WaitForChild("Bus"))
 
 local DT = 1 / Balance.SimHz
+local PULSE_ITEMS = { "RecessWhistle", "Megaphone", "FridgeMagnet" } -- objets à impulsion
 local P = Weapons.Passives
 local VIS = FxCodec.Visual
 
@@ -217,7 +218,7 @@ local function tickPlayer(player: Player, d: PData)
 	end
 
 	-- Impulsions à minuteur
-	for _, id in { "RecessWhistle", "Megaphone", "FridgeMagnet" } do
+	for _, id in PULSE_ITEMS do
 		local count = s.getItemCount(player, id)
 		if count <= 0 then
 			continue

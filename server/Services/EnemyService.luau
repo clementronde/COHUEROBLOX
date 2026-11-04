@@ -164,7 +164,9 @@ local function radiusOf(i: number): number
 	return Enemies[kinds[i]].radius * sizeMult[i]
 end
 
-local function nPlayers(): number
+local cachedPlayers = 1 -- joueurs de la run, relu une fois par tick (pas une copie de liste par apparition)
+
+local function countRunPlayers(): number
 	local run = Registry.find("RunManager")
 	if run then
 		local ok, list = pcall(run.getRunPlayers)
@@ -182,7 +184,7 @@ end
 
 local function scaledHp(): number
 	local overflow = if Run.Overtime.OverflowToHp then director.overflowMult else 1
-	return worldScale().hp * (1 + Balance.HpPerExtraPlayer * (nPlayers() - 1)) * director.hpMult * overflow
+	return worldScale().hp * (1 + Balance.HpPerExtraPlayer * (cachedPlayers - 1)) * director.hpMult * overflow
 end
 
 local function scaledDamage(): number
@@ -857,7 +859,38 @@ function EnemyService.getCount(): number
 	return count
 end
 
+-- Au plafond technique, retire l'ennemi ordinaire (ni élite, ni boss) le plus loin de tout joueur,
+-- sans butin ni KO, pour laisser passer une apparition voulue (mini-boss, invocation, autel).
+local function makeRoom(): boolean
+	if count < Balance.MaxEnemies then
+		return true
+	end
+	local best, bestD2 = 0, -1
+	for i = 1, count do
+		if not external[i] and bit32.band(states[i], BIT_ELITE) == 0 then
+			local nearest2 = math.huge
+			for _, player in Players:GetPlayers() do
+				local character = player.Character
+				local root = character and character:FindFirstChild("HumanoidRootPart")
+				if root and root:IsA("BasePart") then
+					local dx, dz = xs[i] - root.Position.X, zs[i] - root.Position.Z
+					nearest2 = math.min(nearest2, dx * dx + dz * dz)
+				end
+			end
+			if nearest2 > bestD2 then
+				best, bestD2 = i, nearest2
+			end
+		end
+	end
+	if best == 0 then
+		return false
+	end
+	removeAt(best)
+	return true
+end
+
 -- Spawns one enemy with the run's tier/stage/coop scaling. opts.hpMult multiplies on top.
+-- Apparition voulue : jamais perdue au plafond technique (makeRoom).
 function EnemyService.spawnAt(kind: number, x: number, z: number, opts: { elite: boolean?, hpMult: number? }?): number?
 	if type(kind) ~= "number" or not Enemies[kind] or Enemies[kind].isBoss then
 		return nil
@@ -867,6 +900,9 @@ function EnemyService.spawnAt(kind: number, x: number, z: number, opts: { elite:
 	end
 	local elite = opts ~= nil and opts.elite == true
 	local hpMult = if opts and type(opts.hpMult) == "number" and opts.hpMult > 0 then opts.hpMult else 1
+	if not makeRoom() then
+		return nil
+	end
 	return spawnScaled(kind, x, z, elite, hpMult)
 end
 
@@ -1094,6 +1130,7 @@ function EnemyService.start()
 		end
 		acc = math.min(acc - DT, DT) -- never run more than one catch-up tick
 		simTick += 1
+		cachedPlayers = countRunPlayers()
 		local targets, viewers = gatherTargets()
 		step(targets, os.clock())
 		send(viewers)

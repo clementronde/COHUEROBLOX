@@ -121,6 +121,7 @@ type Zone = {
 	cluster: number,
 	clusterDamage: number,
 	refresh: number,
+	fxAt: number, -- prochain FX de soin (aura du Cleric)
 	hitTimes: { [number]: number },
 	dead: boolean,
 }
@@ -152,6 +153,8 @@ local fxIdx: { number } = {}
 -- reused query buffers
 local qbuf: { number } = {}
 local qbuf2: { number } = {}
+local areaBufs: { { number } } = {} -- copie des ids par profondeur d'appel (hitArea, segmentHits)
+local areaDepth = 0
 local chainHits: { number } = {}
 
 local hitsThisTick = 0
@@ -387,8 +390,14 @@ local function hitArea(ps: PState, spec: Spec, x: number, z: number, radius: num
 	if n == 0 then
 		return 0
 	end
-	-- copy ids: hitEnemy may run nested queries
-	local ids = table.move(qbuf2, 1, n, 1, table.create(n))
+	-- copie des ids : hitEnemy peut relancer des requêtes (arcs de critique)
+	areaDepth += 1
+	local ids = areaBufs[areaDepth]
+	if not ids then
+		ids = {}
+		areaBufs[areaDepth] = ids
+	end
+	table.move(qbuf2, 1, n, 1, ids)
 	local cosHalf = math.cos(math.rad(halfDeg))
 	local count = 0
 	for i = 1, n do
@@ -407,6 +416,7 @@ local function hitArea(ps: PState, spec: Spec, x: number, z: number, radius: num
 		hitEnemy(ps, spec, id, x, z)
 		count += 1
 	end
+	areaDepth -= 1
 	return count
 end
 
@@ -661,6 +671,7 @@ local function newZone(kind: string, ps: PState, spec: Spec, weaponId: string): 
 		cluster = 0,
 		clusterDamage = 0,
 		refresh = 0,
+		fxAt = 0,
 		hitTimes = {},
 		dead = false,
 	}
@@ -707,7 +718,13 @@ local function segmentHits(z: Zone, x1: number, z1: number, x2: number, z2: numb
 	local dx, dz = x2 - x1, z2 - z1
 	local len2 = dx * dx + dz * dz
 	local n = es.queryRadius(mx, mz, math.sqrt(len2) * 0.5 + width + PAD, qbuf2)
-	local ids = table.move(qbuf2, 1, n, 1, table.create(n))
+	areaDepth += 1
+	local ids = areaBufs[areaDepth]
+	if not ids then
+		ids = {}
+		areaBufs[areaDepth] = ids
+	end
+	table.move(qbuf2, 1, n, 1, ids)
 	local w2 = (width + PAD) ^ 2
 	for i = 1, n do
 		local id = ids[i]
@@ -720,6 +737,7 @@ local function segmentHits(z: Zone, x1: number, z1: number, x2: number, z2: numb
 			end
 		end
 	end
+	areaDepth -= 1
 end
 
 -- Passif Cleric (Blessing) : l'aura de l'arme `auraWeapon` soigne les joueurs actifs dedans,
@@ -734,11 +752,18 @@ local function healAlliesInAura(z: Zone)
 		return
 	end
 	local r2 = z.radius * z.radius
+	local showFx = z.age >= z.fxAt
+	if showFx then
+		z.fxAt = z.age + 1.5
+	end
 	for _, other in pstates do
 		if other.active and other.hasRoot then
 			local dx, dz = other.x - z.x, other.z - z.z
 			if dx * dx + dz * dz <= r2 then
 				run.healPlayer(other.player, passive.auraHealPerTick)
+				if showFx then
+					areaFx(FxCodec.Visual.Blessing, other.x, other.z, 2.5, 0, 0, 0)
+				end
 			end
 		end
 	end
@@ -1045,6 +1070,7 @@ local function fireWeapon(ps: PState, weaponId: string, level: number, n: number
 	elseif kind == "Orbit" or kind == "Beam" then
 		local permanent = (w.permanent or 0) > 0
 		local z = if permanent then findZone(ps, weaponId) else nil
+		local fresh = z == nil
 		if not z then
 			killZones(ps, weaponId)
 			z = newZone(kind, ps, spec, weaponId)
@@ -1064,8 +1090,10 @@ local function fireWeapon(ps: PState, weaponId: string, level: number, n: number
 				z.radius = w.radius
 				z.interval = w.interval
 			end
-			z.refresh = ATTACH_REFRESH
-			attachFx(z, false)
+			if fresh or not permanent then
+				z.refresh = ATTACH_REFRESH
+				attachFx(z, false)
+			end
 		end
 	end
 end
@@ -1225,6 +1253,7 @@ local function step()
 	clock += DT
 	simTick += 1
 	hitsThisTick = 0
+	areaDepth = 0 -- une erreur rattrapée au tick précédent ne doit pas laisser la pile décalée
 	gather()
 	local stats = statsService()
 

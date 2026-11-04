@@ -19,6 +19,7 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Run = require(Config:WaitForChild("Run"))
+local Classes = require(Config:WaitForChild("Classes"))
 local Worlds = require(Config:WaitForChild("Worlds"))
 local Balance = require(Config:WaitForChild("Balance"))
 local Heightmap = require(Shared:WaitForChild("Heightmap"))
@@ -288,6 +289,7 @@ local function sendRunState(target: Player?)
 		overtimeStep = state.overtimeStep,
 		victory = state.victory,
 		cashOutPosition = state.cashOut,
+		cashOutProgress = if state.victory then math.clamp(state.cashOutHold / Run.CashOut.HoldSeconds, 0, 1) else nil,
 		arenaCountdown = if state.arenaEnterAt and not state.bossSpawned
 			then math.max(0, Run.ArenaStartSeconds - (now() - state.arenaEnterAt))
 			else nil,
@@ -366,8 +368,15 @@ local function worldIdFor(index: number): string
 	return if id and Worlds[id] then id else Run.DefaultWorld
 end
 
+-- Id de classe jouable : un id v1 sans équivalent v2 (Astrel, Cristallin) ou inconnu devient la
+-- classe par défaut, pour que stats, équipement et résumé parlent de la même classe.
+local function playableClass(classId: string): string
+	return if Classes[classId] then classId else Run.DefaultClass
+end
+
 local function initPlayerForRun(r: PlayerRun)
 	local player = r.player
+	r.classId = playableClass(r.classId)
 	r.inRun = true
 	r.downedUntil = nil
 	r.ghost = false
@@ -839,8 +848,10 @@ local function spawnMiniBoss()
 	end
 	local a = math.random() * math.pi * 2
 	local world = Worlds[state.worldId]
-	safe(enemies.spawnAt, world.miniBoss, root.Position.X + math.cos(a) * 55, root.Position.Z + math.sin(a) * 55, { elite = true })
-	announce("MiniBoss", { en = "A mini-boss approaches!", fr = "A mini-boss approaches!" }, 3)
+	local ok, id = safe(enemies.spawnAt, world.miniBoss, root.Position.X + math.cos(a) * 55, root.Position.Z + math.sin(a) * 55, { elite = true })
+	if ok and id then
+		announce("MiniBoss", { en = "A mini-boss approaches!", fr = "A mini-boss approaches!" }, 3)
+	end
 end
 
 local function startBossFight()
@@ -882,7 +893,7 @@ end
 
 -- Overtime ------------------------------------------------------------------------------------
 
-local startOvertime: (t: number) -> ()
+local startOvertime: (t: number, silent: boolean?) -> ()
 local stepOvertime: (t: number) -> ()
 local updateDirector: (t: number) -> ()
 
@@ -904,7 +915,7 @@ local function averageDifficulty(): number
 	return if n > 0 then total / n else 0
 end
 
-function startOvertime(t: number)
+function startOvertime(t: number, silent: boolean?)
 	if state.finalWaveStart ~= nil then
 		return
 	end
@@ -915,7 +926,9 @@ function startOvertime(t: number)
 	state.overtimeFrozen = false
 	setPhase("FinalWave")
 	Bus.FinalWaveStarted:fire()
-	announce("Overtime", { en = "OVERTIME! Enemies get stronger every 30 s", fr = "OVERTIME! Enemies get stronger every 30 s" }, 4)
+	if not silent then
+		announce("Overtime", { en = "OVERTIME! Enemies get stronger every 30 s", fr = "OVERTIME! Enemies get stronger every 30 s" }, 4)
+	end
 end
 
 function stepOvertime(t: number)
@@ -997,6 +1010,13 @@ local function stepRun(dt: number)
 				startRun()
 			end
 		end
+		return
+	end
+
+	-- Tous les joueurs de la run sont partis (un retardataire peut rester sur l'écran de choix) :
+	-- on ne laisse pas l'Overtime grimper dans le vide.
+	if #runPlayers == 0 then
+		resetToLoadout()
 		return
 	end
 
@@ -1108,12 +1128,14 @@ local function stepRun(dt: number)
 	if state.victory and cashOut then
 		if t >= state.portalOpensAt and allActiveNear(cashOut, Run.CashOut.Radius) then
 			state.cashOutHold += dt
+			state.stateDirty = true
 			if state.cashOutHold >= Run.CashOut.HoldSeconds then
 				state.cashedOut = true
 				endRun(true)
 			end
-		else
+		elseif state.cashOutHold > 0 then
 			state.cashOutHold = 0
+			state.stateDirty = true
 		end
 	end
 end
@@ -1151,7 +1173,7 @@ local function onBossDefeated(_bossId: string, _stage: number)
 			setPhase("FinalWave")
 			state.overtimeFrozen = false
 		else
-			startOvertime(now())
+			startOvertime(now(), true) -- la bannière Victory reste à l'écran
 		end
 	else
 		state.farmEndsAt = now() + Run.FarmSeconds
@@ -1342,7 +1364,8 @@ end
 local function onReady(player: Player)
 	local r = getRecord(player)
 	local progression = find("ProgressionService")
-	if progression then
+	-- Un joueur déjà dans la run garde sa classe jusqu'à la fin (résumé = classe jouée).
+	if progression and not r.inRun then
 		local ok, classId, companionId = safe(progression.getLoadout, player)
 		if ok and type(classId) == "string" then
 			r.classId = classId
@@ -1373,7 +1396,8 @@ function RunManager.init()
 		task.delay(0.2, function()
 			if player.Parent then
 				local r = getRecord(player)
-				if not find("ProgressionService") then
+				-- Sans domaine data (test isolé) : seuls les ids de classe connus sont acceptés.
+				if not find("ProgressionService") and not r.inRun and Classes[classId] then
 					r.classId, r.companionId = classId, companionId
 				end
 				onReady(player)
@@ -1461,7 +1485,8 @@ function RunManager.init()
 	end)
 end
 
--- Commandes de test (Studio seulement, Run.Debug.StudioCommands). Depuis la barre de commande :
+-- Commandes de test (Studio seulement, Run.Debug.StudioCommands). En Play, barre de commande
+-- réglée sur la vue Server (bouton Client/Server de l'onglet Test), puis :
 --   game.ServerStorage.CohueRunDebug:Invoke("state")
 --   :Invoke("skip", 590)        avance le chrono du monde de 590 s
 --   :Invoke("xp", 500)          donne 500 XP à chaque joueur de la run
