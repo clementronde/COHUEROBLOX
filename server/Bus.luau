@@ -7,6 +7,7 @@ local Signal = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Si
 
 return {
 	-- EnemyService: (id: number, kind: number, x: number, z: number, killer: Player?, isElite: boolean)
+	-- isElite = élite « à butin » (coffre) ; les élites en plus de l'Overtime arrivent avec false.
 	EnemyKilled = Signal.new(),
 	-- StatsService: (player: Player, level: number)
 	PlayerLeveledUp = Signal.new(),

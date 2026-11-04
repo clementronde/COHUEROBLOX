@@ -34,7 +34,7 @@ Ended ──(Replay de tous, ou 10 s après le premier Replay)──> Running (m
 | `Overtime.SpawnPerStep` | +15 % | Densité voulue ×(1 + 0,15 k) |
 | `Overtime.HpPerStep` | +20 % | PV des ennemis qui apparaissent ×(1 + 0,20 k) |
 | `Overtime.DamagePerStep` | +10 % | Dégâts ennemis ×(1 + 0,10 k) |
-| `Overtime.ElitePointsPerStep` | +3 points | Part d'élites = `EliteChance` (0,5 %) + 3 % × k ; en Overtime le plafond d'élites vivantes saute |
+| `Overtime.ElitePointsPerStep` | +3 points | Part d'élites = `EliteChance` (0,5 %) + 3 % × k ; en Overtime le plafond d'élites vivantes saute. Seules `EliteMaxAlive` (4) élites à la fois sont « à butin » (coffre) ; les autres ont les PV, la taille et la couronne d'élite mais pas de coffre (`Bus.EnemyKilled` isElite = false), sinon les coffres pleuvraient |
 | `Overtime.Compound` | `false` | `true` : ×1,15^k au lieu de ×(1 + 0,15 k). Linéaire par défaut pour que le Keep going reste farmable longtemps |
 | `Overtime.CoinsPerStep` | 10 × monde | Pièces de survie par palier et par joueur actif |
 | `Overtime.OverflowToHp` | `true` | Au-delà du plafond technique `Balance.MaxEnemies` (300), l'excès de densité devient des PV : PV × (densité voulue / 300). Le joueur voit des ennemis plus forts, pas plus nombreux |

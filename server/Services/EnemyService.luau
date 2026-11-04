@@ -55,6 +55,10 @@ local targetOf: { [number]: Player } = {}
 local dmgMult: { number } = {}
 local sizeMult: { number } = {}
 local external: { boolean } = {}
+-- Élite « à butin » (coffre chez LootService). En Overtime, les élites en plus du plafond classique
+-- Run.EliteMaxAlive gardent PV, taille et couronne mais sortent sans coffre : sinon la part d'élites
+-- sans plafond ferait pleuvoir les coffres. Bus.EnemyKilled porte isElite = élite à butin.
+local lootElite: { boolean } = {}
 -- Family AI
 local actPhase: { number } = {} -- 0 idle/walk, 1 windup, 2 airborne
 local actT: { number } = {}
@@ -78,13 +82,14 @@ local kbVZ: { number } = {}
 local kbUntil: { number } = {}
 
 local columns: { { any } } = {
-	ids, xs, zs, hps, kinds, states, targetOf :: any, dmgMult, sizeMult, external,
+	ids, xs, zs, hps, kinds, states, targetOf :: any, dmgMult, sizeMult, external, lootElite,
 	actPhase, actT, actX, actZ, actOX, actOZ,
 	burnDps, burnUntil, burnSrc :: any, poisonDps, poisonUntil, poisonSrc :: any, dotNext,
 	slowMult, slowUntil, stopUntil, kbVX, kbVZ, kbUntil,
 }
 
 local indexOf: { [number]: number } = {} -- id -> index
+local lootEliteAlive = 0 -- élites à butin vivantes, hors mini-boss (plafond Run.EliteMaxAlive)
 local coinTimes: { [number]: number } = {}
 
 local nextId = 1
@@ -189,7 +194,11 @@ local function clampToMap(x: number, z: number): (number, number)
 	return math.clamp(x, -h, h), math.clamp(z, -h, h)
 end
 
-local function insertEnemy(kind: number, x: number, z: number, hp: number, dmg: number, elite: boolean, isExternal: boolean): number?
+local function countsTowardEliteCap(i: number): boolean
+	return lootElite[i] and Enemies[kinds[i]].family ~= "MiniBoss"
+end
+
+local function insertEnemy(kind: number, x: number, z: number, hp: number, dmg: number, elite: boolean, isExternal: boolean, noLoot: boolean?): number?
 	if count >= Balance.MaxEnemies and not isExternal then
 		return nil
 	end
@@ -214,6 +223,10 @@ local function insertEnemy(kind: number, x: number, z: number, hp: number, dmg: 
 	dmgMult[i] = dmg
 	sizeMult[i] = if elite and def.family ~= "MiniBoss" then Run.EliteSizeMult else 1
 	external[i] = isExternal
+	lootElite[i] = elite and not isExternal and noLoot ~= true
+	if countsTowardEliteCap(i) then
+		lootEliteAlive += 1
+	end
 	actPhase[i] = 0
 	actT[i] = os.clock() + math.random() * 2
 	actX[i], actZ[i], actOX[i], actOZ[i] = 0, 0, 0, 0
@@ -227,6 +240,9 @@ local function insertEnemy(kind: number, x: number, z: number, hp: number, dmg: 
 end
 
 local function removeAt(i: number)
+	if countsTowardEliteCap(i) then
+		lootEliteAlive -= 1
+	end
 	indexOf[ids[i]] = nil
 	coinTimes[ids[i]] = nil
 	local last = count
@@ -321,16 +337,6 @@ local function desiredAlive(elapsed: number, n: number): number
 	return math.min(math.floor(scaled), Balance.MaxEnemies)
 end
 
-local function eliteCount(): number
-	local n = 0
-	for i = 1, count do
-		if bit32.band(states[i], BIT_ELITE) ~= 0 and Enemies[kinds[i]].family ~= "MiniBoss" and not external[i] then
-			n += 1
-		end
-	end
-	return n
-end
-
 local function pickKind(elapsed: number): number
 	local world = Worlds[director.worldId] or Worlds[Run.DefaultWorld]
 	if math.random() < Balance.SwarmShare then
@@ -348,7 +354,7 @@ local function pickKind(elapsed: number): number
 	return options[math.random(#options)]
 end
 
-local function spawnScaled(kind: number, x: number, z: number, elite: boolean, hpMult: number): number?
+local function spawnScaled(kind: number, x: number, z: number, elite: boolean, hpMult: number, noLoot: boolean?): number?
 	local def = Enemies[kind]
 	if not def then
 		return nil
@@ -358,7 +364,7 @@ local function spawnScaled(kind: number, x: number, z: number, elite: boolean, h
 		hp *= Run.EliteHpMult
 	end
 	local dmg = scaledDamage() * (if elite then Run.Player.EliteDamageMult else 1)
-	return insertEnemy(kind, x, z, hp, dmg, elite, false)
+	return insertEnemy(kind, x, z, hp, dmg, elite, false, noLoot)
 end
 
 -- Projectiles ----------------------------------------------------------------------------------
@@ -558,7 +564,8 @@ local function spawnTick(targets: { Target }, now: number)
 		local t = targets[(simTick + s) % n + 1] -- round robin: ~equal share per player
 		local x, z = ringPoint(t)
 		local elite = false
-		local underCap = director.eliteMaxAlive == math.huge or eliteCount() < director.eliteMaxAlive
+		local classicRoom = lootEliteAlive < Run.EliteMaxAlive
+		local underCap = director.eliteMaxAlive == math.huge or lootEliteAlive < director.eliteMaxAlive
 		if now >= director.nextEliteAt and underCap then
 			elite = true
 			director.nextEliteAt = now + Run.EliteEvery
@@ -569,7 +576,7 @@ local function spawnTick(targets: { Target }, now: number)
 		if elite and kind == (Worlds[director.worldId] or Worlds[Run.DefaultWorld]).roster.Swarm and math.random() < 0.5 then
 			kind = pickKind(math.huge)
 		end
-		spawnScaled(kind, x, z, elite, 1)
+		spawnScaled(kind, x, z, elite, 1, elite and not classicRoom)
 	end
 end
 
@@ -793,7 +800,7 @@ function EnemyService.damage(id: number, amount: number, source: Player?): boole
 	hps[i] -= amount
 	if hps[i] <= 0 then
 		local kind, x, z = kinds[i], xs[i], zs[i]
-		local isElite = bit32.band(states[i], BIT_ELITE) ~= 0
+		local isElite = lootElite[i] -- élite à butin (voir lootElite)
 		removeAt(i)
 		Bus.EnemyKilled:fire(id, kind, x, z, source, isElite)
 		return true
