@@ -274,7 +274,7 @@ models.py (voxels) → cohue_voxel.py (maillage glouton, tons) → Blender 5.2 e
 
 ### 12.2 Importer dans Studio
 
-`AssetService:CreateAssetAsync` n'est pas encore ouvert (« not available yet », testé le 4 nov.) : le téléversement passe par **Import 3D**.
+`AssetService:CreateAssetAsync` n'est pas encore ouvert (« not available yet », testé le 4 nov.). L'outil MCP `open_cloud_invoke` n'existe que dans une instance de Studio à jour, et apparaît puis disparaît au gré des reconnexions. Le téléversement passe donc par **Import 3D**, ici la file d'importation : un fichier à la fois, l'aperçu s'ouvre seul après l'ajout, puis Importer.
 
 1. Accueil → Import 3D → sélectionner tous les `assets/voxel/glb/*.glb` (import groupé).
 2. Réglages : Scale Unit = **Studs** · Upload to Roblox = **activé** (import final seulement) · Creator = le propriétaire de l'expérience · Merge Meshes désactivé · Use Imported Pivot activé · Ignore Vertex Colors **désactivé**.
@@ -285,11 +285,51 @@ models.py (voxels) → cohue_voxel.py (maillage glouton, tons) → Blender 5.2 e
    - affiche la liste `nom;MeshId;taille`.
 5. Reporter cette liste dans `assets/creatures.csv` et `assets/equipment.csv`, puis écrire les `.model.json`.
 
-**Test à blanc fait le 4 nov.** Des maillages d'aperçu portant les 23 noms ont remplacé les imports. La finalisation a produit 10 Accessories, 8 armes et 2 effets. `ArtLibrary.equipClassTier` a posé 4, 3 et 3 pièces, placées par `AddAccessory` exactement comme prévu, y compris sur un avatar agrandi 1,3 fois (capture `studio_equipClassTier_dos.jpg`). Il reste à faire le vrai Import 3D pour obtenir les ids : voir section 13.
+**Test à blanc fait le 4 nov.** Des maillages d'aperçu portant les 23 noms ont remplacé les imports. La finalisation a produit 10 Accessories, 8 armes et 2 effets. `ArtLibrary.equipClassTier` a posé 4, 3 et 3 pièces, placées par `AddAccessory` exactement comme prévu, y compris sur un avatar agrandi 1,3 fois (capture `studio_equipClassTier_dos.jpg`). Le vrai import a suivi : voir section 13.
 
 ## 13. Livrables et ids Roblox
 
-Voir `assets/equipment.csv`, `assets/creatures.csv` et `assets/voxel/manifest.json`. Les ids sont remplis après l'import groupé dans Studio.
+**Import fait le 4 nov. (soir)** dans la place `COHUE` (placeId 132257920785923), par la file d'importation de Studio, avec les réglages par défaut : unité studs, facteur 1, couleurs par sommet conservées, téléversement sur le compte de Clément. Une capture en jeu des meshes téléversés est dans `assets/style/captures/studio_COHUE_meshes_televerses.jpg`. Contrôles faits :
+
+- les tailles en jeu sont identiques au manifeste ;
+- l'avant de chaque mesh est bien en −Z ;
+- `A01_finalize.luau` a créé `ReplicatedStorage.Assets` : Creatures (4), Equipment (10 Accessories), Weapons (8), FX (2).
+
+**La place n'est pas sauvegardée** : c'est à la session principale de le faire.
+
+Fiches dans le dépôt :
+
+- `assets/a01-meshes.csv` : les 23 meshes, avec attache, décalage, rotation et partie de référence ;
+- les lignes gobelins dans `assets/creatures.csv` ;
+- les fichiers `.model.json` (format Rojo) dans `assets/creatures/`, `assets/equipment/`, `assets/weapons/` et `assets/fx/`, régénérés par `python assets/install/make_records.py`.
+
+Aucune texture : la colonne texture est vide pour tous les meshes.
+
+| Mesh | MeshId | Taille (studs) |
+| --- | --- | --- |
+| Enemy_GoblinGrunt | `102615059367724` | 4.500 × 4.000 × 2.000 |
+| Enemy_GoblinArcher | `132629528679784` | 3.500 × 3.500 × 2.500 |
+| Enemy_GoblinShaman | `85524445528373` | 3.500 × 4.250 × 2.000 |
+| Enemy_GoblinBomber | `85411290248554` | 4.500 × 3.500 × 1.750 |
+| FX_CaptureRing | `127618518100828` | 3.500 × 0.500 × 3.500 |
+| FX_CaptureIcon | `120961194899196` | 1.000 × 2.000 × 1.000 |
+| Knight_Helm | `132240907256271` | 2.000 × 2.000 × 2.250 |
+| Knight_Pauldron | `72447148865331` | 1.750 × 1.500 × 1.500 |
+| Knight_Cape | `99009188505054` | 2.500 × 3.500 × 1.000 |
+| Archer_Hood | `75942870774271` | 2.250 × 2.750 × 2.500 |
+| Archer_Bracer | `120950419069141` | 1.750 × 1.250 × 1.750 |
+| Archer_Quiver | `75868637250392` | 2.000 × 3.500 × 0.750 |
+| Mage_Hat | `92427299567407` | 3.000 × 2.750 × 3.000 |
+| Mage_Orb | `121605107426611` | 2.000 × 2.500 × 2.000 |
+| Mage_Cape | `96432733334599` | 3.000 × 4.250 × 1.000 |
+| Weapon_Broadsword | `135800784718280` | 2.000 × 5.000 × 1.000 |
+| Weapon_Longbow | `125338053789307` | 0.500 × 5.250 × 1.000 |
+| Weapon_FireStaff | `135835703924289` | 1.250 × 5.750 × 1.000 |
+| Weapon_QuakeHammer | `125437062108252` | 2.500 × 5.250 × 1.250 |
+| Weapon_ThrowingDagger | `91444651706594` | 1.000 × 2.500 × 0.750 |
+| Weapon_HolyBell | `83647104694033` | 2.000 × 3.500 × 2.000 |
+| Weapon_SpinningAxe | `102028773090465` | 2.250 × 3.250 × 0.750 |
+| Weapon_BeastWhip | `98868436713221` | 2.000 × 4.750 × 2.000 |
 
 ## Notes du vault utilisées
 
