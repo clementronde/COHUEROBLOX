@@ -1,6 +1,6 @@
 --!strict
 -- Draws server enemies from binary snapshots (doc 12.2, dossier 20 section 8).
--- Pooled anchored low-poly models (2-5 parts per kind from Config.Enemies), interpolated between
+-- Pooled anchored meshes and low-poly fallback models, interpolated between
 -- samples, all moved in one BulkMoveTo per frame. LOD: full model < 80 studs, one part < 150,
 -- a small flat impostor beyond (cheaper than one BillboardGui per enemy). Elites: gold neon ring
 -- + crown (no Highlight: creating one per elite triggers a geometry rebuild, vault "Highlights
@@ -21,6 +21,9 @@ local Worlds = require(Config:WaitForChild("Worlds"))
 local Codec = require(Shared:WaitForChild("EnemyCodec"))
 local Heightmap = require(Shared:WaitForChild("Heightmap"))
 local Net = require(Shared:WaitForChild("Net"))
+local Motion = require(script.Parent.EnemyMotion)
+local Effects = require(script.Parent.EnemyAttackFX)
+local RigMotion = require(script.Parent.EnemyRigMotion)
 local ArtLibrary = require(Shared:WaitForChild("ArtLibrary"))
 
 -- Meshes are drawn a bit taller than the gameplay height so they read from the high camera.
@@ -38,7 +41,7 @@ local BIT_ELITE = 1
 local BIT_ACTION = 2
 local BIT_STOPPED = 4
 
-type Model = { parts: { BasePart }, offsets: { CFrame }, colors: { Color3 } }
+type Model = { parts: { BasePart }, offsets: { CFrame }, colors: { Color3 }, groundIndex: number?, rig: RigMotion.Rig? }
 
 type Entry = {
 	kind: number,
@@ -54,6 +57,10 @@ type Entry = {
 	lastTick: number,
 	state: number,
 	actionStart: number,
+	aimAt: number,
+	strikeAt: number,
+	stride: number,
+	walkWeight: number,
 	tinted: boolean,
 	faceX: number,
 	faceZ: number,
@@ -126,9 +133,29 @@ local function buildModel(kind: number, lod: number, elite: boolean): Model
 		table.insert(m.offsets, offset)
 		table.insert(m.colors, part.Color)
 	end
-	-- Generated mesh (ReplicatedStorage.Assets.Creatures.Enemy_<name>) for near and mid LOD.
-	local mesh = if lod <= 2 then ArtLibrary.clonePart("Enemy_" .. def.name, def.height * ART_SCALE * s) else nil
-	if mesh then
+	local assetName = "Enemy_" .. def.name
+	local template = if lod <= 2 then ArtLibrary.find(assetName) else nil
+	local hasRig = template and template:IsA("Model") and template:FindFirstChildWhichIsA("Bone", true) ~= nil
+	local mesh = if lod <= 2 and not hasRig then ArtLibrary.clonePart(assetName, def.height * ART_SCALE * s) else nil
+	local source = if lod == 1 and hasRig and template and template:IsA("Model")
+		then template:FindFirstChildWhichIsA("MeshPart", true) else nil
+	if source and template then
+		local part = source:Clone()
+		local scaleModel = Instance.new("Model")
+		part.Parent = scaleModel
+		local visualHeight = (template:GetAttribute("VisualHeight") :: number?) or def.height * ART_SCALE
+		scaleModel:ScaleTo(visualHeight * s / part.Size.Y)
+		part.Parent = nil
+		scaleModel:Destroy()
+		local floor = part.Position - Vector3.yAxis * (part.Size.Y * .5)
+		local yaw = math.rad((template:GetAttribute("FaceYaw") :: number?) or 0)
+		local facing = CFrame.new(floor) * CFrame.Angles(0, -yaw, 0)
+		m.rig = RigMotion.bind(part, facing)
+		add(part, facing:ToObjectSpace(part.CFrame))
+		part.Name = def.name
+		part.CFrame = HIDDEN
+		part.Parent = container
+	elseif mesh then
 		mesh.CFrame = HIDDEN
 		mesh.Parent = container
 		add(mesh, CFrame.new(0, mesh.Size.Y / 2, 0))
@@ -152,6 +179,7 @@ local function buildModel(kind: number, lod: number, elite: boolean): Model
 	end
 	if elite and lod <= 2 then
 		local r = def.radius * s
+		m.groundIndex = #m.parts + 1
 		add(newPart("Cylinder", Vector3.new(0.3, r * 3, r * 3), GOLD, true), CFrame.new(0, 0.2, 0) * CFrame.Angles(0, 0, math.rad(90)))
 		if lod == 1 then
 			add(newPart("Block", Vector3.new(1.2, 0.8, 1.2), GOLD, true), CFrame.new(0, def.height * s + 0.8, 0) * CFrame.Angles(0, math.rad(45), 0))
@@ -236,6 +264,10 @@ local function onSnapshot(payload: unknown)
 				lastTick = tick,
 				state = st,
 				actionStart = if bit32.band(st, BIT_ACTION) ~= 0 then now else 0,
+				aimAt = -math.huge,
+				strikeAt = -math.huge,
+				stride = id % 13,
+				walkWeight = 0,
 				tinted = false,
 				faceX = 0,
 				faceZ = -1,
@@ -248,7 +280,7 @@ local function onSnapshot(payload: unknown)
 			e.t0 = now
 			e.span = math.max(SAMPLE_DT, (tick - e.lastTick) * SAMPLE_DT)
 			e.lastTick = tick
-			if bit32.band(st, BIT_ACTION) ~= 0 and bit32.band(e.state, BIT_ACTION) == 0 then
+			if bit32.band(st, BIT_ACTION) ~= 0 and bit32.band(e.state, BIT_ACTION) == 0 and now - e.aimAt > .22 then
 				e.actionStart = now
 			end
 			e.state = st
@@ -327,7 +359,48 @@ local function blackoutVisible(x: number, z: number, viewer: Vector3, hazard: Wo
 	return false
 end
 
-local function render()
+local function onAttackVisual(id: number, name: string, mode: string, position: Vector3, direction: Vector3, radius: number)
+	local profile = Motion.profiles[name]
+	if not profile then
+		return
+	end
+	local now = os.clock()
+	local entry = entries[id]
+	local facing = if direction.Magnitude > .01 then direction.Unit
+		elseif entry then Vector3.new(entry.faceX, 0, entry.faceZ) else -Vector3.zAxis
+	if entry and Enemies[entry.kind].name == name then
+		if mode == "aim" then
+			entry.aimAt = now
+			entry.actionStart = now
+		elseif now - entry.strikeAt < .15 then
+			return -- simultaneous contact from multiple players
+		else
+			entry.strikeAt = now
+		end
+		entry.faceX, entry.faceZ = facing.X, facing.Z
+	end
+	if mode == "aim" then
+		return
+	end
+	local viewer = viewerPosition()
+	if (position - viewer).Magnitude > (if mode == "boss" then 135 else 82) then
+		return
+	end
+	if mode ~= "boss" and Workspace:GetAttribute("CohueHazard") == "Blackout" then
+		local layout = Heightmap.getLayout()
+		local world = layout and Worlds[layout.worldId]
+		local hazard = world and world.hazard
+		if hazard and not blackoutVisible(position.X, position.Z, viewer, hazard) then
+			return
+		end
+	end
+	if mode == "contact" and profile.style ~= "burst" then
+		position += Vector3.yAxis * radius * .55 + facing * radius * .55
+	end
+	Effects.emit(profile, position, facing, mode, radius)
+end
+
+local function render(dt: number)
 	local now = os.clock()
 	local staleBefore = latestTick - Balance.ClientStaleTicks
 	local viewer = viewerPosition()
@@ -369,36 +442,56 @@ local function render()
 		setTint(e, bit32.band(e.state, BIT_STOPPED) ~= 0)
 
 		local y = Heightmap.getY(x, z)
-		local jitterX = 0
+		local profile = Motion.profiles[def.name]
+		local stopped = bit32.band(e.state, BIT_STOPPED) ~= 0
 		local acting = bit32.band(e.state, BIT_ACTION) ~= 0
-		if acting and def.family == "Jumper" then
-			local t = now - e.actionStart
-			local windup = def.leapWindup or 0.4
-			local air = def.leapAir or 0.8
-			if t > windup then
-				local u = math.clamp((t - windup) / air, 0, 1)
-				y += math.sin(math.pi * u) * 7
-			else
-				y -= 0.3
-			end
-		elseif acting then
-			jitterX = math.sin(now * 45) * 0.15 -- charging a shot: shake
-		elseif e.lod == 1 then
-			y += math.abs(math.sin(now * 9 + id)) * 0.35 -- hop walk
-		end
-
 		local dx, dz = e.toX - e.fromX, e.toZ - e.fromZ
-		if dx * dx + dz * dz > 1e-4 then
-			local d = math.sqrt(dx * dx + dz * dz)
-			e.faceX, e.faceZ = dx / d, dz / d
+		local distance = math.sqrt(dx * dx + dz * dz)
+		local speed = if distance < def.speed * e.span * 3 and a < 1 then distance / e.span else 0
+		local striking = now - e.strikeAt
+		if speed > .2 and not acting and not stopped and striking >= .38 then
+			e.faceX, e.faceZ = dx / distance, dz / distance
 		end
-		local pos = Vector3.new(x + jitterX, y, z)
+		local pos = Vector3.new(x, y, z)
 		local base = if hidden then HIDDEN else CFrame.lookAt(pos, pos + Vector3.new(e.faceX, 0, e.faceZ))
+		local modelBase = base
+		local windupPose, strikePose = 0, 0
+		if not hidden and e.lod <= 2 and not stopped and profile then
+			local scale = if e.elite then Run.EliteSizeMult else 1
+			local weight = if acting or striking < .38 then 0 else math.clamp(speed / def.speed, 0, 1)
+			e.walkWeight += (weight - e.walkWeight) * math.min(dt * 13, 1)
+			e.stride = (e.stride + speed * dt / scale) % profile.walk.stride
+			if striking < .38 then
+				strikePose = striking / .38
+				modelBase *= Motion.strike(profile, strikePose, scale)
+			elseif acting then
+				local elapsed = now - e.actionStart
+				local leaping = def.family == "Jumper" or def.leapAir ~= nil
+				local windup = if leaping then def.leapWindup or .4 else def.shotWindup or .6
+				if leaping and elapsed > windup then
+					local travel = math.clamp((elapsed - windup) / (def.leapAir or .8), 0, 1)
+					if def.name == "Golem" then
+						windupPose = 1 - travel ^ 2
+					end
+					modelBase *= Motion.air(profile, travel, scale, if def.name == "Golem" then .75 else nil)
+				else
+					windupPose = math.clamp(elapsed / windup, 0, 1)
+					modelBase *= Motion.charge(profile, windupPose, scale)
+				end
+			elseif e.lod == 1 then
+				modelBase *= Motion.walk(profile, e.stride, e.walkWeight, now + id, scale)
+			end
+		end
 		local m = e.model
+		if m.rig and profile and not hidden then
+			local phase = e.stride * (2 * math.pi / profile.walk.stride)
+			local weight = if stopped or acting or striking < .38 then 0 else e.walkWeight
+			RigMotion.apply(m.rig, def.name, phase, weight, windupPose, strikePose, now)
+		end
 		for k, part in m.parts do
 			n += 1
 			moveParts[n] = part
-			moveCFrames[n] = if hidden then HIDDEN else base * m.offsets[k]
+			moveCFrames[n] = if hidden then HIDDEN else (if k == m.groundIndex then base else modelBase) * m.offsets[k]
 		end
 		if not hidden then
 			drawn += 1
@@ -436,12 +529,14 @@ end
 
 function EnemyRenderer.init()
 	container = Instance.new("Folder")
+	Effects.init()
 	container.Name = "ClientEnemies"
 	container.Parent = Workspace
 end
 
 function EnemyRenderer.start()
 	Net.unreliable("EnemySnapshot").OnClientEvent:Connect(onSnapshot)
+	Net.unreliable("EnemyAttackVisual").OnClientEvent:Connect(onAttackVisual)
 	Net.event("EnemyProjectiles").OnClientEvent:Connect(onProjectiles)
 	RunService.PreRender:Connect(render)
 end

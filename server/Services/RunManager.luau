@@ -785,6 +785,7 @@ local function stepContact()
 					if dx * dx + dz * dz <= reach * reach and feet <= ey + height + P.ContactVerticalSlack and feet >= ey - P.ContactVerticalSlack - 4 then
 						total += damage
 						touching += 1
+						enemies._attackVisual(id, "contact", ex, ez, -dx, -dz)
 						if touching >= P.ContactMaxEnemies then
 							break
 						end

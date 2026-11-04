@@ -22,6 +22,7 @@ local PART_BUDGET = 900
 local StageService = {}
 
 local folder: Folder? = nil
+local editorBaseplate: BasePart? = nil
 local portal: Model? = nil
 local cashOut: Model? = nil
 local partCount = 0
@@ -289,6 +290,14 @@ function StageService.buildStage(worldId: string, stage: number, seed: number, b
 	if partCount > PART_BUDGET then
 		warn(`[StageService] {partCount} parts, over the {PART_BUDGET} budget`)
 	end
+	-- A Studio baseplate above the generated ground hides enemies and intercepts feet checks.
+	local baseplate = Workspace:FindFirstChild("Baseplate")
+	if baseplate and baseplate:IsA("BasePart") and baseplate.Anchored
+		and baseplate.Size.X >= world.size and baseplate.Size.Z >= world.size
+		and baseplate.Position.Y + baseplate.Size.Y * .5 > 0 then
+		editorBaseplate = baseplate
+		baseplate.Parent = nil
+	end
 	f.Parent = Workspace
 	applyLighting(world)
 	Workspace:SetAttribute(Heightmap.Attribute, key)
@@ -300,6 +309,10 @@ function StageService.buildStage(worldId: string, stage: number, seed: number, b
 end
 
 function StageService.clear()
+	if editorBaseplate then
+		editorBaseplate.Parent = Workspace
+		editorBaseplate = nil
+	end
 	if folder then
 		folder:Destroy()
 		folder = nil
@@ -434,6 +447,10 @@ function StageService.getWorld(): Worlds.World?
 end
 
 function StageService.init()
+	local preview = Workspace:FindFirstChild("COHUE_ApercuEnnemis")
+	if preview and preview:IsA("Folder") then
+		preview.Parent = nil
+	end
 	Workspace:SetAttribute(Heightmap.Attribute, "")
 	Workspace:SetAttribute("CohueHazard", "")
 end

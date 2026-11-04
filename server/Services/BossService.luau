@@ -258,6 +258,11 @@ local function resolveTelegraph(b: BossRuntime, t: Telegraph, targets: { { playe
 	local attack = t.attack
 	local run = Registry.find("RunManager")
 	local enemies = Registry.find("EnemyService")
+	if enemies then
+		local dx, dz = t.dirX or (t.x - b.x), t.dirZ or (t.z - b.z)
+		local reach = if t.kind == "Line" then (t.length or 0) * .5 else 0
+		enemies._attackVisual(b.entity, "boss", t.x + dx * reach, t.z + dz * reach, dx, dz, t.radius)
+	end
 	if t.resolve == "Damage" then
 		local dmg = (attack.damage or 10) * damageScale()
 		for _, p in targets do
