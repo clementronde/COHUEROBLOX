@@ -97,6 +97,7 @@ local simTick = 0
 local grid: { [number]: { number } } = {}
 local snapshot: UnreliableRemoteEvent
 local projectileRemote: RemoteEvent
+local attackVisualRemote: UnreliableRemoteEvent
 
 -- Run director (set by RunManager) ---------------------------------------------------------
 local director = {
@@ -276,7 +277,15 @@ local function gatherTargets(): ({ Target }, { Player })
 			end
 			if active then
 				local p = root.Position
-				table.insert(list, { player = player, x = p.X, y = p.Y - 3, z = p.Z })
+				-- S-01 : hauteur des pieds retenue par RunManager (au sol après 1,5 s en l'air)
+				local feet = p.Y - 3
+				if run and run.getDamageFeetY then
+					local ok, y = pcall(run.getDamageFeetY, player)
+					if ok and type(y) == "number" then
+						feet = y
+					end
+				end
+				table.insert(list, { player = player, x = p.X, y = feet, z = p.Z })
 			end
 		end
 	end
@@ -339,10 +348,15 @@ local function desiredAlive(elapsed: number, n: number): number
 	return math.min(math.floor(scaled), Balance.MaxEnemies)
 end
 
+local function pickSwarm(world: Worlds.World): number
+	local variant = world.swarmVariant
+	return if variant and math.random() < .5 then variant else world.roster.Swarm
+end
+
 local function pickKind(elapsed: number): number
 	local world = Worlds[director.worldId] or Worlds[Run.DefaultWorld]
 	if math.random() < Balance.SwarmShare then
-		return world.roster.Swarm
+		return pickSwarm(world)
 	end
 	local options: { number } = {}
 	for _, family in { "Jumper", "Shooter", "Armored" } do
@@ -351,9 +365,14 @@ local function pickKind(elapsed: number): number
 		end
 	end
 	if #options == 0 then
-		return world.roster.Swarm
+		return pickSwarm(world)
 	end
-	return options[math.random(#options)]
+	local kind = options[math.random(#options)]
+	local armoredVariant = world.armoredVariant
+	if kind == world.roster.Armored and armoredVariant and math.random() < .35 then
+		return armoredVariant
+	end
+	return kind
 end
 
 local function spawnScaled(kind: number, x: number, z: number, elite: boolean, hpMult: number, noLoot: boolean?): number?
@@ -366,7 +385,25 @@ local function spawnScaled(kind: number, x: number, z: number, elite: boolean, h
 		hp *= Run.EliteHpMult
 	end
 	local dmg = scaledDamage() * (if elite then Run.Player.EliteDamageMult else 1)
+	-- Règles anti-triche §5.2 : jamais inf ni NaN, même après des heures d'Overtime.
+	local cap = Run.Overtime.ValueCap
+	hp = if hp == hp then math.min(hp, cap) else cap
+	dmg = if dmg == dmg then math.min(dmg, cap) else cap
 	return insertEnemy(kind, x, z, hp, dmg, elite, false, noLoot)
+end
+
+-- Sends only cosmetic cues. Direction is flattened so effects stay aligned to the ground.
+function EnemyService._attackVisual(id: number, mode: string, x: number, z: number, dx: number, dz: number, radius: number?)
+	local i = indexOf[id]
+	if not i then
+		return
+	end
+	if mode == "contact" and (external[i] or actPhase[i] ~= 0) then
+		return
+	end
+	local def = Enemies[kinds[i]]
+	local y = Heightmap.getY(x, z) + (if mode == "shot" then 2.5 else 0)
+	attackVisualRemote:FireAllClients(id, def.name, mode, Vector3.new(x, y, z), Vector3.new(dx, 0, dz), radius or radiusOf(i))
 end
 
 -- Projectiles ----------------------------------------------------------------------------------
@@ -663,13 +700,14 @@ local function step(targets: { Target }, now: number)
 		local family = def.family
 		local walk = true
 
-		if family == "Jumper" then
+		if family == "Jumper" or def.leapAir ~= nil then
 			local phase = actPhase[i]
 			if phase == 0 then
 				if now >= actT[i] and d < (def.leapRange or 22) and d > 4 then
 					actPhase[i] = 1
 					actT[i] = now + (def.leapWindup or 0.4)
 					actX[i], actZ[i] = t.x, t.z -- locked landing point
+					EnemyService._attackVisual(ids[i], "aim", x, z, dx, dz)
 					st = bit32.bor(st, BIT_ACTION)
 					walk = false
 				end
@@ -689,6 +727,7 @@ local function step(targets: { Target }, now: number)
 				if u >= 1 then
 					actPhase[i] = 0
 					actT[i] = now + (def.leapCooldown or 3.5)
+					EnemyService._attackVisual(ids[i], "land", xs[i], zs[i], actX[i] - actOX[i], actZ[i] - actOZ[i])
 					st = bit32.band(st, bit32.bnot(BIT_ACTION))
 				end
 			end
@@ -700,6 +739,7 @@ local function step(targets: { Target }, now: number)
 					actPhase[i] = 0
 					actT[i] = now + (def.shotCooldown or 3.2) + math.random() * 0.5
 					st = bit32.band(st, bit32.bnot(BIT_ACTION))
+					local previousCount = pCount
 					fireProjectile(
 						x,
 						z,
@@ -710,10 +750,14 @@ local function step(targets: { Target }, now: number)
 						def.shotRadius or 1.2,
 						4
 					)
+					if pCount > previousCount then
+						EnemyService._attackVisual(ids[i], "shot", x, z, dx, dz)
+					end
 				end
 			elseif d <= (def.shotRange or 40) and now >= actT[i] then
 				actPhase[i] = 1
 				actT[i] = now + (def.shotWindup or 0.6)
+				EnemyService._attackVisual(ids[i], "aim", x, z, dx, dz)
 				st = bit32.bor(st, BIT_ACTION)
 				walk = false
 			elseif d < keep - 6 then
@@ -1132,6 +1176,7 @@ end
 function EnemyService.init()
 	snapshot = Net.unreliable("EnemySnapshot")
 	projectileRemote = Net.event("EnemyProjectiles")
+	attackVisualRemote = Net.unreliable("EnemyAttackVisual")
 end
 
 function EnemyService.start()

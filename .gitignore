@@ -12,3 +12,4 @@ assets/import/
 # Agent worktrees and downloaded vault archives
 .claude/worktrees/
 *.zip
+.studio-files.txt

@@ -1,9 +1,122 @@
 # 60 — UI / UX (domaine ui)
 
-Domaine : `client/Controllers/UI/*`, `server/Services/PingService.luau`, `shared/Config/UI.luau`.
-Contrat : `docs/ARCHITECTURE.md` (sections 2, 6, 7). Vision : `00-vision.md` sections 1, 5.2, 10, 11.3, 13.
+Domaine : `client/Controllers/UI/*` (sauf `LoadoutUI.luau`, qui passe à A09), `server/Services/PingService.luau`, `shared/Config/UI.luau`.
+Contrat : `docs/ARCHITECTURE.md` (sections 2, 6, 7). Vision : `01-decisions-v2.md` d'abord, puis `00-vision.md` sections 1, 5.2, 10, 11.3, 13.
 
 Objectif : un écran lisible au milieu de 200 ennemis sur un téléphone de 6 pouces, pour des joueurs de 9 à 15 ans, conçu mobile d'abord. HUD réduit aux coins, cartes en bas, couleurs de rareté reconnaissables sans lire **et** sans voir les couleurs (toujours un 2e canal).
+
+> **v2 (4 nov. 2026)** : la section 0 ci-dessous remplace les sections 1 à 15 partout où elles se contredisent (style, polices, couleurs, positions, boutons). Les règles techniques des sections 1 à 15 (ScreenInsets, `UIScale`, pools, fréquences, localisation, câblage des entrées) restent valables.
+
+---
+
+## 0. v2 — Design system « Toy-block gloss » et maquettes (A08)
+
+**Fichier Figma** : [COHUE — UI Design System & Run Screens](https://www.figma.com/design/0Yq5m1skq5dzgOQXZ9bG6D). Pages : Cover, Foundations, Icons, Components, Run — Phone landscape (L01-L11), Run — Phone portrait (P01-P11), Run — PC (C01-C11). Statut : **à valider par Clément** (A08-03). Rien n'est intégré dans Roblox avant son accord.
+
+### 0.1 Le style
+
+Chaque élément pressable ou important ressemble à un **bloc de jouet verni** :
+
+| Élément | Règle | Pourquoi |
+| --- | --- | --- |
+| Face | Couleur plate du rôle | Lisible, pas d'effet « plastique flou » |
+| Brillance | Bande plus claire **nette** sur le haut (≈ 42 % de la face), deux tons, **aucun dégradé** | Le vault (Glossy Icon Style) : des aplats nets lisent comme du verni, un dégradé lisse lit comme du générique |
+| Lèvre | Bande plus sombre de 5 à 7 px sous la face ; « Pressed » = la face s'enfonce de lèvre − 2 | « S'il a une lèvre, on peut appuyer » |
+| Contour | Encre marine `#0E1424`, 3 px sur les blocs, 2 à 2,5 sur les petits | Sépare tout du décor coloré ; jamais du noir pur |
+| Reflets | Deux petits carrés blancs en haut à gauche | Clin d'œil voxel, signature COHUE (fwjelaa utilise des reflets ronds) |
+| Ombre | Ombre dure encre, y 3-4, flou 0 | Effet bloc posé ; ombre douce seulement sous les popups |
+| Corps des panneaux | Bleu nuit `#1F2B49` (92-97 % opaque) | Texte blanc à plus de 12:1, même au-dessus d'une horde très saturée |
+
+Inspiré du design system fwjelaa (encre, slabs à lèvre) sans le copier : base bleu nuit au lieu de violet, reflets carrés, couleurs par rôle de jeu et non par menu.
+
+### 0.2 Jetons (variables Figma = futur `UITheme`)
+
+Trois collections : **Primitives** (66 couleurs, cachées), **Color** (rôles, modes `Default` et `Colorblind`), **Layout** (espacements 2/4/8/12/16/24/32, rayons 4/8/12/16/22/pill, contours 1,5/2/3/4, lèvres 3/5/7, tailles tactiles 44/52/68/84).
+
+| Rôle | Default | Colorblind (Okabe-Ito) | 2e canal |
+| --- | --- | --- | --- |
+| PV | rouge `#FF4757` | idem | cœur + « 72 / 100 » |
+| Bouclier | argent `#DDEBFA` | idem | extension après les PV + bouclier + nombre |
+| XP | aqua `#2EDDF5` (= gemme d'XP dans le monde) | idem | badge LV |
+| Pièces | or `#FFC22E` | idem | pièce + nombre |
+| KO | orange `#FF8A1F` | idem | tête-cube aux yeux en croix + nombre |
+| Overtime | rouge `#FF4757` | vermillon `#D55E00` | chrono qui monte (+), pastille OVERTIME |
+| Common | gris `#BCC5D6` | blanc cassé `#E6E6E6` | mot, 1 losange, cadre 3 px |
+| Rare | bleu `#3B87FF` | bleu ciel `#56B4E9` | mot, 2 losanges, cadre 4 px |
+| Epic | violet `#A75CFF` | vermillon `#D55E00` | mot, 3 losanges, cadre 5 px |
+| Legendary | or `#FFC22E` | jaune `#F0E442` | mot, 4 losanges, cadre 6 px, halo or fixe + rayons |
+| Allié / autel / coffre / boss / capturable | turquoise / bleu / or / rouge / rose | vert-bleu / bleu / jaune / vermillon / pourpre | chevron / losange / carré / gros « ! » / étoile |
+| Boutons | Go vert, Neutral bleu nuit, Danger rouge, Premium or, Info bleu, Slide turquoise, Capture rose | Slide et Capture suivent Okabe-Ito | libellé toujours écrit |
+
+Le mode daltonien **change de palette** (mode de la collection), jamais de filtre ; les formes et les mots ne changent pas.
+
+### 0.3 Typographie
+
+Trois polices, toutes livrées avec Roblox (`rbxasset://fonts/families/…`) **et** présentes dans Figma, pour un rendu identique :
+
+| Style | Police | Taille (échelle 1) | Usage |
+| --- | --- | --- | --- |
+| Display/Hero, XL, L, M | Luckiest Guy | 56 / 40 / 30 / 22 | Victory, KO, chrono, niveau : la voix « jouet », chiffres très lisibles avec contour |
+| Title/L, Title/M, Label/M, Label/S | Fredoka One | 22 / 16 / 15 / 14 | Titres, boutons, pastilles |
+| Body/M, Body/S | Nunito ExtraBold / Bold | 14 / 14 | Descriptions, aides |
+
+Plancher technique 12 px après échelle ; le plus petit style est à **14 px** sur téléphone (relecture : 13 px restait juste pour des 9 ans sur 6 pouces). Contour encre du texte ≤ 8 % de la taille (min 1 px) : au-delà, le contour mange la lettre voisine (vu en relecture). Taille réglable 100 / 115 / 130 % (`textScale`). Builder Sans reste la police de secours des menus longs (A09).
+
+**Échelle** : téléphone 1 ; PC et tablette `clamp(petit côté / 420, 1, 1,6)` (le plafond passe de 1,4 à 1,6 : à 1,4 le HUD était trop petit sur un écran 1080p).
+
+**Manette et clavier** : composant `FocusRing` (anneau or 4 px + halo encre, 6 px autour du bouton ; c'est le `SelectionImageObject`), focus par défaut sur la carte 1, Cash out et Play again. Glyphes `PadGlyph` (A, B, X, Y, croix haut) pour les maquettes ; en jeu, glyphes de la plateforme via `UserInputService:GetImageForKeyCode`. Touches : 1/2/3 cartes, R/S/B Relancer/Passer/Bannir, C/K Victory, Entrée/Échap écran de fin, Espace/Maj/E/G en run (à valider).
+
+### 0.4 Composants (page Components)
+
+Base : `Button` (5 rôles × Default/Pressed/Disabled × L 58 / M 46), `ActionButton` (Jump 84, Action 68, Small 52 × Default/Pressed/Ready/Disabled), `Bar` (HP, Shield, XP, Capture, Revive, Boss), `Slot` (Weapon 44, Rune 34, plein ou vide en pointillés), `LevelBadge`, `Pill` (7 tons), `KeyHint`, `RarityPips`, `CountBadge`, `TimerRing`, `Panel` (Default, Sunken, Chip), `SettingsButton`.
+Cartes : `Card` (4 raretés × Default/Banish, 150×188) et `CardRow` (portrait, 366×98).
+HUD : `Vitals`, `TimerChip` (Normal/Warning/Overtime), `KOCounter` (Normal/NewBest), `Minimap`, `BuildBar`, `TeamRow` (Alive/Downed/Ghost), `BossArrow`, `EdgeArrow`.
+Overlays : `CardTray`, `CapturePrompt` (Capturing/Interrupted/Captured), `AnnounceBanner`, `ReviveMarker`, `DownedPanel` (Downed/Ghost), `VictoryBanner` (Landscape/Portrait), `EndScreen` (Landscape/Portrait), `PingMarker` (6), `PingWheel`, `PingFeed`.
+Icônes : 24 icônes 48 px (stats, actions, 4 armes, 4 Runes, coffre, autel…) dessinées selon la recette « Glossy Icon Style » (deux tons nets, encre marine, lumière en haut à gauche). A08-07 complétera les 16 armes, 14 Runes et 40 objets.
+
+### 0.5 Les 11 écrans de run
+
+| # | Écran | Changements par rapport aux sections 3 à 10 |
+| --- | --- | --- |
+| 01 | HUD | KO + record en haut à droite à côté de la mini-carte ; Réglages à gauche de la mini-carte ; armes et **Runes** ; plus de bouton Ultime |
+| 02 | Chrono → Overtime | « Vague Finale » remplacée par l'**Overtime** : chronomètre rouge qui monte, pastilles OVERTIME + DANGER n (un cran / 30 s), annonce unique |
+| 03 | Compteur de KO | Nouveau : gros chiffre, record perso, NEW BEST! en or quand il est battu |
+| 04 | Cartes | 150×188 (lignes 366×98 en portrait) sur une plaque sombre ; Relancer / Passer / Bannir en 100×48 ; pendant le choix on masque build, équipe et boutons ; cartes inertes 0,4 s |
+| 05 | Mini-carte | + marque **capturable** (étoile rose) ; flèche du boss en pastille avec distance |
+| 06 | Boutons mobiles | **Saut 84, Glisser 68, Ping 52, Capture 68** (contextuel, anneau or) ; Ultime retiré |
+| 07 | Barre de capture | Nouveau : panneau près de la cage, barre 2 s avec les secondes écrites à côté, « OUCH! CAPTURE RESET » si touché, nom de la créature si réussi |
+| 08 | Victory | Nouveau : ruban or, **Keep going** = le seul bouton Go vert (Overtime infini, record de KO), **Cash out** en or (fin de run, gains sauvés) ; focus manette sur Keep going |
+| 09 | Écran de fin | + rang hebdo et record ; dégâts par arme ; gains (Silver, capture, quêtes) |
+| 10 | À terre / relève | 25 s ; vignette orange fixe ; marqueur HELP au-dessus d'un coéquipier |
+| 11 | Pings | Inchangés sur le fond ; roue à 6 cibles de 48 px ; sur tactile, Saut / Glisser / Ping masqués tant que la roue est ouverte |
+
+Positions de référence (pixels logiques, échelle 1) :
+
+| Élément | Téléphone paysage 844×390 | Téléphone portrait 390×844 | PC 1920×1080 (×1,4) |
+| --- | --- | --- | --- |
+| Barre Roblox | haut gauche, réservée | rangée sous l'encoche, à gauche | haut gauche |
+| Vitaux | haut gauche, sous la barre Roblox | sous le chrono, à gauche | haut gauche |
+| Build | sous les vitaux | sous les vitaux | bas gauche |
+| Chrono | haut centre (zone libre de la barre) | sous la barre Roblox, centre | haut centre |
+| KO | haut droite, à gauche de la mini-carte | rangée de la barre Roblox, à droite | haut droite |
+| Mini-carte | haut droite, 120 | à droite sous le KO, 120 | haut droite, 168 |
+| Boutons | bas droite | bas droite, au-dessus de la barre d'accueil (34) | légende des touches bas droite |
+| Joystick Roblox | bas gauche, libre | bas gauche, libre | — |
+
+### 0.6 États, mouvement et son
+
+Planche « États, mouvement et son » de la page Foundations. Cinq états par bouton : Default, Hover (PC : `UIScale` 1,04, 0,10 s), Pressed (face qui s'enfonce, 0,05 s), Disabled (neutre, sans reflets, texte atténué), Focus (`FocusRing`). Popups : ouverture 0,9 → 1 en 0,18 s Back Out, fermeture 1 → 0,92 en 0,12 s Quad In ; cartes distribuées une par une, la carte choisie vole vers sa case du build. Chaque interaction a un emplacement de son (`ui_press`, `ui_open`, `card_deal`, `card_pick`, `timer_warn`, `overtime_horn`, `record_fanfare`, `capture_tick/ok/fail`) que A10 remplit avec la bibliothèque sous licence du Creator Store. Vibration courte à la manette (capture, record), désactivable. « Réduire les flashs » : fondus seuls, pas de pop, pas de secousse, halos fixes.
+
+### 0.7 Note qualité (skill quality-score, 3 relecteurs à l'aveugle)
+
+Premier jet 5,0 (plafonné : boutons du plateau jugés < 44 px, chevauchements, pas de manette), 2e tour 7,1 (médiane), corrections : boutons 100×48, roue de pings qui masque les boutons, bannières dans un couloir central, texte 14 px, contours ≤ 8 %, PC à 1,6, focus et glyphes manette, Keep going en vert, planche d'états et de sons. Note finale : voir le rapport A08.
+
+### 0.8 Questions ouvertes pour Clément
+
+1. **Victory en coop** : chacun choisit Cash out ou Keep going pour lui-même (proposition des maquettes), ou un vote d'équipe ?
+2. **Fantôme** : que devient un joueur fantôme (retour au monde suivant ? au prochain autel ? spectateur jusqu'à la fin) ? Les maquettes écrivent « BACK AT THE NEXT WORLD » en attendant.
+3. **Raccourcis PC** : R / S / B pour Relancer / Passer / Bannir et C / K pour Cash out / Keep going, à valider.
+4. **Monnaie de fin** : le mot « Silver » est repris du code existant ; à remplacer si A09/A12 choisissent un autre nom.
 
 ---
 

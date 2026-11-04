@@ -29,6 +29,7 @@ local KIND = FxCodec.Kind
 local FX_RADIUS = 160
 local FX_MAX_PER_PLAYER = FxCodec.PerChunk * 2
 local ATTACH_REFRESH = 4 -- permanent zones re-send their attach event this often (unreliable)
+local TELEPORT_STEP = 20 -- studs par tick au-delà desquels un déplacement est un téléport (S-07)
 
 type Stats = { [string]: number }
 
@@ -1155,7 +1156,7 @@ local function onPlayerDamaged(player: Player, amount: number)
 	heal(ps, amount)
 	local run = Registry.find("RunManager")
 	if run and run.setInvulnerable then
-		run.setInvulnerable(player, w.invuln or 0.5)
+		run.setInvulnerable(player, w.invuln or 0.5, "Shield")
 	end
 	umbrellaWave(ps, shieldId, level)
 end
@@ -1227,19 +1228,24 @@ local function gather()
 			ps.hasRoot = false
 			continue
 		end
+		local hadRoot = ps.hasRoot
 		ps.hasRoot = true
 		local pos = root.Position
+		-- S-07 : vitesse = déplacement mesuré par le serveur entre deux ticks (lissé), jamais
+		-- AssemblyLinearVelocity ; un saut de plus de TELEPORT_STEP studs (téléport) compte pour 0.
+		local dx, dz = pos.X - ps.x, pos.Z - ps.z
+		local step = math.sqrt(dx * dx + dz * dz)
+		local measured = if hadRoot and step < TELEPORT_STEP then step / DT else 0
+		ps.speed = ps.speed * 0.5 + measured * 0.5
 		ps.x, ps.z = pos.X, pos.Z
 		local look = root.CFrame.LookVector
 		local lm = math.sqrt(look.X * look.X + look.Z * look.Z)
 		if lm > 0.01 then
 			ps.lookX, ps.lookZ = look.X / lm, look.Z / lm
 		end
-		local v = root.AssemblyLinearVelocity
-		ps.speed = math.sqrt(v.X * v.X + v.Z * v.Z)
 		ps.moving = ps.speed > 1
-		local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-		ps.airborne = humanoid ~= nil and humanoid.FloorMaterial == Enum.Material.Air
+		-- En l'air : attribut serveur posé par MovementGuard (jamais FloorMaterial du client)
+		ps.airborne = player:GetAttribute("Airborne") == true
 		local active = true
 		if run and run.isActive then
 			local ok, result = pcall(run.isActive, player)

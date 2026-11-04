@@ -96,7 +96,15 @@ local function activePlayers(): { { player: Player, x: number, z: number, feet: 
 			end
 			if active then
 				local p = root.Position
-				table.insert(out, { player = player, x = p.X, z = p.Z, feet = p.Y - hum.HipHeight - root.Size.Y / 2 })
+				-- S-01 : hauteur des pieds retenue par RunManager (au sol après 1,5 s en l'air)
+				local feet = p.Y - hum.HipHeight - root.Size.Y / 2
+				if run and run.getDamageFeetY then
+					local ok, y = pcall(run.getDamageFeetY, player)
+					if ok and type(y) == "number" then
+						feet = y
+					end
+				end
+				table.insert(out, { player = player, x = p.X, z = p.Z, feet = feet })
 			end
 		end
 	end
@@ -258,6 +266,11 @@ local function resolveTelegraph(b: BossRuntime, t: Telegraph, targets: { { playe
 	local attack = t.attack
 	local run = Registry.find("RunManager")
 	local enemies = Registry.find("EnemyService")
+	if enemies then
+		local dx, dz = t.dirX or (t.x - b.x), t.dirZ or (t.z - b.z)
+		local reach = if t.kind == "Line" then (t.length or 0) * .5 else 0
+		enemies._attackVisual(b.entity, "boss", t.x + dx * reach, t.z + dz * reach, dx, dz, t.radius)
+	end
 	if t.resolve == "Damage" then
 		local dmg = (attack.damage or 10) * damageScale()
 		for _, p in targets do

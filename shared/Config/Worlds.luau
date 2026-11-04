@@ -22,6 +22,8 @@ export type World = {
 	name: Types.LocalizedText,
 	size: number, -- square side, centred on the origin
 	roster: { Swarm: number, Jumper: number, Shooter: number, Armored: number },
+	swarmVariant: number?,
+	armoredVariant: number?,
 	miniBoss: number,
 	boss: string, -- Bosses id (stage 1 and Enraged stage 2)
 	finalBoss: string, -- stage 3 of Tier 3
@@ -57,6 +59,8 @@ local Worlds: { [string]: World } = {
 		name = { en = "Grumpy Woods", fr = "Grumpy Woods" },
 		size = 560,
 		roster = { Swarm = 1, Jumper = 2, Shooter = 3, Armored = 4 },
+		swarmVariant = 21,
+		armoredVariant = 22,
 		miniBoss = 13,
 		boss = "GrandCheneRonchon",
 		finalBoss = "GrandBrouhaha",
@@ -128,6 +132,7 @@ local Worlds: { [string]: World } = {
 		name = { en = "Haunted Recess", fr = "Haunted Recess" },
 		size = 520,
 		roster = { Swarm = 9, Jumper = 10, Shooter = 11, Armored = 12 },
+		swarmVariant = 20,
 		miniBoss = 15,
 		boss = "DirectriceEternelle",
 		finalBoss = "GrandBrouhaha",

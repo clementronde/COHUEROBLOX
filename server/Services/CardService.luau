@@ -385,7 +385,7 @@ local function tryOpen(player: Player)
 	local run = Registry.find("RunManager")
 	if run then
 		if run.setInvulnerable then
-			pcall(run.setInvulnerable, player, Cards.OfferSeconds)
+			pcall(run.setInvulnerable, player, Cards.OfferSeconds, "Card")
 		end
 		if run.setSlow then
 			pcall(run.setSlow, player, Cards.SlowMultiplier, Cards.OfferSeconds)
@@ -401,6 +401,12 @@ local function closeOffer(player: Player, d: PlayerCards)
 	end
 	d.offer = nil
 	d.pending = math.max(0, d.pending - 1)
+	-- S-05 : l'invulnérabilité du choix s'arrête avec le choix (l'offre suivante la redonne,
+	-- dans la limite du plafond de RunManager).
+	local run = Registry.find("RunManager")
+	if run and run.clearInvulnerable then
+		pcall(run.clearInvulnerable, player, "Card")
+	end
 	offerRemote:FireClient(player, { offerId = offer.offerId, closed = true })
 	tryOpen(player)
 end

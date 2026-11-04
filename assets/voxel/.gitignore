@@ -1,0 +1,4 @@
+# Reproductibles (assets/voxel/boards.py et build.py)
+review/
+luau/
+__pycache__/
