@@ -1,6 +1,6 @@
 # 65 — Lobby : hub 3D et menus (domaine A09)
 
-Statut : **plan du hub et structure des 8 écrans validés par Clément le 4 nov. 2026** (A09-02, A09-03). Habillage glossy des écrans à faire avec le design system de A08 (fin de A09-01). Rien n'est construit en vague 1.
+Statut : **plan du hub et structure des 8 écrans validés par Clément le 4 nov. 2026** (A09-02, A09-03). Écrans habillés le 4 nov. avec le design system de A08 (bibliothèque Figma publiée par Clément) : habillage à valider (A09-01). Rien n'est construit en vague 1.
 Sources : `01-decisions-v2.md` (fait foi), `00-vision.md` §5.1, §11.3, §12.1, `70-donnees-progression-monetisation.md` §13 et §15, `60-ui-ux.md`.
 Schéma : [img/65-lobby-plan.svg](img/65-lobby-plan.svg) (vue de dessus à l'échelle, 1 stud = 3 px).
 
@@ -224,15 +224,17 @@ Toutes les stations sont aussi dans le HUD, pour qu'un joueur mobile n'ait jamai
 
 ## 6. Les 8 écrans de menu (A09-01)
 
-Maquettes Figma : **[COHUE — Menus & Lobby (A09)](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b)** (équipe « c_rondepierre's team »). Pages : `00 · Read me`, `01 · Hub plan` (ce plan en vecteurs), `02 · Wireframes` (les 8 écrans + le HUD du hub, une note par écran), `03 · Wireframe kit` (17 composants gris). **État : wireframes en niveaux de gris**, en attendant le design system de A08 ; l'habillage glossy remplacera les composants du kit sans changer la structure.
+Maquettes Figma : **[COHUE — Menus & Lobby (A09)](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b)** (équipe « c_rondepierre's team »). Pages : `00 · Read me`, `01 · Hub plan` (ce plan en vecteurs), `02 · Wireframes` (les 8 écrans + le HUD du hub, une note par écran), `03 · Wireframe kit` (17 composants propres au lobby). **État : habillés avec le design system de A08** ([fichier A08](https://www.figma.com/design/0Yq5m1skq5dzgOQXZ9bG6D), bibliothèque « COHUE — UI Design System & Run Screens »). Les boutons sont les `Button` de A08 (Go vert = l'action principale, Premium or = prix en Robux, Neutral, Disabled) ; les couleurs, les styles de texte (Display, Title, Label, Body) et les ombres viennent de ses variables et styles ; les composants du kit (cartes, lignes, onglets, interrupteurs) sont liés à ces variables. La structure validée n'a pas bougé.
 
-Planche des wireframes (capture du 4 nov. 2026) : [img/65-wireframes-v1.png](img/65-wireframes-v1.png).
+Couleur d'en-tête de chaque menu = couleur de sa zone dans le village (primitives A08) : Classes `teal/500`, Critters `lime/500`, Shop `orange/500`, Ranks `gold/500`, Quests `blue/500`, Settings `action/neutral/face`, Play `purple/500`, avec une lèvre en `*/700`.
+
+Planche des maquettes habillées (capture du 4 nov. 2026) : [img/65-maquettes-v2.png](img/65-maquettes-v2.png).
 
 Règles communes :
 
 - textes en anglais ; lisibles sur un téléphone de 6 pouces. Dessin en **pixels logiques sur la référence téléphone 844 × 390** (convention de `60-ui-ux.md`) : texte ≥ 12 px, zones tactiles ≥ 44 px, écarts ≥ 8 px ;
 - zones réservées dessinées sur chaque écran (`skip_safe_area`, en magenta) : encoche (48 px), boutons Roblox en haut à gauche, barre du bas. Rien d'interactif dedans ;
-- **adaptation** : un menu est un panneau en mise en page flexible. Échelle = clamp(min(L / 844, H / 390), 1, 1,4) : jamais de texte sous 12 px. La hauteur du corps suit l'écran, les listes défilent. Sous 780 px logiques de large, la colonne d'aperçu 3D est cachée et remplacée par un bouton « VIEW 3D » (« hide, do not shrink »). Vérifié sur l'écran le plus dense (Choix de classe) en 800 × 360 (Android 6") et 667 × 375 (petit iPhone) : rien ne déborde ;
+- **adaptation** : un menu est un panneau en mise en page flexible. Échelle = clamp(min(L / 844, H / 390), 1, 1,6) (plafond 1,6 sur PC fixé par A08) : jamais de texte sous 12 px. La hauteur du corps suit l'écran, les listes défilent. Sous 780 px logiques de large, la colonne d'aperçu 3D est cachée et remplacée par un bouton « VIEW 3D » (« hide, do not shrink »). Vérifié sur l'écran le plus dense (Choix de classe) en 800 × 360 (Android 6") et 667 × 375 (petit iPhone) : rien ne déborde ;
 - **une seule action verte** par écran, avec un verbe ;
 - un bouton verrouillé dit toujours pourquoi ;
 - la couleur n'est jamais le seul signal (icône, mot, losanges de rareté) ;
@@ -326,7 +328,7 @@ A09-04 : place du lobby, blockout gris puis formes, puis décor (méthode `fwjel
 | data (A12) | Exposer le texte de la quête de déblocage de chaque classe (`Config.Quests`) pour les plaques des présentoirs |
 | classes (A04, propriétaire de l'équipement de classe qui remplace TraitService) | `applyClass(player, classId)` utilisable **dans le lobby** (palier 1) |
 | companion (A05) | Mode lobby de `CompanionRenderer` : le compagnon équipé suit son joueur (visible de tous), la collection du joueur se promène dans l'enclos (client seul) |
-| ui (A08) | Design system Figma (lien dans le Journal) ; `SettingsUI` suit la maquette n° 7 ; toasts et prompts au style du kit |
+| ui (A08) | Ajouter au design system des variables sémantiques `zone/*` (classes, critters, shop, ranks, quests, settings, play) pour remplacer les primitives utilisées dans les en-têtes ; icônes manquantes pour le lobby : 8 classes, Solo / Friends / Public, quêtes (aujourd'hui des codes de 2 lettres) ; `SettingsUI` suit la maquette n° 7 ; toasts et prompts au style du kit |
 | VFX (A07) | Pop d'équipement au « Try on », tourbillon du portail, anneau de décompte des pads |
 | monde (A02) | Lumière diorama du hub ; kit de maisons voxel |
 
@@ -341,7 +343,7 @@ Checklist anti-AI-slop du doc de suivi, appliquée à ce qui existe (un plan et 
 | 3 | Silhouette reconnaissable | Non applicable (pas de modèle) |
 | 4 | Aucune sortie brute | Polices Fredoka One + Nunito choisies, pas de dégradé par défaut, composants faits pour le projet |
 | 5 | Une touche d'humour par élément | Gob le gobelin boutiquier, le Gland Grincheux gardien du portail, le Hibou des quêtes, « Do not feed the critters », le casque trop grand du Knight, la statue « Your statue here? » |
-| 6 | quality-score ≥ 8 | **Auto-évaluation seulement** (pas de relecteurs à l'aveugle lancés) sur la grille UI : U1 clarté 2/2, U2 hiérarchie 2/2, U3 cohérence 2/2, U4 mouvement 0/2 (pas encore dessiné, viendra avec le kit A08), U5 lisibilité 2/2, U6 perf 1/2 (listes en pool prévues mais non codées) → **7,9 / 10**. Brouillon tant que le mouvement et l'habillage ne sont pas faits |
+| 6 | quality-score ≥ 8 | **Auto-évaluation seulement** (pas de relecteurs à l'aveugle lancés) sur la grille UI : U1 clarté 2/2, U2 hiérarchie 2/2, U3 cohérence 2/2 (design system A08), U4 mouvement 0/2 (ouverture, fermeture et appui pas encore spécifiés), U5 lisibilité 2/2, U6 perf 1/2 (listes en pool prévues mais non codées) → **7,9 / 10**. Brouillon tant que le mouvement n'est pas spécifié (vague 2, avec le code) |
 | 7 | Vérifié en jeu (capture Studio) | Non : rien n'est construit en vague 1 |
 | 8 | Budget de perf | Budget du hub fixé (§8), à mesurer en vague 2 |
 
