@@ -119,10 +119,10 @@ local Movement = {
 		SpeedFovFrom = 1.15, -- multiple de la marche où le FOV commence à s'ouvrir
 		FovSharpness = 6,
 
-		Distance = 26, -- studs derrière le point visé
-		MinDistance = 12,
-		MaxDistance = 44,
-		Pitch = 30, -- degrés sous l'horizon
+		Distance = 32, -- studs derrière le point visé (testé : 217 ennemis lisibles, anneau autour du joueur visible)
+		MinDistance = 14,
+		MaxDistance = 48,
+		Pitch = 42, -- degrés sous l'horizon (30 = plus de profondeur, 46 = plus vue de dessus)
 		MinPitch = 8,
 		MaxPitch = 70,
 		FocusHeight = 2.5, -- au-dessus du HumanoidRootPart
@@ -136,7 +136,7 @@ local Movement = {
 		TouchDegreesPerScreen = 260, -- yaw pour un glissé de toute la hauteur de l'écran
 		TouchPitchMult = 0.6,
 		TouchZoneMinX = 0.5, -- seule la moitié droite de l'écran tourne la caméra
-		MouseDegreesPerPixel = 0.3, -- x réglage de sensibilité Roblox du joueur
+		MouseDegreesPerPixel = 0.3, -- x sensibilité du jeu (CameraController.setSensitivity), pas celle de Roblox
 		GamepadYawSpeed = 220, -- degrés/s stick à fond
 		GamepadPitchSpeed = 120,
 		GamepadDeadzone = 0.15,

@@ -148,12 +148,12 @@ local function feetReach(h: Humanoid, r: BasePart): number
 	return h.HipHeight + r.Size.Y / 2
 end
 
-local function verifiedGround(): RaycastResult?
+local function verifiedGround(extraReach: number?): RaycastResult?
 	local h, r = humanoid, root
 	if not h or not r then
 		return nil
 	end
-	local hit = Workspace:Raycast(r.Position, Vector3.new(0, -(feetReach(h, r) + 0.6), 0), rayParams)
+	local hit = Workspace:Raycast(r.Position, Vector3.new(0, -(feetReach(h, r) + 0.6 + (extraReach or 0)), 0), rayParams)
 	if hit and hit.Normal.Y >= M.GroundNormalMinY then
 		return hit
 	end
@@ -479,7 +479,9 @@ local function onLanded()
 	landedAt = now
 	jumpedSinceGrounded = false
 	leftGroundAt = -math.huge
-	if verifiedGround() then
+	-- À l'état Landed le personnage est encore un peu au-dessus du sol : rayon plus long. Le pas suivant
+	-- recharge aussi (step), pour les sauts relancés à l'image même de l'atterrissage.
+	if verifiedGround(2) then
 		airJumpsLeft = prof.airJumps or 0
 		glideLeft = if prof.glide then prof.glide.duration else 0
 	end
@@ -556,7 +558,16 @@ local function step(dt: number)
 				r.AssemblyLinearVelocity = Vector3.new(v.X, -glide.fallSpeed, v.Z)
 			end
 		end
-	elseif (hopBonus > 0 or hopCount > 0) and now - ourJumpAt > 0.2 then
+	else
+		-- Recharge du double saut et du plané une fois vraiment au sol (rayon vérifié, normale du sol).
+		local maxAir = prof.airJumps or 0
+		local maxGlide = if prof.glide then prof.glide.duration else 0
+		if (airJumpsLeft < maxAir or glideLeft < maxGlide) and now - ourJumpAt > 0.2 and verifiedGround() then
+			airJumpsLeft = maxAir
+			glideLeft = maxGlide
+		end
+	end
+	if not isAirState(state) and (hopBonus > 0 or hopCount > 0) and now - ourJumpAt > 0.2 then
 		-- Bonus perdu après la fenêtre au sol, ou sans entrée de déplacement.
 		if (now - landedAt > M.BhopWindow and not sliding) or h.MoveDirection.Magnitude < 0.1 then
 			resetHops()
@@ -729,7 +740,8 @@ function MovementController.start()
 	RunService.PreSimulation:Connect(step)
 
 	if IS_STUDIO then
-		-- Point d'inspection pour les tests MCP : ("state") / ("log") / ("trigger", action, pressed).
+		-- Point d'inspection pour les tests MCP : ("state") / ("log") / ("trigger", action, pressed) /
+		-- ("cam", distance, pitch).
 		local bf = Instance.new("BindableFunction")
 		bf.Name = "CohueMoveDebug"
 		bf.OnInvoke = function(cmd: any, a: any, b: any): any
@@ -737,6 +749,13 @@ function MovementController.start()
 				local out = table.concat(debugLog, "\n")
 				table.clear(debugLog)
 				return out
+			elseif cmd == "cam" then
+				local cam = Registry.find("CameraController")
+				if cam then
+					cam.setDistance(a)
+					cam.setPitch(b)
+				end
+				return true
 			elseif cmd == "trigger" then
 				local ic = input()
 				if ic then

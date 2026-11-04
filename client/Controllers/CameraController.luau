@@ -17,7 +17,7 @@
 --   CameraController.getYaw() -> number              -- radians, 0 = regarde vers -Z
 --   CameraController.setEnabled(on)                  -- off = rend la caméra à Roblox (Custom), ex. cinématique
 --   CameraController.setSensitivity(mult)            -- réglage joueur (SettingsUI), 0.25..3
---   CameraController.setDistance(studs) / getDistance()
+--   CameraController.setDistance(studs) / getDistance() · setPitch(degrees) / getPitch()
 --   CameraController.shake(strength 0..1, seconds?)  -- secousse additive, ne dérive jamais
 
 local Players = game:GetService("Players")
@@ -35,7 +35,6 @@ local C = Movement.Camera
 local CameraController = {}
 
 local player = Players.LocalPlayer
-local gameSettings = UserSettings():GetService("UserGameSettings")
 
 local enabled = true
 local sensitivity = 1
@@ -53,6 +52,7 @@ local shakeStart = 0
 local shakeStrength = 0
 
 local mouseRotating = false
+local lastMousePos: Vector3? = nil
 
 type TouchInfo = { last: Vector2 }
 local touches: { [InputObject]: TouchInfo } = {}
@@ -255,6 +255,19 @@ local function onInputChanged(input: InputObject, processed: boolean)
 				targetDistance = clampZoom(pinchStartZoom / ratio ^ C.PinchPower)
 			end
 		end
+	elseif t == Enum.UserInputType.MouseMovement then
+		-- Delta de l'événement (curseur verrouillé) ; repli sur l'écart de position quand le delta est nul
+		-- (bureau à distance, certains pavés tactiles, entrées injectées par les tests).
+		local pos = input.Position
+		local d = input.Delta
+		if d.Magnitude < 1e-4 and lastMousePos then
+			d = pos - lastMousePos
+		end
+		lastMousePos = pos
+		if mouseRotating then
+			local k = C.MouseDegreesPerPixel * sensitivity
+			rotate(-d.X * k, d.Y * k)
+		end
 	elseif t == Enum.UserInputType.MouseWheel and not processed then
 		targetDistance = clampZoom(targetDistance - input.Position.Z * C.WheelStep)
 	end
@@ -279,13 +292,6 @@ local function onInputEnded(input: InputObject, _processed: boolean)
 end
 
 local function pollDevices(dt: number)
-	if mouseRotating then
-		local d = UserInputService:GetMouseDelta()
-		if d.Magnitude > 0 then
-			local k = C.MouseDegreesPerPixel * sensitivity * gameSettings.MouseSensitivity
-			rotate(-d.X * k, d.Y * k)
-		end
-	end
 	local ic = inputController()
 	if not ic then
 		return
@@ -448,6 +454,18 @@ end
 
 function CameraController.getDistance(): number
 	return targetDistance
+end
+
+-- Angle sous l'horizon, en degrés (borné par MinPitch / MaxPitch).
+function CameraController.setPitch(degrees: number)
+	if type(degrees) == "number" and degrees == degrees then
+		pitch = math.rad(degrees)
+		clampPitch()
+	end
+end
+
+function CameraController.getPitch(): number
+	return math.deg(pitch)
 end
 
 function CameraController.shake(strength: number, seconds: number?)
