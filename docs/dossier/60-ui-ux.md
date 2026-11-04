@@ -107,11 +107,44 @@ Positions de référence (pixels logiques, échelle 1) :
 
 Planche « États, mouvement et son » de la page Foundations. Cinq états par bouton : Default, Hover (PC : `UIScale` 1,04, 0,10 s), Pressed (face qui s'enfonce, 0,05 s), Disabled (neutre, sans reflets, texte atténué), Focus (`FocusRing`). Popups : ouverture 0,9 → 1 en 0,18 s Back Out, fermeture 1 → 0,92 en 0,12 s Quad In ; cartes distribuées une par une, la carte choisie vole vers sa case du build. Chaque interaction a un emplacement de son (`ui_press`, `ui_open`, `card_deal`, `card_pick`, `timer_warn`, `overtime_horn`, `record_fanfare`, `capture_tick/ok/fail`) que A10 remplit avec la bibliothèque sous licence du Creator Store. Vibration courte à la manette (capture, record), désactivable. « Réduire les flashs » : fondus seuls, pas de pop, pas de secousse, halos fixes.
 
-### 0.7 Note qualité (skill quality-score, 3 relecteurs à l'aveugle)
+### 0.7 Note qualité des maquettes (skill quality-score, 3 relecteurs à l'aveugle)
 
-Premier jet 5,0 (plafonné : boutons du plateau jugés < 44 px, chevauchements, pas de manette), 2e tour 7,1 (médiane), corrections : boutons 100×48, roue de pings qui masque les boutons, bannières dans un couloir central, texte 14 px, contours ≤ 8 %, PC à 1,6, focus et glyphes manette, Keep going en vert, planche d'états et de sons. Note finale : voir le rapport A08.
+Premier jet 5,0 (plafonné : boutons du plateau jugés < 44 px, chevauchements, pas de manette), 2e tour 7,1 (médiane), corrections : boutons 100×48, roue de pings qui masque les boutons, bannières dans un couloir central, texte 14 px, contours ≤ 8 %, PC à 1,6, focus et glyphes manette, Keep going en vert, planche d'états et de sons. Note finale : **7,9 / 10** (médiane du 3e tour), critères bloquants OK ; il manquait la lisibilité des petits libellés sur la horde et la densité du HUD. Clément a validé les maquettes le 4 nov. 2026.
 
-### 0.8 Questions ouvertes pour Clément
+### 0.8 Intégration Roblox (A08-04 à A08-06, 4 nov. 2026)
+
+| Module | Ce qu'il fait | Données |
+| --- | --- | --- |
+| `shared/Config/UI.luau` | Jetons Figma (modes Default / Colorblind), polices, tailles, textes anglais, réglages des écrans | — |
+| `UITheme` | Builders glossy (`glossy` : bloc ou bouton avec Pressed, survol 1,04, Disabled, anneau de focus or), `chip`, `popup`, `glossBar`, `pill`, `keycap`, icônes dessinées en code (KO, cœur, horloge), drapeaux partagés (`cardsOpen`, `captureAvailable`...), anglais forcé, forçage d'appareil en Studio (`UIDebugDevice`) | — |
+| `HUD` | Vitaux, build, équipe, fil de pings, chrono → Overtime, compteur de KO + record, flèche et barre du boss, annonces, écran à terre / fantôme | `RunState` v2 (A04), `PlayerProgress.kills`, attribut `RunKills`, `PlayerVitals`, `Build`, `Coins`, `Profile.bestKills` |
+| `VictoryBanner` (nouveau, démarré par HUD) | Bannière Victory. Keep going ferme ; Cash out ferme et guide vers le portail doré (flèche, distance, barre de maintien d'équipe) | `RunState.victory`, `cashOutPosition`, `cashOutProgress` |
+| `CaptureUI` (nouveau, démarré par HUD) | Panneau de capture 2 s, reset si touché, nom de la créature | remote optionnel `CaptureState` ou `CaptureUI.set(payload)` |
+| `CardUI` | Cartes glossy, lignes en portrait, plaque, Relancer / Passer / Bannir 100×48, anneau 8 s, touches 1/2/3 et R/X/B, 0,4 s inertes | `CardOffer` |
+| `MobileButtons` | Saut, Glisser, Ping, Capture (anneau or) ; légende clavier sur PC | drapeaux UI, `InputController.bindButton` |
+| `EndScreen` | Résultat, KO, record, rang hebdo, dégâts par arme, gains, Play again, Lobby si le remote existe | `RunSummary` |
+| `Minimap`, `SettingsUI` | Positions des maquettes (rangée de la barre Roblox, engrenage à gauche de la mini-carte en paysage) | — |
+
+**Écarts assumés par rapport aux maquettes**
+
+- Victory : A04 a codé le Cash out comme un portail doré (toute l'équipe 2 s dedans). Les deux boutons restent, mais « Cash out » guide vers le portail au lieu d'envoyer un remote ; la ligne d'équipe de la maquette n'est pas affichée (aucune donnée serveur).
+- Raccourcis PC : Passer = X (S sert à marcher pendant l'offre), Lobby = L (Échap est réservé à Roblox).
+- Carte venant du compagnon : pastille « PET » (« Companion » ne tient pas à côté de LEGENDARY dans 150 px).
+- Icônes : formes dessinées en code et initiales en attendant A08-07, qui demande de téléverser des images (permission de Clément).
+
+**Test** : place `COHUE-A08.rbxlx` construite avec rojo depuis la branche (`tools/test.project.json`). Run réelle (cartes, fin de run, dégâts par arme) + script de test serveur propre à la place (Overtime, record battu, Victory, capture, à terre). Profil téléphone vérifié avec l'attribut joueur `UIDebugDevice = "phone"` (Studio seulement).
+
+**Contract requests**
+
+| Domaine | Demande |
+| --- | --- |
+| data | `Profile.bestKills` (record perso de KO en une run) ; `RunSummary.weeklyRank` ; remote `ReturnToLobby` (bouton Lobby) |
+| companion (A05) | Remote `CaptureState { state = "Idle" \| "Available" \| "Capturing" \| "Interrupted" \| "Captured", progress, holdSeconds, name }` dans `shared/NetDefs/Companion.luau`, et `RunSummary.captured` |
+| avatar (A06) | Action `Capture` dans `InputController` (présente sur la branche A06, absente de main : avertissement « unknown action Capture » tant que ce n'est pas fusionné) |
+| combat (A04) | Renommer `Build.grimoires` / `grimoireSlots` en `runes` / `runeSlots` quand le contenu v2 arrive (le HUD lit les deux) |
+| lead | Ajouter `VictoryBanner` et `CaptureUI` à la liste des modules UI (modules simples démarrés par HUD, pas de nom de boot) |
+
+### 0.9 Questions ouvertes pour Clément
 
 1. **Victory en coop** : chacun choisit Cash out ou Keep going pour lui-même (proposition des maquettes), ou un vote d'équipe ?
 2. **Fantôme** : que devient un joueur fantôme (retour au monde suivant ? au prochain autel ? spectateur jusqu'à la fin) ? Les maquettes écrivent « BACK AT THE NEXT WORLD » en attendant.
