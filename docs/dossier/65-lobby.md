@@ -114,11 +114,11 @@ Les 3 classes gratuites sont les plus proches de l'arrivée. Chaque présentoir 
 - un mannequin qui porte l'équipement **au palier 3** (ce que la classe devient au niveau 30), dans une pose drôle : le casque du Knight est trop grand, l'Archer vise un pigeon ;
 - une bannière verticale de 12 studs à la couleur de la classe, avec son icône ;
 - une plaque : nom de la classe + arme de départ (« Knight · Broadsword ») ;
-- un `ProximityPrompt` « Try on » sur le mannequin, à hauteur de poitrine : `MaxActivationDistance = 7`, `HoldDuration = 0`, `RequiresLineOfSight = false` (le mannequin cacherait son propre prompt). Les prompts d'un même côté sont à 14 studs (= 2 × 7, règle du vault contre le clignotement entre deux prompts), ceux d'en face à 48.
+- un `ProximityPrompt` sur le mannequin (« Try on » si la classe est débloquée, « See quest » sinon), à hauteur de poitrine : `MaxActivationDistance = 7`, `HoldDuration = 0`, `RequiresLineOfSight = false` (le mannequin cacherait son propre prompt). Les prompts d'un même côté sont à 14 studs (= 2 × 7, règle du vault contre le clignotement entre deux prompts), ceux d'en face à 48.
 
 **Classe débloquée** : « Try on » équipe la classe tout de suite. L'équipement **palier 1** apparaît sur l'avatar avec un petit pop (VFX A07), et un toast dit « Knight equipped! ». Le bouton « Details » du toast ouvre l'écran Choix de classe. Pas de fenêtre bloquante.
 
-**Classe verrouillée** : le mannequin est gris, avec un cadenas voxel et une plaque « Quest: … » (texte de la quête de déblocage). « Try on » montre l'équipement sur l'avatar pendant 8 s, **côté client seulement**, sans aucune stat. Un toast dit « Locked · Quest: Revive 10 teammates » avec un bouton « See quest » qui ouvre l'écran Quêtes sur cette quête. Essayer donne envie, sans jamais rien vendre : les classes ne sont **jamais** en Robux.
+**Classe verrouillée** (décision de Clément, 4 nov. : **cadenas seul**, pas d'essai sur l'avatar) : le mannequin est gris, avec un cadenas voxel et une plaque « Quest: … » (texte de la quête de déblocage). Le prompt « See quest » ouvre l'écran Quêtes sur cette quête. Rien n'apparaît sur l'avatar du joueur. Les classes ne sont **jamais** en Robux.
 
 ### 3.3 Plaza
 
@@ -256,7 +256,7 @@ Règles communes :
 
 ### 6.2 Class Select
 
-Écran du présentoir, aussi accessible par le HUD. Liste des 8 classes à gauche (cartes 2 × 4 sur téléphone), avatar au centre (`ViewportFrame` qui tourne, arrêté si mouvement réduit), fiche à droite : arme de départ, passif, mouvement, paliers d'équipement (3 vignettes). Classe verrouillée : cadenas + texte de la quête + barre de progression + « See quest ». Les cosmétiques de classe (skins) se voient dans un sous-onglet « Style », avec le prix de chaque article ; jamais de stat.
+Écran du présentoir, aussi accessible par le HUD. Liste des 8 classes à gauche (cartes 2 × 4 sur téléphone), avatar au centre (`ViewportFrame` qui tourne, arrêté si mouvement réduit), fiche à droite : arme de départ, passif, mouvement, paliers d'équipement (3 vignettes). Classe verrouillée : silhouette grise avec cadenas au centre (jamais sur l'avatar du joueur) + texte de la quête + barre de progression + « See quest ». Les cosmétiques de classe (skins) se voient dans un sous-onglet « Style », avec le prix de chaque article ; jamais de stat.
 
 ### 6.3 Critter Collection
 
@@ -324,7 +324,7 @@ A09-04 : place du lobby, blockout gris puis formes, puis décor (méthode `fwjel
 | lead (ARCHITECTURE) | Ajouter au périmètre A09 : la place du lobby, `client/Controllers/Lobby/*`, `server/Services/LobbyService.luau` (pads, présentoirs, enclos), et les noms de boot correspondants |
 | data (A12) | `MatchRequest` : accepter un groupe (liste de membres présents) et un mode `Solo`/`Party`/`Public` ; reformer le groupe au retour de run ; API `getParty(player)` |
 | data (A12) | Exposer le texte de la quête de déblocage de chaque classe (`Config.Quests`) pour les plaques des présentoirs |
-| classes (A04, propriétaire de l'équipement de classe qui remplace TraitService) | `applyClass(player, classId)` utilisable **dans le lobby** (palier 1) et un aperçu client sans stat pour les classes verrouillées |
+| classes (A04, propriétaire de l'équipement de classe qui remplace TraitService) | `applyClass(player, classId)` utilisable **dans le lobby** (palier 1) |
 | companion (A05) | Mode lobby de `CompanionRenderer` : le compagnon équipé suit son joueur (visible de tous), la collection du joueur se promène dans l'enclos (client seul) |
 | ui (A08) | Design system Figma (lien dans le Journal) ; `SettingsUI` suit la maquette n° 7 ; toasts et prompts au style du kit |
 | VFX (A07) | Pop d'équipement au « Try on », tourbillon du portail, anneau de décompte des pads |
@@ -355,7 +355,7 @@ Checklist anti-AI-slop du doc de suivi, appliquée à ce qui existe (un plan et 
 | 2 | Solo mis en avant pour la 1re run, Public ensuite | Oui |
 | 3 | Joueurs par serveur de lobby | **8** (au lieu des 20 proposés) |
 | 4 | File publique dans le même serveur d'abord | Oui |
-| 5 | Essai des classes verrouillées | Question pas comprise : réexpliquée, en attente |
+| 5 | Essai des classes verrouillées | **Non : cadenas seul** |
 | 6 | Enclos : chacun voit sa collection | Oui |
 
 Questions telles que posées :
