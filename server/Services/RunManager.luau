@@ -44,7 +44,11 @@ type PlayerRun = {
 	downedUntil: number?, -- os.clock
 	ghost: boolean,
 	reviveProgress: number,
-	invulnUntil: number,
+	invuln: { [string]: number }, -- source -> fin d'invulnérabilité (os.clock), S-05
+	invulnSeconds: number, -- temps passé invulnérable dans la run
+	runStart: number, -- arrivée dans la run (os.clock), base du plafond d'invulnérabilité
+	airSince: number?, -- en l'air (pieds > Run.Player.AirHeight au-dessus du sol) depuis, S-01
+	deathPos: Vector3?, -- mort du Humanoid (reset, chute) pendant la run : réapparition là, à terre
 	contactReadyAt: number,
 	revives: number,
 	replay: boolean,
@@ -221,7 +225,11 @@ local function getRecord(player: Player): PlayerRun
 			downedUntil = nil,
 			ghost = false,
 			reviveProgress = 0,
-			invulnUntil = 0,
+			invuln = {},
+			invulnSeconds = 0,
+			runStart = now(),
+			airSince = nil,
+			deathPos = nil,
 			contactReadyAt = 0,
 			revives = 0,
 			replay = false,
@@ -233,6 +241,47 @@ local function getRecord(player: Player): PlayerRun
 		records[player] = r
 	end
 	return r
+end
+
+-- Invulnérabilité par source (S-05) -----------------------------------------------------------
+
+local function invulnerableNow(r: PlayerRun, t: number): boolean
+	for _, untilT in r.invuln do
+		if untilT > t then
+			return true
+		end
+	end
+	return false
+end
+
+-- Accorde `seconds` d'invulnérabilité pour `source` (la plus longue fin gagne pour une même source).
+-- Refusé quand le joueur a déjà passé InvulnCapShare de son temps de run invulnérable (+ grâce).
+local function grantInvuln(r: PlayerRun, seconds: number, source: string)
+	local t = now()
+	local P = Run.Player
+	local budget = P.InvulnCapShare * math.max(0, t - r.runStart) + P.InvulnCapGrace
+	if r.invulnSeconds >= budget then
+		return
+	end
+	r.invuln[source] = math.max(r.invuln[source] or 0, t + math.clamp(seconds, 0, 30))
+end
+
+-- Hauteur des pieds retenue pour les dégâts subis (S-01, défense en profondeur). Le Y vient du
+-- client : un joueur resté plus de AirGroundAfter s à plus de AirHeight studs au-dessus du sol
+-- (Heightmap) est compté au sol. Plus de cachette en l'air ni sur un décor inaccessible.
+local function damageFeet(r: PlayerRun, root: BasePart, hum: Humanoid?, t: number): number
+	local feet = feetY(root, hum)
+	local ground = Heightmap.getY(root.Position.X, root.Position.Z)
+	if feet - ground > Run.Player.AirHeight then
+		local since = r.airSince or t
+		r.airSince = since
+		if t - since > Run.Player.AirGroundAfter then
+			return ground
+		end
+	else
+		r.airSince = nil
+	end
+	return feet
 end
 
 local function refreshMaxHp(r: PlayerRun)
@@ -363,6 +412,21 @@ local function director(opts: { [string]: any })
 	end
 end
 
+-- S-12 : en mode lobby (MatchService actif), la config de run vient de MatchService.getRunConfig()
+-- (tier et membres) ; SelectStage est ignoré. Les mondes viennent toujours de Run.WorldChain (v2).
+local function lobbyConfig(): { worldId: string, tier: number, members: { number } }?
+	local match = find("MatchService")
+	if not match or type(match.isActive) ~= "function" or type(match.getRunConfig) ~= "function" then
+		return nil
+	end
+	local okActive, active = safe(match.isActive)
+	if not okActive or active ~= true then
+		return nil
+	end
+	local ok, config = safe(match.getRunConfig)
+	return if ok and type(config) == "table" then config else nil
+end
+
 local function worldIdFor(index: number): string
 	local id = Run.WorldChain[math.clamp(index, 1, math.max(1, #Run.WorldChain))]
 	return if id and Worlds[id] then id else Run.DefaultWorld
@@ -403,7 +467,12 @@ local function initPlayerForRun(r: PlayerRun)
 	r.maxHp = 0
 	refreshMaxHp(r)
 	r.hp = r.maxHp
-	r.invulnUntil = now() + 2
+	table.clear(r.invuln)
+	r.invulnSeconds = 0
+	r.runStart = now()
+	r.airSince = nil
+	r.deathPos = nil
+	grantInvuln(r, 2, "Spawn")
 	r.dirty = true
 	if not table.find(runPlayers, player) then
 		table.insert(runPlayers, player)
@@ -461,7 +530,7 @@ local function startStage(stage: number)
 			r.reviveProgress = 0
 			setGhostLook(r, false)
 			clearSlow(player)
-			r.invulnUntil = now() + 3
+			grantInvuln(r, 3, "Spawn")
 			r.dirty = true
 			teleport(player, spawnPointFor(index))
 		end
@@ -484,7 +553,8 @@ local function startRun()
 	state.runId += 1
 	-- v2 : la run part toujours du monde 1 de Run.WorldChain (la sélection v1 monde/tier est ignorée).
 	state.worldId = worldIdFor(1)
-	state.tier = 1
+	local lobby = lobbyConfig()
+	state.tier = if lobby and type(lobby.tier) == "number" then math.clamp(math.floor(lobby.tier), 1, 3) else 1
 	state.victory = false
 	state.cashOut = nil
 	state.cashOutHold = 0
@@ -675,7 +745,7 @@ local function revive(r: PlayerRun, rescuer: Player)
 	r.downedUntil = nil
 	r.reviveProgress = 0
 	r.hp = math.max(1, r.maxHp * Run.Coop.ReviveHpFraction)
-	r.invulnUntil = now() + Run.Coop.ReviveInvulnerable
+	grantInvuln(r, Run.Coop.ReviveInvulnerable, "Revive")
 	r.dirty = true
 	clearSlow(r.player)
 	setLifeAttributes(r)
@@ -770,7 +840,7 @@ local function stepContact()
 		end
 		local rec = r :: PlayerRun
 		local pos = root.Position
-		local feet = feetY(root, hum)
+		local feet = damageFeet(rec, root, hum, t)
 		local n = enemies.queryRadius(pos.X, pos.Z, P.ContactHalfWidth + 4.5, queryBuffer)
 		local total, touching = 0, 0
 		for k = 1, n do
@@ -993,6 +1063,19 @@ local function stepRun(dt: number)
 		end
 		local timeout = if RunService:IsStudio() then Run.StudioLoadoutTimeout else Run.LoadoutTimeout
 		local allReady = true
+		-- Mode lobby : on attend aussi les membres de la config encore en téléportation (S-12).
+		local lobby = lobbyConfig()
+		if lobby and type(lobby.members) == "table" then
+			local firstJoin = math.huge
+			for _, player in players do
+				firstJoin = math.min(firstJoin, getRecord(player).joinedAt)
+			end
+			for _, userId in lobby.members do
+				if type(userId) == "number" and not Players:GetPlayerByUserId(userId) and now() - firstJoin < timeout then
+					allReady = false
+				end
+			end
+		end
 		for _, player in players do
 			local r = getRecord(player)
 			if not r.ready and now() - r.joinedAt >= timeout then
@@ -1032,9 +1115,12 @@ local function stepRun(dt: number)
 	local t = now()
 	local elapsed = t - state.stageStart
 
-	-- Vitals upkeep: max hp follows stats, regen.
+	-- Vitals upkeep: max hp follows stats, regen ; temps invulnérable (S-05).
 	for _, player in runPlayers do
 		local r = records[player]
+		if r and isActiveRecord(r) and invulnerableNow(r, t) then
+			r.invulnSeconds += dt
+		end
 		if r and isActiveRecord(r) then
 			refreshMaxHp(r)
 			local regen = stat(statsOf(player), "Regen", 0)
@@ -1229,7 +1315,7 @@ function RunManager.damagePlayer(player: Player, amount: number, _source: string
 		return 0
 	end
 	local rec = r :: PlayerRun
-	if now() < rec.invulnUntil then
+	if invulnerableNow(rec, now()) then
 		return 0
 	end
 	-- Knight / Valor : parade d'un coup toutes les 8 s (PassiveService)
@@ -1286,11 +1372,36 @@ function RunManager.isActive(player: Player): boolean
 	return isActiveRecord(records[player]) and (state.phase ~= "Loadout" and state.phase ~= "Ended")
 end
 
-function RunManager.setInvulnerable(player: Player, seconds: number)
+-- S-05 : invulnérabilité par source ("Card", "Shadowstep", "Shield"...), retirée par
+-- clearInvulnerable(player, source), plafonnée à Run.Player.InvulnCapShare du temps de run.
+function RunManager.setInvulnerable(player: Player, seconds: number, source: string?)
 	local r = records[player]
 	if r and type(seconds) == "number" and seconds == seconds then
-		r.invulnUntil = math.max(r.invulnUntil, now() + math.clamp(seconds, 0, 30))
+		grantInvuln(r, seconds, if type(source) == "string" then source else "Other")
 	end
+end
+
+function RunManager.clearInvulnerable(player: Player, source: string)
+	local r = records[player]
+	if r and type(source) == "string" then
+		r.invuln[source] = nil
+	end
+end
+
+-- Secondes passées invulnérable dans la run (signal de quarantaine, règles anti-triche §2.3).
+function RunManager.getInvulnerableSeconds(player: Player): number
+	local r = records[player]
+	return if r then r.invulnSeconds else 0
+end
+
+-- S-01 : hauteur des pieds à utiliser pour les dégâts subis (EnemyService, BossService).
+function RunManager.getDamageFeetY(player: Player): number?
+	local r = records[player]
+	local root, hum = rootOf(player)
+	if not r or not root then
+		return nil
+	end
+	return damageFeet(r, root, hum, now())
 end
 
 -- Sets Player attributes SlowMult (number) and SlowUntil (Workspace:GetServerTimeNow() based),
@@ -1353,16 +1464,39 @@ end
 
 -- Lifecycle ----------------------------------------------------------------------------------
 
+-- Reset ou chute hors carte pendant la run (S-02) : le Humanoid meurt, ce qui ne doit rien
+-- rapporter. Côté serveur, c'est une mise à terre, et le personnage réapparaît là où il est tombé
+-- (pas au point d'apparition, pour ne pas offrir un téléport ni sortir d'un encerclement).
+local function onCharacterDied(player: Player, character: Model)
+	local r = records[player]
+	if not r or not r.inRun or state.phase == "Loadout" or state.phase == "Ended" then
+		return
+	end
+	local root = character:FindFirstChild("HumanoidRootPart")
+	if root and root:IsA("BasePart") then
+		local p = root.Position
+		r.deathPos = Vector3.new(p.X, Heightmap.getY(p.X, p.Z), p.Z)
+	end
+	if isActiveRecord(r) then
+		goDown(r)
+	end
+end
+
 local function onCharacterAdded(player: Player, character: Model)
 	local hum = character:WaitForChild("Humanoid", 10)
 	if hum and hum:IsA("Humanoid") then
 		hum.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+		hum.Died:Connect(function()
+			onCharacterDied(player, character)
+		end)
 	end
 	local r = records[player]
 	if r and r.inRun and state.phase ~= "Loadout" and state.phase ~= "Ended" then
 		task.defer(function()
 			local index = table.find(runPlayers, player) or 1
-			teleport(player, spawnPointFor(index))
+			local deathPos = r.deathPos
+			r.deathPos = nil
+			teleport(player, deathPos or spawnPointFor(index))
 			if r.ghost then
 				setGhostLook(r, true)
 			end
@@ -1415,6 +1549,9 @@ function RunManager.init()
 	end)
 
 	Net.onServerEvent("SelectStage", 4, function(player: Player, worldId: unknown, tier: unknown)
+		if lobbyConfig() then
+			return -- S-12 : en mode lobby, monde et tier viennent de MatchService
+		end
 		if type(worldId) ~= "string" or not Worlds[worldId] then
 			return
 		end
@@ -1573,9 +1710,25 @@ local function installStudioCommands()
 			startStage(math.clamp(math.floor(a), 1, worldCount()))
 			return state.stage
 		end
-		local kills = {}
+		local kills, invuln = {}, {}
 		for _, p in runPlayers do
 			kills[p.Name] = if stats then stats.getKills(p) else 0
+			local rec = records[p]
+			if rec then
+				local sources = {}
+				for source, untilT in rec.invuln do
+					if untilT > now() then
+						sources[source] = math.floor((untilT - now()) * 10) / 10
+					end
+				end
+				invuln[p.Name] = {
+					sources = sources,
+					seconds = math.floor(rec.invulnSeconds * 10) / 10,
+					now = invulnerableNow(rec, now()),
+					downed = rec.downedUntil ~= nil,
+					hp = math.floor(rec.hp),
+				}
+			end
 		end
 		return {
 			phase = state.phase,
@@ -1588,6 +1741,7 @@ local function installStudioCommands()
 			victory = state.victory,
 			cashedOut = state.cashedOut,
 			kills = kills,
+			players = invuln,
 			enemies = (find("EnemyService") and find("EnemyService").getCount()) or 0,
 		}
 	end

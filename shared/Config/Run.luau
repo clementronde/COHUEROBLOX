@@ -41,6 +41,7 @@ local Run = {
 		-- Au-delà du plafond technique (Balance.MaxEnemies), l'excès de densité devient des PV :
 		-- PV x (densité voulue / plafond). Le joueur ne voit pas la différence, le téléphone tient.
 		OverflowToHp = true,
+		ValueCap = 1e9, -- PV et dégâts ennemis plafonnés (règles anti-triche §5.2 : jamais inf ni NaN)
 	},
 	-- Après le boss du dernier monde : portail doré « Cash out ». Tous les joueurs actifs dedans
 	-- pendant HoldSeconds = fin de run, gains sauvés. Sinon on continue (Keep going).
@@ -80,6 +81,14 @@ local Run = {
 		ContactHalfWidth = 1.5,
 		ContactVerticalSlack = 2,
 		EliteDamageMult = 1.5,
+		-- S-05 : temps invulnérable (cartes, glissade, relève, apparition) plafonné à cette part du
+		-- temps passé dans la run, + une grâce fixe pour les protections d'apparition.
+		InvulnCapShare = 0.3,
+		InvulnCapGrace = 10,
+		-- S-01 (défense en profondeur) : un joueur à plus de AirHeight studs au-dessus du sol depuis
+		-- plus de AirGroundAfter s est compté au sol pour les dégâts subis (contact, projectiles, boss).
+		AirHeight = 3,
+		AirGroundAfter = 1.5,
 	},
 	Coop = {
 		DownedSeconds = 25,

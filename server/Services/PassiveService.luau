@@ -189,7 +189,7 @@ local function tickPlayer(player: Player, d: PData)
 		d.slideReadyAt = clock + (passive.slideCooldown or 0)
 		local run = Registry.find("RunManager")
 		if run and run.setInvulnerable then
-			pcall(run.setInvulnerable, player, passive.slideInvuln)
+			pcall(run.setInvulnerable, player, passive.slideInvuln, "Shadowstep")
 		end
 		weapons.areaFx(VIS.Shadowstep, x, z, 3)
 	end
