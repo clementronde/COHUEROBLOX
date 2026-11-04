@@ -10,6 +10,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Cards = require(Config:WaitForChild("Cards"))
+local Classes = require(Config:WaitForChild("Classes"))
 local Grimoires = require(Config:WaitForChild("Grimoires"))
 local Items = require(Config:WaitForChild("Items"))
 local Weapons = require(Config:WaitForChild("Weapons"))
@@ -291,15 +292,20 @@ function StatsService.grantItem(player: Player, itemId: string)
 	markStats(s)
 end
 
--- New run build for this player: start weapon of the class, meta slots and draw controls.
+-- Nouveau build de run : arme de départ de la classe, emplacements méta, contrôles de tirage.
+-- `classId` peut être un id v1 (domaine data) : Config/Classes le résout vers la classe v2.
 function StatsService.resetRun(player: Player, classId: string)
+	local def = Classes[classId]
+	if not def then
+		warn(`[StatsService] classe inconnue {classId}, Knight par défaut`)
+		def = Classes.Knight
+	end
+	classId = def.id
 	local passive = Weapons.Passives[classId]
-	local startWeapon = Weapons.StartWeapon[classId]
-	if not startWeapon then
-		warn(`[StatsService] unknown class {classId}, using Cornu`)
-		classId = "Cornu"
-		startWeapon = Weapons.StartWeapon.Cornu
-		passive = Weapons.Passives.Cornu
+	local startWeapon = def.startWeapon
+	if not Weapons.Defs[startWeapon] then
+		warn(`[StatsService] arme de départ inconnue {startWeapon} pour {classId}`)
+		startWeapon = Weapons.Order[1]
 	end
 	local meta = metaBonuses(player)
 	local extraSlots = if passive and passive.extraWeaponSlots then passive.extraWeaponSlots :: number else 0

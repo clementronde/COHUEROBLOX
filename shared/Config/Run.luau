@@ -10,7 +10,7 @@ local Run = {
 
 	DefaultWorld = "BoisGrognon",
 	DefaultTier = 1,
-	DefaultClass = "Cornu",
+	DefaultClass = "Knight",
 	DefaultCompanion = "Braise",
 	LoadoutTimeout = 45, -- seconds before a player without a loadout gets the default
 	StudioLoadoutTimeout = 5,

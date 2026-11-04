@@ -30,39 +30,73 @@ local TIERS: { [string]: Tier } = {
 	High = { maxProj = 300, maxAreas = 56, maxSegments = 80, maxAttach = 96, fade = true, material = Enum.Material.Neon },
 }
 
--- Visual styles: shape + colour + base size (studs) per weapon index / special visual.
-type Style = { shape: Enum.PartType, color: Color3, size: Vector3 }
-
-local STYLES: { [number]: Style } = {
-	[1] = { shape = Enum.PartType.Block, color = Color3.fromRGB(190, 120, 60), size = Vector3.new(2.4, 0.4, 1.2) }, -- axe
-	[2] = { shape = Enum.PartType.Block, color = Color3.fromRGB(240, 240, 255), size = Vector3.new(1.4, 0.2, 0.3) }, -- feather
-	[3] = { shape = Enum.PartType.Block, color = Color3.fromRGB(150, 160, 175), size = Vector3.new(1.6, 2.2, 1.6) }, -- turret
-	[4] = { shape = Enum.PartType.Block, color = Color3.fromRGB(255, 240, 90), size = Vector3.new(1, 0.2, 1) }, -- claws
-	[5] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(150, 110, 70), size = Vector3.new(0.3, 1, 1) }, -- quake
-	[6] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(130, 200, 90), size = Vector3.new(0.4, 1, 1) }, -- spores
-	[7] = { shape = Enum.PartType.Block, color = Color3.fromRGB(255, 120, 40), size = Vector3.new(1, 0.3, 1) }, -- flame
-	[8] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(255, 90, 60), size = Vector3.new(0.3, 1, 1) }, -- meteor
-	[9] = { shape = Enum.PartType.Block, color = Color3.fromRGB(170, 230, 255), size = Vector3.new(0.3, 0.3, 1) }, -- prism
-	[10] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(180, 90, 200), size = Vector3.new(0.3, 1, 1) }, -- whip
-	[11] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(200, 200, 210), size = Vector3.new(0.3, 2.4, 2.4) }, -- saw
-	[12] = { shape = Enum.PartType.Ball, color = Color3.fromRGB(40, 40, 90), size = Vector3.new(2, 2, 2) }, -- bowling
-	[13] = { shape = Enum.PartType.Block, color = Color3.fromRGB(255, 70, 160), size = Vector3.new(0.4, 0.4, 1) }, -- laser
-	[14] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(90, 160, 255), size = Vector3.new(0.3, 1, 1) }, -- umbrella wave
-	[15] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(255, 150, 230), size = Vector3.new(0.3, 1, 1) }, -- glitter
-	[16] = { shape = Enum.PartType.Ball, color = Color3.fromRGB(160, 220, 255), size = Vector3.new(1.4, 1.4, 1.4) }, -- bubble
-	[VIS.FelyneBolt] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(255, 255, 120), size = Vector3.new(0.3, 1, 1) },
-	[VIS.CornuRam] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(255, 200, 150), size = Vector3.new(0.3, 1, 1) },
-	[VIS.Ghost] = { shape = Enum.PartType.Ball, color = Color3.fromRGB(235, 235, 255), size = Vector3.new(1.4, 1.6, 1.4) },
-	[VIS.Whistle] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(255, 255, 255), size = Vector3.new(0.2, 1, 1) },
-	[VIS.Megaphone] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(255, 220, 80), size = Vector3.new(0.2, 1, 1) },
-	[VIS.Thorns] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(140, 120, 100), size = Vector3.new(0.2, 1, 1) },
-	[VIS.Contagion] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(110, 220, 70), size = Vector3.new(0.2, 1, 1) },
-	[VIS.ChainBolt] = { shape = Enum.PartType.Block, color = Color3.fromRGB(255, 255, 140), size = Vector3.new(0.3, 0.3, 1) },
-	[VIS.MiniBomb] = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(255, 180, 240), size = Vector3.new(0.3, 1, 1) },
+-- Styles visuels : forme + couleur + taille de base (studs). Les 16 armes lisent leur style dans
+-- Config/Weapons (champ `fx`, pièces provisoires en attendant les vrais VFX de la vague 2) ; les
+-- visuels spéciaux (passifs, objets) sont ici.
+type Style = {
+	shape: Enum.PartType,
+	color: Color3,
+	size: Vector3,
+	projDiv: number, -- rayon de touche qui donne la taille de base
+	spin: boolean,
+	rolls: boolean,
+	boomerang: boolean,
+	outTime: number,
+	orbit: boolean,
+	aura: boolean,
+	beamHeight: number,
 }
-local DEFAULT_STYLE: Style = { shape = Enum.PartType.Block, color = Color3.new(1, 1, 1), size = Vector3.new(1, 1, 1) }
-local KITE_STYLE: Style = { shape = Enum.PartType.Block, color = Color3.fromRGB(255, 120, 180), size = Vector3.new(2, 0.2, 2.4) }
-local TELEGRAPH_STYLE: Style = { shape = Enum.PartType.Cylinder, color = Color3.fromRGB(255, 40, 40), size = Vector3.new(0.15, 1, 1) }
+
+local SHAPES: { [string]: Enum.PartType } = {
+	Block = Enum.PartType.Block,
+	Ball = Enum.PartType.Ball,
+	Cylinder = Enum.PartType.Cylinder,
+}
+
+local function style(shape: Enum.PartType, color: Color3, size: Vector3): Style
+	return {
+		shape = shape,
+		color = color,
+		size = size,
+		projDiv = 1,
+		spin = false,
+		rolls = false,
+		boomerang = false,
+		outTime = 0,
+		orbit = false,
+		aura = false,
+		beamHeight = PROJ_HEIGHT,
+	}
+end
+
+local RING = Enum.PartType.Cylinder
+local STYLES: { [number]: Style } = {
+	[VIS.Parry] = style(RING, Color3.fromRGB(255, 240, 150), Vector3.new(0.3, 1, 1)),
+	[VIS.Blessing] = style(RING, Color3.fromRGB(255, 230, 120), Vector3.new(0.2, 1, 1)),
+	[VIS.Ghost] = style(Enum.PartType.Ball, Color3.fromRGB(235, 235, 255), Vector3.new(1.4, 1.6, 1.4)),
+	[VIS.Whistle] = style(RING, Color3.fromRGB(255, 255, 255), Vector3.new(0.2, 1, 1)),
+	[VIS.Megaphone] = style(RING, Color3.fromRGB(255, 220, 80), Vector3.new(0.2, 1, 1)),
+	[VIS.Thorns] = style(RING, Color3.fromRGB(140, 120, 100), Vector3.new(0.2, 1, 1)),
+	[VIS.Shadowstep] = style(RING, Color3.fromRGB(90, 70, 140), Vector3.new(0.2, 1, 1)),
+	[VIS.ChainBolt] = style(Enum.PartType.Block, Color3.fromRGB(255, 255, 140), Vector3.new(0.3, 0.3, 1)),
+	[VIS.MiniBomb] = style(RING, Color3.fromRGB(255, 180, 240), Vector3.new(0.3, 1, 1)),
+}
+for _, def in Weapons.List do
+	local fx = def.fx
+	local st = style(SHAPES[fx.shape] or Enum.PartType.Block, fx.color, fx.size)
+	st.projDiv = fx.projDiv or def.base.radius or 1
+	st.spin = fx.spin == true
+	st.rolls = fx.rolls == true
+	st.boomerang = fx.boomerang == true
+	st.outTime = def.base.outTime or 0
+	st.orbit = fx.orbit == true
+	st.aura = fx.aura == true
+	st.beamHeight = fx.beamHeight or PROJ_HEIGHT
+	STYLES[def.index] = st
+end
+local coneStyles: { [number]: Style } = {} -- cônes : une pièce plate par visuel, créée une fois
+local DEFAULT_STYLE: Style = style(Enum.PartType.Block, Color3.new(1, 1, 1), Vector3.new(1, 1, 1))
+local TELEGRAPH_STYLE: Style = style(RING, Color3.fromRGB(255, 40, 40), Vector3.new(0.15, 1, 1))
 
 type ProjEntry = {
 	part: BasePart,
@@ -245,9 +279,9 @@ local function onProjectile(scale: number, visual: number, id: number, x: number
 	local style = styleOf(visual)
 	local key = `p{visual}`
 	local part = acquire(key, style)
-	part.Size = style.size * scale / (if visual == 1 then 1.8 elseif visual == 12 then 2.2 elseif visual == 16 then 1.2 else 1)
-	local boomerang = visual == 1
-	local outTime = if boomerang then Weapons.Defs.HacheBoomerang.base.outTime else 0
+	part.Size = style.size * scale / math.max(style.projDiv, 0.1)
+	local boomerang = style.boomerang
+	local outTime = style.outTime
 	projs[id] = {
 		part = part,
 		key = key,
@@ -275,10 +309,14 @@ local function onArea(scale: number, visual: number, x: number, z: number, p1: n
 		return
 	end
 	local _ = scale
-	local style = styleOf(visual)
+	local st = styleOf(visual)
 	local half = p3
 	local key = if half > 0 and half < 180 then `c{visual}` else `a{visual}`
-	local coneStyle = if half > 0 and half < 180 then { shape = Enum.PartType.Block, color = style.color, size = Vector3.one } else style
+	local coneStyle = st
+	if half > 0 and half < 180 then
+		coneStyle = coneStyles[visual] or style(Enum.PartType.Block, st.color, Vector3.one)
+		coneStyles[visual] = coneStyle
+	end
 	local part = acquire(key, coneStyle)
 	local telegraph: BasePart? = nil
 	if delay > 0 then
@@ -309,14 +347,14 @@ local function onSegment(visual: number, x: number, z: number, p1: number, p2: n
 	local part = acquire(key, style)
 	local dx, dz = x2 - x, z2 - z
 	local len = math.max(0.1, math.sqrt(dx * dx + dz * dz))
-	local y1 = groundY(x, z) + (if visual == 13 then 9 else PROJ_HEIGHT)
+	local y1 = groundY(x, z) + style.beamHeight
 	local y2 = groundY(x2, z2) + 1.5
 	local a = Vector3.new(x, y1, z)
 	local b = Vector3.new(x2, y2, z2)
 	part.Size = Vector3.new(style.size.X, style.size.Y, (b - a).Magnitude)
 	part.CFrame = CFrame.lookAt((a + b) * 0.5, b)
 	local _ = len
-	table.insert(segs, { part = part, key = key, t0 = os.clock(), life = if visual == 13 then 0.27 else 0.15 })
+	table.insert(segs, { part = part, key = key, t0 = os.clock(), life = if style.beamHeight > PROJ_HEIGHT then 0.27 else 0.15 })
 end
 
 local function releaseAttach(e: AttachEntry)
@@ -341,16 +379,16 @@ local function onAttach(visual: number, slot: number, x: number, z: number, p1: 
 	if #attaches >= tier.maxAttach then
 		return
 	end
-	local style = if visual == 13 then KITE_STYLE else styleOf(visual)
+	local style = styleOf(visual)
 	local key = `t{visual}`
-	-- clouds and kites are one piece; saws and turrets one piece each
-	local pieces = if visual == 11 then count else 1
+	-- auras et tourelles : une pièce ; orbites : une pièce par élément
+	local pieces = if style.orbit then count else 1
 	local parts = table.create(pieces)
 	for k = 1, pieces do
 		parts[k] = acquire(key, style)
 	end
 	local radius = p1 / Codec.Scale
-	if visual == 6 then
+	if style.aura then
 		parts[1].Size = Vector3.new(0.4, radius * 2, radius * 2)
 		parts[1].Transparency = if tier.fade then 0.55 else 0.4
 	end
@@ -438,9 +476,10 @@ local function onFrame()
 			e.x = e.x0 + e.vx * t
 			e.z = e.z0 + e.vz * t
 		end
-		local y = groundY(e.x, e.z) + (if e.visual == 12 then e.part.Size.Y * 0.5 else PROJ_HEIGHT)
+		local st = styleOf(e.visual)
+		local y = groundY(e.x, e.z) + (if st.rolls then e.part.Size.Y * 0.5 else PROJ_HEIGHT)
 		local cf = CFrame.new(e.x, y, e.z)
-		if e.boomerang or e.visual == 11 then
+		if e.boomerang or st.spin then
 			cf *= CFrame.Angles(0, t * 20, 0)
 		elseif e.vx ~= 0 or e.vz ~= 0 then
 			cf = CFrame.lookAt(cf.Position, cf.Position + Vector3.new(e.vx, 0, e.vz))
@@ -523,17 +562,16 @@ local function onFrame()
 			end
 		end
 		local y = groundY(cx, cz)
-		if e.visual == 11 then
+		local st = styleOf(e.visual)
+		if st.orbit then
 			local count = #e.parts
 			for k, part in e.parts do
 				local a = t * e.spin + (k - 1) / count * math.pi * 2
 				local sx, sz = cx + math.cos(a) * e.radius, cz + math.sin(a) * e.radius
 				n = queue(n, part, CFrame.new(sx, y + 2, sz) * CFrame.Angles(0, t * 15, math.pi / 2))
 			end
-		elseif e.visual == 6 then
+		elseif st.aura then
 			n = queue(n, e.parts[1], CFrame.new(cx, y + 0.4, cz) * CFrame.Angles(0, 0, math.pi / 2))
-		elseif e.visual == 13 then
-			n = queue(n, e.parts[1], CFrame.new(cx + 1.5, y + 9 + math.sin(t * 3) * 0.5, cz) * CFrame.Angles(0.4, t, 0))
 		else
 			n = queue(n, e.parts[1], CFrame.new(cx, y + 1.1, cz))
 		end

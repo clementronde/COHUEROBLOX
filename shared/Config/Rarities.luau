@@ -43,7 +43,7 @@ function Rarities.rank(rarity: string): number
 	return table.find(Rarities.Order, rarity) or 1
 end
 
--- Rolls a rarity. `minRank` forces at least that rank (Astrel guarantee). Pure: pass your Random.
+-- Rolls a rarity. `minRank` forces at least that rank (garantie du passif Mage). Pure: pass your Random.
 function Rarities.roll(luck: number, rng: Random, minRank: number?): string
 	local l = math.clamp(if luck == luck then luck else 0, 0, Rarities.LuckCap)
 	local lo = minRank or 1

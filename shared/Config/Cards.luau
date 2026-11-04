@@ -1,5 +1,7 @@
 --!strict
--- Level-up cards and XP curve (dossier 10, sections 3 and 4).
+-- Cartes de niveau et courbe d'XP (dossier 10, sections 3 et 4). Décisions v2 section 4 :
+-- 3 choix, rareté visible, 8 s pour choisir sans pause (joueur ralenti et invulnérable),
+-- Bannir / Passer / Relancer limités par run. Les textes des cartes sont en anglais.
 
 local Cards = {
 	OfferSize = 3,
@@ -44,16 +46,47 @@ local Cards = {
 
 	Text = {
 		NewWeapon = { fr = "Nouvelle arme", en = "New weapon" },
-		NewGrimoire = { fr = "Nouveau grimoire", en = "New tome" },
+		NewGrimoire = { fr = "Nouvelle Rune", en = "New Rune" },
+		Level = { fr = "niv.", en = "Lv" },
 		Fusion = { fr = "FUSION", en = "FUSION" },
 		Heal = { fr = "Goûter", en = "Snack" },
 		HealDesc = { fr = "Soigne 30 % des PV max", en = "Heals 30% of max HP" },
 		Coins = { fr = "Tirelire", en = "Piggy bank" },
 		CoinsDesc = { fr = "+20 pièces", en = "+20 coins" },
+		Damage = { fr = "dégâts", en = "damage" },
 	},
 
-	-- Language used for Card.title / Card.desc (Types.Card has plain strings).
-	Locale = "fr",
+	-- Mots affichés pour les deltas de niveau des armes (clé de stat -> texte joueur).
+	-- Une clé absente n'est pas affichée (stats internes comme volleyDelay).
+	WeaponStatWords = {
+		damage = "damage",
+		cooldown = "cooldown",
+		radius = "area",
+		popRadius = "blast area",
+		amount = "projectile",
+		speed = "speed",
+		life = "range",
+		pierce = "pierce",
+		range = "range",
+		duration = "duration",
+		interval = "tick rate",
+		angle = "° arc",
+		bounces = "bounce",
+		critChance = "crit chance",
+		critDamage = "crit damage",
+		knockback = "knockback",
+		statusDps = "burn",
+		statusDuration = "s freeze",
+		statusMult = "slow",
+		turrets = "turret",
+		darts = "bolt",
+		orbitRadius = "orbit",
+		spin = "spin speed",
+		volleys = "volley",
+	} :: { [string]: string },
+
+	-- Langue de Card.title / Card.desc (Types.Card porte des chaînes simples). v2 : anglais seul.
+	Locale = "en",
 }
 
 function Cards.xpToNext(level: number): number

@@ -1,5 +1,7 @@
 --!strict
--- Server auto-fire for the 16 weapons and their fusions (dossier 10, sections 2, 5, 10; doc 12.3).
+-- Tir automatique serveur des 16 armes v2 (dossier 10, sections 2, 5, 10 ; doc 12.3).
+-- Aucun id d'arme ou de classe n'est écrit en dur : tout passe par Config/Weapons (kind, drapeaux de
+-- stats) et Config/Weapons.Passives (crit à distance de l'Archer, aura qui soigne du Cleric...).
 -- Projectiles and zones are data (pooled records, no Parts), stepped at Balance.SimHz.
 -- Targets via EnemyService.queryRadius, damage via EnemyService.damage(id, amount, player),
 -- statuses via EnemyService.applyStatus. Visuals: compact events on WeaponFx (WeaponFxCodec).
@@ -48,6 +50,9 @@ type Spec = {
 	chainOnCrit: number,
 	xpOnKill: number,
 	popRadius: number,
+	endBlast: boolean, -- explose aussi en fin de course (Fire Staff)
+	farCrit: number, -- critique en plus au-delà de farRange (passif Archer)
+	farRange: number,
 }
 
 type PState = {
@@ -151,7 +156,7 @@ local chainHits: { number } = {}
 
 local hitsThisTick = 0
 
--- Poison tracking for Sporelin's Contagion
+-- Suivi des poisons (qui a empoisonné quel ennemi), lu par getPoisoner
 local poisonUntil: { [number]: number } = {}
 local poisonOwner: { [number]: Player } = {}
 
@@ -231,7 +236,13 @@ local function heal(ps: PState, amount: number)
 	end
 end
 
--- Context bonus (additive bucket) from PassiveService (air, ram stacks, moving/still items)
+-- Passif de la classe du joueur (Config/Weapons.Passives), ou nil.
+local function classPassive(player: Player): { [string]: any }?
+	local classId = statsService().getClass(player)
+	return if classId then Weapons.Passives[classId] else nil
+end
+
+-- Bonus de contexte (seau additif) venant de PassiveService (Valor, Rage, objets en mouvement / à l'arrêt)
 local function contextBonus(player: Player): number
 	local passive = Registry.find("PassiveService")
 	if passive and passive.getDamageBonus then
@@ -281,7 +292,15 @@ hitEnemy = function(ps: PState, spec: Spec, id: number, fromX: number, fromZ: nu
 	if hunter > 0 and es.isElite and es.isElite(id) then
 		amount *= 1 + (Items.Defs.HunterGlasses.effect :: any).bonus * hunter
 	end
-	local crit = rng:NextNumber() < spec.critChance
+	local ex, ez = es.getPosition(id)
+	local critChance = spec.critChance
+	if spec.farCrit > 0 and ex and ez then
+		local dx, dz = ex - ps.x, ez - ps.z
+		if dx * dx + dz * dz >= spec.farRange * spec.farRange then
+			critChance += spec.farCrit
+		end
+	end
+	local crit = rng:NextNumber() < critChance
 	if crit then
 		amount *= spec.critMult
 	end
@@ -294,7 +313,6 @@ hitEnemy = function(ps: PState, spec: Spec, id: number, fromX: number, fromZ: nu
 	end
 	amount = math.max(1, math.round(amount))
 
-	local ex, ez = es.getPosition(id)
 	local killed = es.damage(id, amount, player)
 	stats.recordDamage(player, spec.key, amount)
 
@@ -437,6 +455,9 @@ local function refreshSpec(ps: PState, weaponId: string, w: Stats): Spec
 			chainOnCrit = 0,
 			xpOnKill = 0,
 			popRadius = 0,
+			endBlast = false,
+			farCrit = 0,
+			farRange = 0,
 		}
 		ps.specs[weaponId] = spec
 	end
@@ -453,6 +474,9 @@ local function refreshSpec(ps: PState, weaponId: string, w: Stats): Spec
 	spec.chainOnCrit = w.chainOnCrit or 0
 	spec.xpOnKill = w.xpOnKill or 0
 	spec.popRadius = (w.popRadius or 0) * (1 + (block.Size or 0))
+	spec.endBlast = (w.endBlast or 0) > 0
+	spec.farCrit = if passive and type(passive.farCrit) == "number" then passive.farCrit else 0
+	spec.farRange = if passive and type(passive.farRange) == "number" then passive.farRange else 0
 	return spec
 end
 
@@ -584,6 +608,10 @@ local function stepProjectiles()
 			continue
 		end
 		if p.age >= p.life then
+			if p.spec.endBlast and p.spec.popRadius > 0 then
+				hitArea(ps, p.spec, p.x, p.z, p.spec.popRadius, 0, 0, 0)
+				areaFx(p.spec.visual, p.x, p.z, p.spec.popRadius, 0, 0, 0)
+			end
 			if p.split > 0 then
 				local spec, x, z, n = p.spec, p.x, p.z, p.split
 				local r, sp = p.radius * 0.5, p.speed
@@ -694,6 +722,28 @@ local function segmentHits(z: Zone, x1: number, z1: number, x2: number, z2: numb
 	end
 end
 
+-- Passif Cleric (Blessing) : l'aura de l'arme `auraWeapon` soigne les joueurs actifs dedans,
+-- le lanceur compris. Le soin passe par RunManager.healPlayer (serveur).
+local function healAlliesInAura(z: Zone)
+	local passive = classPassive(z.ps.player)
+	if not passive or passive.auraWeapon ~= z.weaponId or type(passive.auraHealPerTick) ~= "number" then
+		return
+	end
+	local run = Registry.find("RunManager")
+	if not run or not run.healPlayer then
+		return
+	end
+	local r2 = z.radius * z.radius
+	for _, other in pstates do
+		if other.active and other.hasRoot then
+			local dx, dz = other.x - z.x, other.z - z.z
+			if dx * dx + dz * dz <= r2 then
+				run.healPlayer(other.player, passive.auraHealPerTick)
+			end
+		end
+	end
+end
+
 local function stepZone(z: Zone)
 	local ps = z.ps
 	z.age += DT
@@ -759,6 +809,7 @@ local function stepZone(z: Zone)
 		z.timer += z.interval
 		if z.kind == "Cloud" then
 			hitArea(ps, z.spec, z.x, z.z, z.radius, 0, 0, 0)
+			healAlliesInAura(z)
 		elseif z.kind == "Turret" then
 			local id, tx, tz = nearestEnemy(z.x, z.z, z.range, nil)
 			if id then
@@ -854,9 +905,9 @@ local function fireWeapon(ps: PState, weaponId: string, level: number, n: number
 		hitArea(ps, spec, ps.x, ps.z, radius, dirX, dirZ, half)
 		areaFx(spec.visual, ps.x, ps.z, radius, math.atan2(dirZ, dirX), half, 0)
 		if n + 1 < amount then
-			-- claws alternate front/back; other cones fan out by 20 degrees
+			-- swingBack : un coup sur deux part derrière ; les autres cônes s'ouvrent de 20 degrés
 			local nx, nz
-			if weaponId == "GriffesEclair" then
+			if (w.swingBack or 0) > 0 then
 				nx, nz = -dirX, -dirZ
 			else
 				local a = math.atan2(dirZ, dirX) + math.rad(if n % 2 == 0 then 20 else -40)
@@ -870,6 +921,25 @@ local function fireWeapon(ps: PState, weaponId: string, level: number, n: number
 		areaFx(spec.visual, ps.x, ps.z, radius, 0, 0, 0)
 		if n + 1 < amount then
 			table.insert(pending, { at = clock + (w.volleyDelay or 0.3), ps = ps, weaponId = weaponId, n = n + 1, dirX = 0, dirZ = 0 })
+		end
+	elseif kind == "Cloud" and (w.permanent or 0) > 0 then
+		-- Aura permanente (Holy Aura) : une seule zone, ses stats suivent le build à chaque recharge.
+		local z = findZone(ps, weaponId)
+		local fresh = z == nil
+		if not z then
+			z = newZone("Cloud", ps, spec, weaponId)
+		end
+		if z then
+			z.follow = true
+			z.x, z.z = ps.x, ps.z
+			z.life = math.huge
+			z.interval = w.interval / (1 + (block.AttackSpeed or 0))
+			z.radius = w.radius * size
+			z.count = 1
+			if fresh then
+				z.refresh = ATTACH_REFRESH
+				attachFx(z, false)
+			end
 		end
 	elseif kind == "Cloud" then
 		for k = 1, amount do
@@ -1005,18 +1075,18 @@ local function finalCooldown(w: Stats, block: { [string]: number }): number
 	return math.max(cd, SIM.MinCooldown)
 end
 
--- Umbrella: recharge and auto-wave (Big Top)
-local function umbrellaWave(ps: PState, level: number)
-	local w = Weapons.statsAt("ParapluieBouclier", level)
-	local spec = refreshSpec(ps, "ParapluieBouclier", w)
+-- Armes de kind "Shield" (aucune dans le contenu v2, moteur gardé) : recharge et onde.
+local function umbrellaWave(ps: PState, weaponId: string, level: number)
+	local w = Weapons.statsAt(weaponId, level)
+	local spec = refreshSpec(ps, weaponId, w)
 	local block = statsService().get(ps.player)
 	local radius = w.radius * (1 + (block.Size or 0))
 	hitArea(ps, spec, ps.x, ps.z, radius, 0, 0, 0)
 	areaFx(spec.visual, ps.x, ps.z, radius, 0, 0, 0)
 end
 
-local function stepShield(ps: PState, level: number, block: { [string]: number })
-	local w = Weapons.statsAt("ParapluieBouclier", level)
+local function stepShield(ps: PState, weaponId: string, level: number, block: { [string]: number })
+	local w = Weapons.statsAt(weaponId, level)
 	local maxCharges = math.floor(w.charges + math.floor((block.Amount or 0) / 2))
 	if ps.shieldCharges >= maxCharges then
 		ps.shieldTimer = 0
@@ -1027,7 +1097,7 @@ local function stepShield(ps: PState, level: number, block: { [string]: number }
 		ps.shieldTimer = 0
 		ps.shieldCharges += 1
 		if (w.autoWave or 0) > 0 and ps.active then
-			umbrellaWave(ps, level)
+			umbrellaWave(ps, weaponId, level)
 		end
 	end
 end
@@ -1037,19 +1107,29 @@ local function onPlayerDamaged(player: Player, amount: number)
 	if not ps or type(amount) ~= "number" or amount <= 0 then
 		return
 	end
-	local stats = statsService()
-	local level = stats.getWeaponLevel(player, "ParapluieBouclier")
-	if level <= 0 or ps.shieldCharges <= 0 then
+	local s = statsService().getState(player)
+	if not s or ps.shieldCharges <= 0 then
+		return
+	end
+	local shieldId, level = nil, 0
+	for _, entry in s.weapons do
+		local def = Weapons.Defs[entry.id]
+		if def and def.kind == "Shield" then
+			shieldId, level = entry.id, entry.level
+			break
+		end
+	end
+	if not shieldId then
 		return
 	end
 	ps.shieldCharges -= 1
-	local w = Weapons.statsAt("ParapluieBouclier", level)
+	local w = Weapons.statsAt(shieldId, level)
 	heal(ps, amount)
 	local run = Registry.find("RunManager")
 	if run and run.setInvulnerable then
 		run.setInvulnerable(player, w.invuln or 0.5)
 	end
-	umbrellaWave(ps, level)
+	umbrellaWave(ps, shieldId, level)
 end
 
 -- Players -------------------------------------------------------------------------------------
@@ -1152,9 +1232,13 @@ local function step()
 	for player, ps in pstates do
 		local lolli = stats.getItemCount(player, "RainbowLollipop")
 		local cap = lolli * (Items.Defs.RainbowLollipop.effect :: any).maxPerSecond
-		local fl = stats.getWeaponLevel(player, "FouetTentacule")
-		if fl >= Weapons.FusionLevel then
-			cap += Weapons.statsAt("FouetTentacule", fl).lifestealCap or 0
+		local s = stats.getState(player)
+		if s then
+			for _, entry in s.weapons do
+				if Weapons.Defs[entry.id] then
+					cap += Weapons.statsAt(entry.id, entry.level).lifestealCap or 0
+				end
+			end
 		end
 		ps.healBudget = math.min(ps.healBudget + cap * DT, cap)
 	end
@@ -1182,8 +1266,12 @@ local function step()
 		end
 		local block = stats.get(player)
 		for _, entry in s.weapons do
-			if entry.id == "ParapluieBouclier" then
-				stepShield(ps, entry.level, block)
+			local def = Weapons.Defs[entry.id]
+			if not def then
+				continue
+			end
+			if def.kind == "Shield" then
+				stepShield(ps, entry.id, entry.level, block)
 				continue
 			end
 			local cd = (ps.cooldowns[entry.id] or 0) - DT
@@ -1270,6 +1358,9 @@ function WeaponService.dealDamage(player: Player, key: string, visual: number, i
 		chainOnCrit = 0,
 		xpOnKill = 0,
 		popRadius = 0,
+		endBlast = false,
+		farCrit = 0,
+		farRange = 0,
 	}
 	return hitEnemy(ps, spec, id, fromX, fromZ)
 end
@@ -1318,6 +1409,9 @@ function WeaponService.spawnGhost(player: Player, damage: number, speed: number,
 			chainOnCrit = 0,
 			xpOnKill = 0,
 			popRadius = 0,
+			endBlast = false,
+			farCrit = 0,
+			farRange = 0,
 		}
 		ps.specs.__ghost = spec
 	end
