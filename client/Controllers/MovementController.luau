@@ -1,36 +1,45 @@
 --!strict
--- MovementController (avatar domain): client feel layer on top of the default Humanoid controls.
--- Design: docs/dossier/50-classes-avatar-mouvement.md section 4. Vault: "Custom Character Controllers",
--- "Input Responsiveness Buffering and Coyote Time", "Mover Constraints and Physics Controllers".
+-- MovementController (A06, domaine avatar) : couche de sensation au-dessus des contrôles Humanoid par défaut.
+-- Design : docs/dossier/50-classes-avatar-mouvement.md section 4. Vault fwjelaa : « Custom Character
+-- Controllers », « Input Responsiveness Buffering and Coyote Time », « Mover Constraints and Physics Controllers ».
 --
--- Bunny-hop, jump buffer, coyote time, slide (LinearVelocity Plane), double jump, glide, short wall
--- climb, low gravity (VectorForce), card-choice slow (SlowMult / SlowUntil, GetServerTimeNow base),
--- MoveSpeed stat (Build remote), no fall damage, landing shockwave (local visual).
--- One writer of Humanoid.WalkSpeed: base(class) x stat x bunny-hop x slow.
--- API: MovementController.isSliding() -> boolean · MovementController.getHopBonus() -> number
+-- Le déplacement reste aux contrôles Roblox (relatif à la caméra). Le saut est à nous : Humanoid.JumpHeight
+-- est tenu à 0 (Espace / A / le bouton tactile Roblox ne sautent plus seuls, ce bouton se masque), et l'action
+-- Jump de l'InputController lance un saut à la bonne vitesse verticale. Ça donne un contrôle exact du
+-- tampon, du coyote time, du bunny-hop (appui neuf obligatoire : maintenir Saut ne relance pas) et du double saut.
+--
+-- Mécaniques : bunny-hop, saut tampon, coyote time, glissade (LinearVelocity Plane), glissade en pente,
+-- conversion glissade -> saut, double saut, plané court, atterrissage lourd, gravité par classe (VectorForce),
+-- ralenti de choix de carte (SlowMult / SlowUntil, base GetServerTimeNow), stat MoveSpeed (remote Build),
+-- pas de dégâts de chute, onde d'atterrissage locale.
+-- Un seul écrivain de Humanoid.WalkSpeed : marche(classe) x stat x bunny-hop x ralenti x contrecoup.
+-- Poses de glissade / charge / atterrissage lourd : PlayerAnimator (démarré ici).
+-- API : MovementController.isSliding() -> boolean · getHopBonus() -> number · getDebug() -> table
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Net = require(Shared:WaitForChild("Net"))
 local Registry = require(Shared:WaitForChild("Registry"))
-local Types = require(Shared:WaitForChild("Types"))
-local Config = Shared:WaitForChild("Config")
-local Classes = require(Config:WaitForChild("Classes"))
-local M = require(Config:WaitForChild("Movement"))
+local M = require(Shared:WaitForChild("Config"):WaitForChild("Movement"))
+local PlayerAnimator = require(script.Parent:WaitForChild("PlayerAnimator"))
+
+type ClassMove = typeof(M.profile(nil))
 
 local MovementController = {}
 
 local player = Players.LocalPlayer
 local HST = Enum.HumanoidStateType
 
--- ---------------------------------------------------------------- state
+-- ---------------------------------------------------------------- état
 
-local def: Types.ClassDef? = nil
+local prof: ClassMove = M.profile(nil)
+local classId: string? = nil
 local statMult = 1
 local hopBonus = 0
 local hopCount = 0
@@ -41,21 +50,28 @@ local charConns: { RBXScriptConnection } = {}
 local rayParams = RaycastParams.new()
 rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
+local airborne = false
 local landedAt = -math.huge
 local leftGroundAt = -math.huge
-local jumpPressedAt = -math.huge
+local jumpPressedAt = -math.huge -- dernier appui non consommé (tampon)
+local ourJumpAt = -math.huge
 local jumpedSinceGrounded = false
 local airJumpsLeft = 0
-local climbLeft = 0
+local glideLeft = 0
 local peakY = 0
-local airTurn = 0
-local lastAirTurn = 0
-local lastYaw: number? = nil
+local landSlowUntil = 0
+local landSlowMult = 1
 
 local sliding = false
 local slideVel = Vector3.zero
 local slideFlatTime = 0
 local slideAirTime = 0
+local slideEndedAt = -math.huge
+local slideExitSpeed = 0
+local slideEntrySpeed = 0 -- vitesse au départ de la glissade (boost compris)
+local slideEntryBonus = 0 -- bonus de bunny-hop au départ de la glissade
+local slidePressedAt = -math.huge
+local slideTouchMode = false
 local slideAttachment: Attachment? = nil
 local slideMover: LinearVelocity? = nil
 
@@ -66,7 +82,19 @@ local moveEvent: RemoteEvent? = nil
 local shockPool: { Part } = {}
 local shockNext = 1
 
--- ---------------------------------------------------------------- helpers
+-- Journal de test (Studio seulement), lu par la BindableFunction LocalPlayer.CohueMoveDebug.
+local IS_STUDIO = RunService:IsStudio()
+local debugLog: { string } = {}
+local function dlog(msg: string)
+	if IS_STUDIO then
+		table.insert(debugLog, string.format("%.3f %s", os.clock(), msg))
+		if #debugLog > 300 then
+			table.remove(debugLog, 1)
+		end
+	end
+end
+
+-- ---------------------------------------------------------------- aides
 
 local function send(kind: string)
 	if moveEvent then
@@ -74,48 +102,79 @@ local function send(kind: string)
 	end
 end
 
-local function classNumber(key: string, default: number): number
-	local v = def and def[key]
-	return if type(v) == "number" then v else default
+local function input(): any
+	return Registry.find("InputController")
+end
+
+local function held(name: string): boolean
+	local ic = input()
+	return ic ~= nil and ic.isDown(name)
 end
 
 local function baseWalk(): number
-	return if def then def.walkSpeed else M.DefaultWalkSpeed
+	return M.walkSpeed(prof) * statMult
+end
+
+local function gravityMult(): number
+	return prof.gravityMult or 1
+end
+
+local function gravity(): number
+	return Workspace.Gravity * gravityMult()
+end
+
+local function slideTune(key: string, default: number): number
+	local s = prof.slide
+	local v = s and (s :: any)[key]
+	return if type(v) == "number" then v else default
 end
 
 local function slowMult(): number
 	local mult = player:GetAttribute("SlowMult")
 	local untilT = player:GetAttribute("SlowUntil")
+	local m = 1
 	if type(mult) == "number" and type(untilT) == "number" and Workspace:GetServerTimeNow() < untilT then
-		return math.clamp(mult, 0.05, 1)
+		m = math.clamp(mult, 0.05, 1)
 	end
-	return 1
+	if os.clock() < landSlowUntil then
+		m *= landSlowMult
+	end
+	return m
 end
 
-local function gravityMult(): number
-	return classNumber("gravityMult", 1)
+local function isAirState(state: Enum.HumanoidStateType): boolean
+	return state == HST.Freefall or state == HST.Jumping
 end
 
-local function verifiedGround(): RaycastResult?
+local function feetReach(h: Humanoid, r: BasePart): number
+	return h.HipHeight + r.Size.Y / 2
+end
+
+local function verifiedGround(extraReach: number?): RaycastResult?
 	local h, r = humanoid, root
 	if not h or not r then
 		return nil
 	end
-	local reach = h.HipHeight + r.Size.Y / 2 + 0.6
-	local hit = Workspace:Raycast(r.Position, Vector3.new(0, -reach, 0), rayParams)
+	local hit = Workspace:Raycast(r.Position, Vector3.new(0, -(feetReach(h, r) + 0.6 + (extraReach or 0)), 0), rayParams)
 	if hit and hit.Normal.Y >= M.GroundNormalMinY then
 		return hit
 	end
 	return nil
 end
 
-local function cameraYaw(): number?
-	local cam = Workspace.CurrentCamera
-	if not cam then
-		return nil
+-- Vrai si le personnage touchera le sol dans moins de JumpBuffer secondes (un appui ici = saut tampon,
+-- pas le double saut).
+local function landingSoon(): boolean
+	local h, r = humanoid, root
+	if not h or not r then
+		return false
 	end
-	local look = cam.CFrame.LookVector
-	return math.atan2(-look.X, -look.Z)
+	local vy = r.AssemblyLinearVelocity.Y
+	if vy >= 0 then
+		return false
+	end
+	local reach = feetReach(h, r) + 0.3 + (-vy) * M.JumpBuffer
+	return Workspace:Raycast(r.Position, Vector3.new(0, -reach, 0), rayParams) ~= nil
 end
 
 local function applyWalkSpeed()
@@ -123,28 +182,35 @@ local function applyWalkSpeed()
 	if not h then
 		return
 	end
-	local speed = baseWalk() * statMult * (1 + hopBonus) * slowMult()
+	local speed = baseWalk() * (1 + hopBonus) * slowMult()
 	if math.abs(h.WalkSpeed - speed) > 0.01 then
 		h.WalkSpeed = speed
 	end
-	local jump = if def then def.jumpHeight else M.DefaultJumpHeight
 	if h.UseJumpPower then
 		h.UseJumpPower = false
 	end
-	if math.abs(h.JumpHeight - jump) > 0.01 then
-		h.JumpHeight = jump
+	if h.JumpHeight ~= 0 then
+		h.JumpHeight = 0 -- le saut passe par l'action Jump (voir en-tête)
 	end
 end
 
 local function resetHops()
 	if hopBonus > 0 or hopCount > 0 then
+		dlog(`hopReset bonus={string.format("%.2f", hopBonus)} hops={hopCount}`)
 		hopBonus = 0
 		hopCount = 0
 		send("HopReset")
 	end
 end
 
--- ---------------------------------------------------------------- landing shockwave (visual only)
+local function cameraShake(strength: number)
+	local cam = Registry.find("CameraController")
+	if cam and cam.shake then
+		cam.shake(strength)
+	end
+end
+
+-- ---------------------------------------------------------------- onde d'atterrissage (visuel seul)
 
 local function makeShockPart(): Part
 	local p = Instance.new("Part")
@@ -156,20 +222,19 @@ local function makeShockPart(): Part
 	p.CanTouch = false
 	p.CastShadow = false
 	p.Material = Enum.Material.Neon
-	p.Color = Color3.fromRGB(235, 240, 255)
+	p.Color = Color3.fromRGB(255, 236, 200)
 	p.Transparency = 1
 	p.Size = Vector3.new(0.15, 1, 1)
 	p.Parent = Workspace
 	return p
 end
 
-local function shockwave(position: Vector3, strength: number)
+local function shockwave(position: Vector3, radius: number)
 	if #shockPool == 0 then
 		return
 	end
 	local p = shockPool[shockNext]
 	shockNext = shockNext % #shockPool + 1
-	local radius = M.ShockwaveMaxRadius * math.clamp(strength, 0.4, 1)
 	p.Size = Vector3.new(0.15, 1, 1)
 	p.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(90))
 	p.Transparency = 0.3
@@ -179,31 +244,33 @@ local function shockwave(position: Vector3, strength: number)
 	}):Play()
 end
 
--- ---------------------------------------------------------------- slide
+-- ---------------------------------------------------------------- glissade
+
+local function slideCap(): number
+	return baseWalk() * M.slideMaxMult(prof)
+end
 
 local function endSlide()
 	if not sliding then
 		return
 	end
 	sliding = false
+	slideEndedAt = os.clock()
+	slideExitSpeed = slideVel.Magnitude
 	if slideMover then
-		slideMover:Destroy()
-		slideMover = nil
+		slideMover.Enabled = false
 	end
-	if slideAttachment then
-		slideAttachment:Destroy()
-		slideAttachment = nil
-	end
+	dlog(`slideEnd speed={string.format("%.1f", slideExitSpeed)}`)
 	send("SlideEnd")
 end
 
-local function slideCap(): number
-	return baseWalk() * statMult * M.SlideMaxMult
-end
-
 local function startSlide()
-	local h, r = humanoid, root
-	if sliding or not h or not r or h.Health <= 0 then
+	local h, r, lv = humanoid, root, slideMover
+	if sliding or not h or not r or not lv or h.Health <= 0 then
+		return
+	end
+	local now = os.clock()
+	if now - slideEndedAt < M.SlideCooldown then
 		return
 	end
 	if not verifiedGround() then
@@ -211,33 +278,28 @@ local function startSlide()
 	end
 	local v = r.AssemblyLinearVelocity
 	local flat = Vector3.new(v.X, 0, v.Z)
-	if flat.Magnitude < M.SlideMinSpeed then
+	local wish = Vector3.new(h.MoveDirection.X, 0, h.MoveDirection.Z)
+	local dir: Vector3
+	if flat.Magnitude >= M.SlideMinSpeed then
+		dir = flat.Unit
+	elseif wish.Magnitude > 0.1 then
+		dir = wish.Unit -- démarrage à l'arrêt : la direction du stick suffit
+	else
 		return
 	end
-	local boost = classNumber("slideBoost", M.SlideBoostDefault)
-	local speed = math.min(math.max(flat.Magnitude, h.WalkSpeed) * boost, slideCap())
-	slideVel = flat.Unit * speed
+	local speed = math.min(math.max(flat.Magnitude, h.WalkSpeed) * slideTune("boost", M.SlideBoost), slideCap())
+	slideVel = dir * speed
+	slideEntrySpeed = speed
+	slideEntryBonus = hopBonus
 	slideFlatTime = 0
 	slideAirTime = 0
-
-	local att = Instance.new("Attachment")
-	att.Name = "SlideAttachment"
-	att.Parent = r
-	local lv = Instance.new("LinearVelocity")
-	lv.Name = "SlideVelocity"
-	lv.Attachment0 = att
-	lv.RelativeTo = Enum.ActuatorRelativeTo.World
-	lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Plane
-	lv.PrimaryTangentAxis = Vector3.xAxis
-	lv.SecondaryTangentAxis = Vector3.zAxis
+	slidePressedAt = -math.huge
 	lv.PlaneVelocity = Vector2.new(slideVel.X, slideVel.Z)
-	lv.ForceLimitsEnabled = true
-	lv.ForceLimitMode = Enum.ForceLimitMode.Magnitude
 	lv.MaxForce = r.AssemblyMass * 2000
-	lv.Parent = r
-	slideAttachment = att
-	slideMover = lv
+	lv.Enabled = true
 	sliding = true
+	slideTouchMode = M.SlideTouchTap and UserInputService.PreferredInput == Enum.PreferredInput.Touch
+	dlog(`slideStart speed={string.format("%.1f", speed)}`)
 	send("SlideStart")
 end
 
@@ -247,36 +309,35 @@ local function updateSlide(dt: number)
 		endSlide()
 		return
 	end
-	local InputController = Registry.find("InputController")
-	local held = InputController == nil or InputController.isDown("Slide")
 	local ground = verifiedGround()
 	if ground then
 		slideAirTime = 0
 		local n = ground.Normal
 		local horizontal = Vector3.new(n.X, 0, n.Z)
 		local slopeSin = horizontal.Magnitude
-		if slopeSin > 0.08 then
-			slideVel += horizontal.Unit * (Workspace.Gravity * gravityMult() * M.SlideSlopeGain * slopeSin * dt)
+		if slopeSin > M.SlideSlopeMin then
+			-- La pente pousse vers le bas : g x part x sin(pente).
+			slideVel += horizontal.Unit * (gravity() * M.SlideSlopeGain * slopeSin * dt)
 		else
 			slideFlatTime += dt
 		end
-		-- Friction always applies; slopes beat it.
 		local speed = slideVel.Magnitude
 		if speed > 0 then
-			slideVel = slideVel.Unit * math.max(0, speed - M.SlideFriction * dt)
+			slideVel = slideVel.Unit * math.max(0, speed - slideTune("friction", M.SlideFriction) * dt)
 		end
 	else
 		slideAirTime += dt
-		if slideAirTime > 0.3 then
+		if slideAirTime > M.SlideAirEnd then
 			endSlide()
 			return
 		end
 	end
-	-- Light steering toward the stick.
+	-- Braquage vers le stick (relatif à la caméra).
 	local wish = h.MoveDirection
 	local speed = slideVel.Magnitude
 	if wish.Magnitude > 0.1 and speed > 0 then
-		local dir = slideVel.Unit:Lerp(Vector3.new(wish.X, 0, wish.Z).Unit, math.min(1, 2 * dt))
+		local flatWish = Vector3.new(wish.X, 0, wish.Z).Unit
+		local dir = slideVel.Unit:Lerp(flatWish, math.min(1, slideTune("steer", M.SlideSteer) * dt))
 		if dir.Magnitude > 1e-3 then
 			slideVel = dir.Unit * speed
 		end
@@ -285,41 +346,100 @@ local function updateSlide(dt: number)
 	if speed > 0 then
 		slideVel = slideVel.Unit * speed
 	end
-	if not held or speed < h.WalkSpeed * M.SlideEndMult or slideFlatTime > M.SlideMaxFlatTime then
+	local released = not slideTouchMode and not held("Slide")
+	local tooSlow = speed < baseWalk() * slideTune("endMult", M.SlideEndMult)
+	if released or tooSlow or slideFlatTime > slideTune("maxFlatTime", M.SlideMaxFlatTime) then
 		endSlide()
 		return
 	end
 	lv.PlaneVelocity = Vector2.new(slideVel.X, slideVel.Z)
-	h:Move(slideVel.Unit) -- keep the Humanoid agreeing with the mover (vault: Mover Constraints section 2)
+	h:Move(slideVel.Unit) -- l'Humanoid suit le mover (vault : Mover Constraints section 2)
 end
 
--- ---------------------------------------------------------------- jumps
+-- ---------------------------------------------------------------- sauts
 
-local function forceJump()
-	local h = humanoid
-	if not h or h.Health <= 0 then
-		return
+local function feetPosition(): Vector3?
+	local h, r = humanoid, root
+	if not h or not r then
+		return nil
 	end
-	jumpedSinceGrounded = true
-	jumpPressedAt = -math.huge
-	h:ChangeState(HST.Jumping)
+	return r.Position - Vector3.new(0, feetReach(h, r) - 0.1, 0)
 end
 
-local function airJump()
+local function launch(heightMult: number)
 	local h, r = humanoid, root
 	if not h or not r then
 		return
 	end
-	airJumpsLeft -= 1
-	local g = Workspace.Gravity * gravityMult()
-	local vy = math.sqrt(2 * g * h.JumpHeight)
+	local vy = math.sqrt(2 * gravity() * M.jumpHeight(prof) * heightMult)
+	ourJumpAt = os.clock()
+	jumpedSinceGrounded = true
+	jumpPressedAt = -math.huge
+	airborne = true
+	peakY = r.Position.Y
+	h:ChangeState(HST.Jumping)
 	local v = r.AssemblyLinearVelocity
 	r.AssemblyLinearVelocity = Vector3.new(v.X, vy, v.Z)
-	peakY = r.Position.Y
 end
 
-local function isAirState(state: Enum.HumanoidStateType): boolean
-	return state == HST.Freefall or state == HST.Jumping
+-- Saut depuis le sol (ou coyote). Décide du bunny-hop :
+--   * relance dans la fenêtre après l'atterrissage, en gardant sa vitesse : +3 % ;
+--   * saut pendant une glissade (ou moins de SlideJumpGrace après) : le bonus d'entrée de la glissade
+--     plus l'élan gagné ou perdu pendant la glissade. Au plat ça conserve le bonus (le boost de départ ne
+--     compte pas, sinon glisser-sauter remplacerait le timing), en pente ça convertit la vitesse gagnée.
+local function groundJump()
+	local h, r = humanoid, root
+	if not h or not r or h.Health <= 0 then
+		return
+	end
+	local now = os.clock()
+	local base = math.max(baseWalk(), 1)
+	if sliding or now - slideEndedAt <= M.SlideJumpGrace then
+		local speed = if sliding then slideVel.Magnitude else slideExitSpeed
+		endSlide()
+		slideEndedAt = -math.huge -- grâce consommée
+		local delta = (speed - slideEntrySpeed) / base
+		local bonus = slideEntryBonus + delta
+		if delta >= -0.02 then
+			bonus += M.BhopGainPerHop -- élan gardé : compte comme un hop
+		end
+		hopBonus = math.clamp(bonus, 0, M.BhopMaxBonus)
+		hopCount += 1
+		dlog(`slideJump speed={string.format("%.1f", speed)} entry={string.format("%.1f", slideEntrySpeed)} bonus={string.format("%.2f", hopBonus)}`)
+		send("Hop")
+	elseif now - landedAt <= M.BhopWindow then
+		local v = r.AssemblyLinearVelocity
+		local flat = Vector3.new(v.X, 0, v.Z).Magnitude
+		if flat >= h.WalkSpeed * M.BhopKeepSpeed then
+			hopCount += 1
+			local wasMax = hopBonus >= M.BhopMaxBonus - 1e-6
+			hopBonus = math.min(M.BhopMaxBonus, hopBonus + M.BhopGainPerHop)
+			if not wasMax and hopBonus >= M.BhopMaxBonus - 1e-6 then
+				local feet = feetPosition()
+				if feet then
+					shockwave(feet, 5) -- plafond atteint
+				end
+			end
+			dlog(`hop dtLand={string.format("%.3f", now - landedAt)} bonus={string.format("%.2f", hopBonus)}`)
+			send("Hop")
+		else
+			dlog(`hop blocked speed={string.format("%.1f", flat)}`) -- contre un mur : pas de gain
+		end
+	else
+		dlog(`jump dtLand={string.format("%.3f", math.min(now - landedAt, 99))}`)
+	end
+	launch(1)
+	applyWalkSpeed()
+end
+
+local function airJump()
+	airJumpsLeft -= 1
+	dlog("airJump")
+	local feet = feetPosition()
+	if feet then
+		shockwave(feet, 3) -- petit anneau sous les pieds : le double saut se voit
+	end
+	launch(M.AirJumpMult)
 end
 
 local function onJumpAction(pressed: boolean)
@@ -327,105 +447,114 @@ local function onJumpAction(pressed: boolean)
 	if not pressed or not h or h.Health <= 0 then
 		return
 	end
-	local state = h:GetState()
-	if not isAirState(state) then
-		h.Jump = true -- grounded: touch/UI buttons need this; keyboard already does it
+	if h.SeatPart then
+		h.Sit = false
+		h.Jump = true
 		return
 	end
 	local now = os.clock()
-	if not jumpedSinceGrounded and now - leftGroundAt <= M.CoyoteTime then
-		forceJump()
-	elseif airJumpsLeft > 0 then
+	local state = h:GetState()
+	if state == HST.Swimming then
+		h.Jump = true -- nage vers le haut (comportement Roblox), pas de saut piloté dans l'eau
+		return
+	end
+	jumpPressedAt = now
+	if not isAirState(state) then
+		groundJump()
+	elseif not jumpedSinceGrounded and now - leftGroundAt <= M.CoyoteTime then
+		groundJump() -- coyote time
+	elseif airJumpsLeft > 0 and not landingSoon() then
 		airJump()
-	else
-		jumpPressedAt = now -- jump buffer: fires on landing
+	end
+	-- sinon : tampon, consommé à l'atterrissage
+end
+
+local function onSlideAction(pressed: boolean)
+	local h = humanoid
+	if not h or h.Health <= 0 then
+		return
+	end
+	if not pressed then
+		return -- la fin au relâchement est gérée par updateSlide (hors tactile)
+	end
+	if sliding then
+		if slideTouchMode then
+			endSlide() -- tactile : deuxième appui = stop
+		end
+		return
+	end
+	slidePressedAt = os.clock()
+	if not isAirState(h:GetState()) then
+		startSlide()
+	end
+end
+
+-- ---------------------------------------------------------------- états
+
+local function onLanded()
+	local h, r = humanoid, root
+	if not airborne or not h or not r then
+		return
+	end
+	local now = os.clock()
+	if now - ourJumpAt < M.LandIgnoreAfterJump then
+		return -- l'Humanoid repasse parfois une image au sol juste après notre saut : pas un atterrissage
+	end
+	airborne = false
+	landedAt = now
+	jumpedSinceGrounded = false
+	leftGroundAt = -math.huge
+	-- À l'état Landed le personnage est encore un peu au-dessus du sol : rayon plus long. Le pas suivant
+	-- recharge aussi (step), pour les sauts relancés à l'image même de l'atterrissage.
+	if verifiedGround(2) then
+		airJumpsLeft = prof.airJumps or 0
+		glideLeft = if prof.glide then prof.glide.duration else 0
+	end
+
+	local fall = peakY - r.Position.Y
+	dlog(`land fall={string.format("%.1f", fall)} speed={string.format("%.1f", Vector3.new(r.AssemblyLinearVelocity.X, 0, r.AssemblyLinearVelocity.Z).Magnitude)}`)
+	local feet = r.Position - Vector3.new(0, feetReach(h, r) - 0.1, 0)
+	local hl = prof.heavyLanding
+	if hl and fall >= hl.minFall then
+		landSlowUntil = now + hl.slowTime
+		landSlowMult = hl.slowMult
+		PlayerAnimator.heavyLand(player, math.clamp(fall / (hl.minFall * 2), 0.5, 1))
+		shockwave(feet, M.ShockwaveMaxRadius * math.clamp(fall / (hl.minFall * 3), 0.5, 1))
+		cameraShake(hl.shake * math.clamp(fall / (hl.minFall * 2), 0.5, 1))
+	elseif fall >= M.ShockwaveMinFall then
+		shockwave(feet, M.ShockwaveMaxRadius * math.clamp(fall / (M.ShockwaveMinFall * 3), 0.4, 1))
+		cameraShake(0.35)
+	end
+
+	-- Entrées tamponnées : le saut d'abord, sinon la glissade (Glisser maintenu ou pressé juste avant).
+	if now - jumpPressedAt <= M.JumpBuffer then
+		task.defer(groundJump)
+	elseif held("Slide") or now - slidePressedAt <= M.SlideBuffer then
+		task.defer(startSlide)
 	end
 end
 
 local function onStateChanged(old: Enum.HumanoidStateType, new: Enum.HumanoidStateType)
 	local r = root
 	local now = os.clock()
-	if new == HST.Jumping then
-		jumpedSinceGrounded = true
-		local window = classNumber("bhopWindow", M.BhopWindow)
-		local maxBonus = M.BhopMaxBonus
-		if sliding then
-			-- Jump at the bottom of a slope converts the slide's momentum.
-			local converted = slideVel.Magnitude / math.max(1, baseWalk() * statMult) - 1
-			hopBonus = math.clamp(converted, hopBonus, maxBonus)
-			endSlide()
-			send("Hop")
-		elseif now - landedAt <= window then
-			hopCount += 1
-			local turned = (def and def.bhopNoTurn == true) or lastAirTurn >= M.BhopMinTurnDeg
-			if turned then
-				hopBonus = math.min(maxBonus, hopBonus + M.BhopGainPerHop)
+	if new == HST.Jumping or new == HST.Freefall then
+		if not airborne then
+			airborne = true
+			if r then
+				peakY = r.Position.Y
 			end
-			send("Hop")
-		end
-		airTurn = 0
-		lastYaw = cameraYaw()
-		if r then
-			peakY = r.Position.Y
-		end
-	elseif new == HST.Freefall then
-		if old ~= HST.Jumping and not jumpedSinceGrounded then
-			leftGroundAt = now -- walked off a ledge: coyote clock
-			airTurn = 0
-			lastYaw = cameraYaw()
-		end
-		if r and old ~= HST.Jumping then
-			peakY = r.Position.Y
-		end
-	elseif new == HST.Landed then
-		landedAt = now
-		lastAirTurn = airTurn
-		jumpedSinceGrounded = false
-		leftGroundAt = -math.huge
-		if verifiedGround() then
-			airJumpsLeft = classNumber("airJumps", 0)
-			climbLeft = classNumber("climbTime", 0)
-		end
-		local h = humanoid
-		if r and h then
-			local fall = peakY - r.Position.Y
-			if fall >= M.ShockwaveMinFall then
-				local feet = r.Position - Vector3.new(0, h.HipHeight + r.Size.Y / 2 - 0.1, 0)
-				shockwave(feet, fall / (M.ShockwaveMinFall * 3))
+			if new == HST.Freefall and not jumpedSinceGrounded and now - ourJumpAt > M.CoyoteIgnoreAfterJump then
+				leftGroundAt = now -- quitté un rebord sans sauter : horloge du coyote time
 			end
 		end
-		if now - jumpPressedAt <= M.JumpBuffer then
-			task.defer(forceJump)
-		end
-	elseif new == HST.Running and isAirState(old) then
-		-- Some landings go straight to Running.
-		landedAt = now
-		lastAirTurn = airTurn
-		jumpedSinceGrounded = false
-		if now - jumpPressedAt <= M.JumpBuffer then
-			task.defer(forceJump)
+	elseif new == HST.Landed or new == HST.Running or new == HST.RunningNoPhysics then
+		if isAirState(old) or airborne then
+			onLanded()
 		end
 	end
 end
 
--- ---------------------------------------------------------------- per-frame
-
-local function wallAhead(): boolean
-	local h, r = humanoid, root
-	if not h or not r then
-		return false
-	end
-	local look = r.CFrame.LookVector
-	local flat = Vector3.new(look.X, 0, look.Z)
-	if flat.Magnitude < 1e-3 then
-		return false
-	end
-	local hit = Workspace:Raycast(r.Position, flat.Unit * M.ClimbProbe, rayParams)
-	if not hit or math.abs(hit.Normal.Y) >= 0.3 then
-		return false
-	end
-	return h.MoveDirection:Dot(-hit.Normal) > 0.3
-end
+-- ---------------------------------------------------------------- image par image
 
 local function step(dt: number)
 	local h, r = humanoid, root
@@ -434,7 +563,6 @@ local function step(dt: number)
 	end
 	applyWalkSpeed()
 
-	-- Low gravity: constant upward force = mass * g * (1 - mult).
 	local gf = gravityForce
 	if gf then
 		gf.Force = Vector3.new(0, r.AssemblyMass * Workspace.Gravity * (1 - gravityMult()), 0)
@@ -445,40 +573,44 @@ local function step(dt: number)
 	end
 
 	local state = h:GetState()
-	local airborne = isAirState(state)
 	local now = os.clock()
-
-	if airborne then
+	if isAirState(state) then
 		peakY = math.max(peakY, r.Position.Y)
-		local yaw = cameraYaw()
-		if yaw and lastYaw then
-			local d = yaw - lastYaw
-			d = (d + math.pi) % (2 * math.pi) - math.pi
-			airTurn += math.abs(math.deg(d))
-		end
-		lastYaw = yaw
-
-		local InputController = Registry.find("InputController")
-		local jumpHeld = InputController ~= nil and InputController.isDown("Jump")
-		local v = r.AssemblyLinearVelocity
-		if jumpHeld and climbLeft > 0 and wallAhead() then
-			climbLeft -= dt
-			r.AssemblyLinearVelocity = Vector3.new(v.X, M.ClimbSpeed, v.Z)
-		elseif jumpHeld and def and def.glide == true and v.Y < -M.GlideFallSpeed then
-			r.AssemblyLinearVelocity = Vector3.new(v.X, -M.GlideFallSpeed, v.Z)
+		local glide = prof.glide
+		if glide and glideLeft > 0 and held("Jump") then
+			local v = r.AssemblyLinearVelocity
+			if v.Y < -glide.fallSpeed then
+				glideLeft -= dt
+				r.AssemblyLinearVelocity = Vector3.new(v.X, -glide.fallSpeed, v.Z)
+			end
 		end
 	else
-		-- Bunny-hop bonus is lost after the window on the ground, or without move input.
-		if hopBonus > 0 or hopCount > 0 then
-			local window = classNumber("bhopWindow", M.BhopWindow)
-			if (now - landedAt > window and not sliding) or h.MoveDirection.Magnitude < 0.1 then
-				resetHops()
-			end
+		-- Recharge du double saut et du plané une fois vraiment au sol (rayon vérifié, normale du sol).
+		local maxAir = prof.airJumps or 0
+		local maxGlide = if prof.glide then prof.glide.duration else 0
+		if (airJumpsLeft < maxAir or glideLeft < maxGlide) and now - ourJumpAt > M.HopResetDelay and verifiedGround() then
+			airJumpsLeft = maxAir
+			glideLeft = maxGlide
+		end
+	end
+	if not isAirState(state) and (hopBonus > 0 or hopCount > 0) and now - ourJumpAt > M.HopResetDelay then
+		-- Bonus perdu après la fenêtre au sol, ou sans entrée de déplacement.
+		if (now - landedAt > M.BhopWindow and not sliding) or h.MoveDirection.Magnitude < 0.1 then
+			resetHops()
 		end
 	end
 end
 
--- ---------------------------------------------------------------- character binding
+-- ---------------------------------------------------------------- personnage
+
+local function destroyMovers()
+	for _, inst in { slideMover, slideAttachment, gravityForce, gravityAttachment } :: { Instance? } do
+		if inst then
+			inst:Destroy()
+		end
+	end
+	slideMover, slideAttachment, gravityForce, gravityAttachment = nil, nil, nil, nil
+end
 
 local function unbindCharacter()
 	endSlide()
@@ -486,27 +618,20 @@ local function unbindCharacter()
 		c:Disconnect()
 	end
 	table.clear(charConns)
-	if gravityForce then
-		gravityForce:Destroy()
-		gravityForce = nil
-	end
-	if gravityAttachment then
-		gravityAttachment:Destroy()
-		gravityAttachment = nil
-	end
+	destroyMovers()
 	humanoid = nil
 	root = nil
 end
 
 local function refreshGravity()
 	local r = root
-	if gravityMult() < 1 and r then
+	if gravityMult() ~= 1 and r then
 		if not gravityForce then
 			local att = Instance.new("Attachment")
-			att.Name = "LowGravityAttachment"
+			att.Name = "CohueGravityAttachment"
 			att.Parent = r
 			local vf = Instance.new("VectorForce")
-			vf.Name = "LowGravity"
+			vf.Name = "CohueGravity"
 			vf.Attachment0 = att
 			vf.RelativeTo = Enum.ActuatorRelativeTo.World
 			vf.ApplyAtCenterOfMass = true
@@ -525,11 +650,32 @@ local function refreshGravity()
 	end
 end
 
+local function makeSlideMover(r: BasePart)
+	local att = Instance.new("Attachment")
+	att.Name = "CohueSlideAttachment"
+	att.Parent = r
+	local lv = Instance.new("LinearVelocity")
+	lv.Name = "CohueSlide"
+	lv.Attachment0 = att
+	lv.RelativeTo = Enum.ActuatorRelativeTo.World
+	lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Plane
+	lv.PrimaryTangentAxis = Vector3.xAxis
+	lv.SecondaryTangentAxis = Vector3.zAxis
+	lv.ForceLimitsEnabled = true
+	lv.ForceLimitMode = Enum.ForceLimitMode.Magnitude
+	lv.MaxForce = 0
+	lv.Enabled = false
+	lv.Parent = r
+	slideAttachment = att
+	slideMover = lv
+end
+
 local function refreshClass()
-	local classId = player:GetAttribute("ClassId")
-	def = if type(classId) == "string" then Classes[classId] else nil
-	airJumpsLeft = classNumber("airJumps", 0)
-	climbLeft = classNumber("climbTime", 0)
+	local id = player:GetAttribute("ClassId")
+	classId = if type(id) == "string" then id else nil
+	prof = M.profile(classId)
+	airJumpsLeft = prof.airJumps or 0
+	glideLeft = if prof.glide then prof.glide.duration else 0
 	refreshGravity()
 	applyWalkSpeed()
 end
@@ -548,24 +694,28 @@ local function bindCharacter(character: Model)
 	root = r
 	rayParams.FilterDescendantsInstances = { character }
 
-	-- No fall damage / trips (state edits run on the owning client).
+	-- Pas de dégâts de chute ni de chute à plat (les changements d'état se font sur le client propriétaire).
 	h:SetStateEnabled(HST.FallingDown, false)
 	h:SetStateEnabled(HST.Ragdoll, false)
 
 	hopBonus = 0
 	hopCount = 0
+	airborne = false
 	landedAt = -math.huge
 	leftGroundAt = -math.huge
 	jumpPressedAt = -math.huge
 	jumpedSinceGrounded = false
+	slideEndedAt = -math.huge
+	landSlowUntil = 0
 	peakY = r.Position.Y
 
+	makeSlideMover(r)
 	table.insert(charConns, h.StateChanged:Connect(onStateChanged))
 	table.insert(charConns, h.Died:Connect(endSlide))
 	refreshClass()
 end
 
--- ---------------------------------------------------------------- lifecycle
+-- ---------------------------------------------------------------- API
 
 function MovementController.isSliding(): boolean
 	return sliding
@@ -575,23 +725,35 @@ function MovementController.getHopBonus(): number
 	return hopBonus
 end
 
+-- Lecture pour les tests et le HUD de debug.
+function MovementController.getDebug(): { [string]: any }
+	local r = root
+	local v = if r then r.AssemblyLinearVelocity else Vector3.zero
+	return {
+		classId = classId,
+		speed = Vector3.new(v.X, 0, v.Z).Magnitude,
+		walkSpeed = if humanoid then humanoid.WalkSpeed else 0,
+		hopBonus = hopBonus,
+		hopCount = hopCount,
+		sliding = sliding,
+		airborne = airborne,
+		state = if humanoid then humanoid:GetState().Name else "none",
+	}
+end
+
 function MovementController.init()
-	for _ = 1, 2 do
+	for _ = 1, 3 do
 		table.insert(shockPool, makeShockPart())
 	end
 end
 
 function MovementController.start()
-	local InputController = Registry.find("InputController")
-	if InputController then
-		InputController.onAction("Jump", onJumpAction)
-		InputController.onAction("Slide", function(pressed: boolean)
-			if pressed then
-				startSlide()
-			end
-		end)
+	local ic = input()
+	if ic then
+		ic.onAction("Jump", onJumpAction)
+		ic.onAction("Slide", onSlideAction)
 	else
-		warn("[MovementController] InputController missing: slide/double jump disabled")
+		warn("[MovementController] InputController missing: jump and slide disabled")
 	end
 
 	player:GetAttributeChangedSignal("ClassId"):Connect(refreshClass)
@@ -602,8 +764,44 @@ function MovementController.start()
 	end
 
 	RunService.PreSimulation:Connect(step)
+	PlayerAnimator.start(MovementController)
 
-	-- Remotes last (they may wait for the server folder).
+	if IS_STUDIO then
+		-- Point d'inspection pour les tests MCP : ("state") / ("log") / ("trigger", action, pressed) /
+		-- ("cam", distance, pitch).
+		local bf = Instance.new("BindableFunction")
+		bf.Name = "CohueMoveDebug"
+		bf.OnInvoke = function(cmd: any, a: any, b: any): any
+			if cmd == "log" then
+				local out = table.concat(debugLog, "\n")
+				table.clear(debugLog)
+				return out
+			elseif cmd == "cam" then
+				local cam = Registry.find("CameraController")
+				if cam then
+					cam.setDistance(a)
+					cam.setPitch(b)
+				end
+				return true
+			elseif cmd == "trigger" then
+				local ic = input()
+				if ic then
+					ic.trigger(a, b == true)
+				end
+				return true
+			end
+			local d = MovementController.getDebug()
+			local cam = Registry.find("CameraController")
+			if cam then
+				d.camYaw = math.deg(cam.getYaw())
+				d.camDistance = cam.getDistance()
+			end
+			return d
+		end
+		bf.Parent = player
+	end
+
+	-- Remotes en dernier (elles peuvent attendre le dossier du serveur).
 	moveEvent = Net.event("MoveEvent")
 	Net.event("Build").OnClientEvent:Connect(function(payload: any)
 		if type(payload) ~= "table" or type(payload.stats) ~= "table" then
