@@ -31,10 +31,10 @@ local Rarities = {
 	} :: { [string]: Color3 },
 
 	Name = {
-		Common = { fr = "Commun", en = "Common" },
-		Rare = { fr = "Rare", en = "Rare" },
-		Epic = { fr = "Épique", en = "Epic" },
-		Legendary = { fr = "Légendaire", en = "Legendary" },
+		Common = { en = "Common", fr = "Common" },
+		Rare = { en = "Rare", fr = "Rare" },
+		Epic = { en = "Epic", fr = "Epic" },
+		Legendary = { en = "Legendary", fr = "Legendary" },
 	} :: { [string]: { fr: string, en: string } },
 }
 

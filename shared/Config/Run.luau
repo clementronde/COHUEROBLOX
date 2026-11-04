@@ -60,6 +60,11 @@ local Run = {
 	ArenaStartSeconds = 20,
 	FarmSeconds = 60, -- fenêtre après un boss (sauf le dernier) avant le téléport automatique
 	PortalRadius = 8,
+	-- Les portails (NEXT WORLD, CASH OUT) s'ouvrent à PortalOffset studs du centre de l'arène, là où
+	-- le boss est mort, et n'acceptent personne pendant PortalGrace s : on ne part jamais par accident
+	-- en tuant le boss au corps à corps.
+	PortalOffset = 26,
+	PortalGrace = 4,
 	PhaseDensity = { Running = 1, Boss = 0.4, BossDefeated = 1, FinalWave = 1 } :: { [string]: number },
 	DifficultyDensityShare = 0.5, -- Rune Cursed : densité x (1 + Difficulty moyenne x part)
 
@@ -106,6 +111,9 @@ local Run = {
 
 	Debug = {
 		AllowAnyStageInStudio = true,
+		-- Studio seulement (jamais en ligne) : BindableFunction ServerStorage.CohueRunDebug pour les
+		-- tests (barre de commande) : avancer le chrono, donner de l'XP, tuer le boss...
+		StudioCommands = true,
 	},
 }
 

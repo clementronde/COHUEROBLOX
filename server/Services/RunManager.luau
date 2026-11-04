@@ -74,6 +74,7 @@ local state = {
 	bossSpawned = false,
 	bossDefeated = false,
 	farmEndsAt = 0,
+	portalOpensAt = 0, -- les portails n'acceptent personne avant (Run.PortalGrace)
 	portal = nil :: Vector3?,
 	wavesDone = {} :: { [number]: boolean },
 	miniBossDone = {} :: { [number]: boolean },
@@ -462,8 +463,8 @@ local function startStage(stage: number)
 	director({ active = true, densityMult = 1, hpMult = 1, damageMult = 1, eliteShare = Run.EliteChance, eliteMaxAlive = Run.EliteMaxAlive })
 	local world = Worlds[state.worldId]
 	announce("StageStart", {
-		fr = `Monde {stage}/{worldCount()} — {world.name.fr}`,
 		en = `World {stage}/{worldCount()} — {world.name.en}`,
+		fr = `World {stage}/{worldCount()} — {world.name.en}`,
 	}, 3)
 	if runId == state.runId then
 		Bus.StageStarted:fire(stage, state.worldId)
@@ -585,11 +586,11 @@ local function endRun(victory: boolean)
 		safe(stageService.stopHazard)
 	end
 	if state.cashedOut then
-		announce("CashOut", { fr = "Encaissé ! Gains sauvés.", en = "Cashed out! Rewards saved." }, 4)
+		announce("CashOut", { en = "Cashed out! Rewards saved.", fr = "Cashed out! Rewards saved." }, 4)
 	elseif victory then
-		announce("Victory", { fr = "Victoire !", en = "Victory!" }, 4)
+		announce("Victory", { en = "Victory!", fr = "Victory!" }, 4)
 	else
-		announce("Defeat", { fr = "Défaite...", en = "Defeat..." }, 4)
+		announce("Defeat", { en = "Defeat...", fr = "Defeat..." }, 4)
 	end
 
 	local summaries: { [Player]: Types.RunSummary } = {}
@@ -647,8 +648,8 @@ local function goDown(r: PlayerRun)
 	setLifeAttributes(r)
 	Bus.PlayerDowned:fire(r.player)
 	announce("Downed", {
-		fr = `{r.player.DisplayName} est à terre !`,
 		en = `{r.player.DisplayName} is down!`,
+		fr = `{r.player.DisplayName} is down!`,
 	}, 2.5)
 end
 
@@ -666,8 +667,8 @@ local function revive(r: PlayerRun, rescuer: Player)
 	end
 	Bus.PlayerRevived:fire(r.player, rescuer)
 	announce("Revived", {
-		fr = `{rescuer.DisplayName} relève {r.player.DisplayName} !`,
 		en = `{rescuer.DisplayName} revived {r.player.DisplayName}!`,
+		fr = `{rescuer.DisplayName} revived {r.player.DisplayName}!`,
 	}, 2)
 end
 
@@ -681,8 +682,8 @@ local function becomeGhost(r: PlayerRun)
 	setLifeAttributes(r)
 	Bus.PlayerDied:fire(r.player)
 	announce("Died", {
-		fr = `{r.player.DisplayName} devient un fantôme`,
 		en = `{r.player.DisplayName} became a ghost`,
+		fr = `{r.player.DisplayName} became a ghost`,
 	}, 2.5)
 end
 
@@ -839,7 +840,7 @@ local function spawnMiniBoss()
 	local a = math.random() * math.pi * 2
 	local world = Worlds[state.worldId]
 	safe(enemies.spawnAt, world.miniBoss, root.Position.X + math.cos(a) * 55, root.Position.Z + math.sin(a) * 55, { elite = true })
-	announce("MiniBoss", { fr = "Un mini-boss approche !", en = "A mini-boss approaches!" }, 3)
+	announce("MiniBoss", { en = "A mini-boss approaches!", fr = "A mini-boss approaches!" }, 3)
 end
 
 local function startBossFight()
@@ -914,7 +915,7 @@ function startOvertime(t: number)
 	state.overtimeFrozen = false
 	setPhase("FinalWave")
 	Bus.FinalWaveStarted:fire()
-	announce("Overtime", { fr = "PROLONGATIONS ! Les ennemis se renforcent toutes les 30 s", en = "OVERTIME! Enemies get stronger every 30 s" }, 4)
+	announce("Overtime", { en = "OVERTIME! Enemies get stronger every 30 s", fr = "OVERTIME! Enemies get stronger every 30 s" }, 4)
 end
 
 function stepOvertime(t: number)
@@ -927,7 +928,7 @@ function stepOvertime(t: number)
 	if k > state.overtimeStep then
 		state.overtimeStep = k
 		state.stateDirty = true
-		announce("OvertimeStep", { fr = `Prolongations niveau {k} !`, en = `Overtime level {k}!` }, 2)
+		announce("OvertimeStep", { en = `Overtime level {k}!`, fr = `Overtime level {k}!` }, 2)
 	end
 	-- Pièces de survie, une fois par palier atteint
 	if state.overtimeStep > state.coinsStep then
@@ -1048,7 +1049,7 @@ local function stepRun(dt: number)
 					local size = wave.size * (1 + Balance.DensityPerExtraPlayer * (#runPlayers - 1))
 					safe(enemies.burst, math.floor(size), wave.spawnSeconds)
 				end
-				announce("Wave", { fr = "Vague renforcée !", en = "Wave incoming!" }, 3)
+				announce("Wave", { en = "Wave incoming!", fr = "Wave incoming!" }, 3)
 			end
 		end
 		for index, at in Run.MiniBossAt do
@@ -1066,15 +1067,15 @@ local function stepRun(dt: number)
 			state.bossRevealed = true
 			state.stateDirty = true
 			Bus.BossRevealed:fire(arche)
-			announce("ArcheRevealed", { fr = "L'Arche du boss est trouvée !", en = "The boss Arch has been found!" }, 3)
+			announce("ArcheRevealed", { en = "The boss Arch has been found!", fr = "The boss Arch has been found!" }, 3)
 		end
 		if state.bossRevealed and not state.bossSpawned then
 			if not state.arenaEnterAt and anyActiveNear(arche, Run.ArenaRadius) then
 				state.arenaEnterAt = t
 				state.stateDirty = true
 				announce("ArenaCountdown", {
-					fr = `Le combat commence dans {Run.ArenaStartSeconds} s`,
 					en = `The fight starts in {Run.ArenaStartSeconds} s`,
+					fr = `The fight starts in {Run.ArenaStartSeconds} s`,
 				}, 3)
 			end
 			if state.arenaEnterAt and (allActiveNear(arche, Run.ArenaRadius) or t - state.arenaEnterAt >= Run.ArenaStartSeconds) then
@@ -1095,7 +1096,8 @@ local function stepRun(dt: number)
 	-- Boss tué (hors dernier monde) : fenêtre de farm, puis portail vers le monde suivant.
 	if state.phase == "BossDefeated" and not state.victory then
 		local portal = state.portal
-		local go = t >= state.farmEndsAt or (portal ~= nil and allActiveNear(portal, Run.PortalRadius))
+		local go = t >= state.farmEndsAt
+			or (portal ~= nil and t >= state.portalOpensAt and allActiveNear(portal, Run.PortalRadius))
 		if go then
 			startStage(state.stage + 1)
 		end
@@ -1104,7 +1106,7 @@ local function stepRun(dt: number)
 	-- Après la victoire : Cash out quand tous les joueurs actifs sont dans le portail doré.
 	local cashOut = state.cashOut
 	if state.victory and cashOut then
-		if allActiveNear(cashOut, Run.CashOut.Radius) then
+		if t >= state.portalOpensAt and allActiveNear(cashOut, Run.CashOut.Radius) then
 			state.cashOutHold += dt
 			if state.cashOutHold >= Run.CashOut.HoldSeconds then
 				state.cashedOut = true
@@ -1121,8 +1123,13 @@ local function onBossDefeated(_bossId: string, _stage: number)
 		return
 	end
 	state.bossDefeated = true
+	state.portalOpensAt = now() + Run.PortalGrace
 	local arche = state.arche
-	local portal = if arche then Vector3.new(arche.X, Heightmap.getY(arche.X, arche.Z), arche.Z) else nil
+	local portal: Vector3? = nil
+	if arche then
+		local x, z = arche.X, arche.Z + Run.PortalOffset
+		portal = Vector3.new(x, Heightmap.getY(x, z), z)
+	end
 	local stageService = find("StageService")
 	if stageService then
 		safe(stageService.stopHazard)
@@ -1137,8 +1144,8 @@ local function onBossDefeated(_bossId: string, _stage: number)
 			safe(stageService.showCashOut, portal)
 		end
 		announce("Victory", {
-			fr = "VICTOIRE ! Entrez dans le portail doré pour encaisser, ou continuez pour plus de KO",
 			en = "VICTORY! Step into the gold portal to Cash out, or keep going for more KOs",
+			fr = "VICTORY! Step into the gold portal to Cash out, or keep going for more KOs",
 		}, 6)
 		if state.finalWaveStart then
 			setPhase("FinalWave")
@@ -1155,8 +1162,8 @@ local function onBossDefeated(_bossId: string, _stage: number)
 			safe(stageService.showPortal, portal)
 		end
 		announce("Portal", {
-			fr = `Portail ouvert ! Monde suivant dans {Run.FarmSeconds} s (ou entrez dans le portail)`,
 			en = `Portal open! Next world in {Run.FarmSeconds} s (or step into the portal)`,
+			fr = `Portal open! Next world in {Run.FarmSeconds} s (or step into the portal)`,
 		}, 4)
 	end
 	state.stateDirty = true
@@ -1454,7 +1461,91 @@ function RunManager.init()
 	end)
 end
 
+-- Commandes de test (Studio seulement, Run.Debug.StudioCommands). Depuis la barre de commande :
+--   game.ServerStorage.CohueRunDebug:Invoke("state")
+--   :Invoke("skip", 590)        avance le chrono du monde de 590 s
+--   :Invoke("xp", 500)          donne 500 XP à chaque joueur de la run
+--   :Invoke("weapon", "Longbow", 8)   ajoute / monte une arme
+--   :Invoke("rune", "Damage", 5)      ajoute / monte une Rune
+--   :Invoke("arche")            téléporte l'équipe à l'Arche (boss)
+--   :Invoke("killboss")         inflige des dégâts énormes au boss
+--   :Invoke("world", 3)         saute au monde 3
+-- Rien de tout ça n'existe hors Studio : aucun remote, aucun accès client.
+local function installStudioCommands()
+	if not (RunService:IsStudio() and Run.Debug.StudioCommands) then
+		return
+	end
+	local fn = Instance.new("BindableFunction")
+	fn.Name = "CohueRunDebug"
+	fn.OnInvoke = function(cmd: string, a: any, b: any): any
+		local stats = find("StatsService")
+		if cmd == "skip" and type(a) == "number" then
+			state.stageStart -= a
+			if state.finalWaveStart then
+				state.finalWaveStart -= a
+			end
+			local enemies = find("EnemyService")
+			if enemies and enemies._debugSkip then
+				enemies._debugSkip(a)
+			end
+			return timeLeft()
+		elseif cmd == "xp" and type(a) == "number" and stats then
+			for _, p in runPlayers do
+				stats.addXp(p, a)
+			end
+			return true
+		elseif cmd == "weapon" and type(a) == "string" and stats then
+			for _, p in runPlayers do
+				stats.upgradeWeapon(p, a, if type(b) == "number" then b else 1, 0)
+			end
+			return true
+		elseif cmd == "rune" and type(a) == "string" and stats then
+			for _, p in runPlayers do
+				stats.upgradeGrimoire(p, a, if type(b) == "number" then b else 1)
+			end
+			return true
+		elseif cmd == "arche" and state.arche then
+			local arche = state.arche :: Vector3
+			for i, p in runPlayers do
+				local x, z = arche.X + i * 4, arche.Z + 12
+				teleport(p, Vector3.new(x, Heightmap.getY(x, z), z))
+			end
+			return true
+		elseif cmd == "killboss" then
+			local boss = find("BossService")
+			local enemies = find("EnemyService")
+			local entity = boss and (boss :: any)._entityId and (boss :: any)._entityId()
+			if entity and enemies then
+				return enemies.damage(entity, 1e9, runPlayers[1])
+			end
+			return "no boss"
+		elseif cmd == "world" and type(a) == "number" then
+			startStage(math.clamp(math.floor(a), 1, worldCount()))
+			return state.stage
+		end
+		local kills = {}
+		for _, p in runPlayers do
+			kills[p.Name] = if stats then stats.getKills(p) else 0
+		end
+		return {
+			phase = state.phase,
+			world = state.stage,
+			worldId = state.worldId,
+			timeLeft = timeLeft(),
+			overtime = state.finalWaveStart ~= nil,
+			overtimeSeconds = state.finalWaveSeconds,
+			overtimeStep = state.overtimeStep,
+			victory = state.victory,
+			cashedOut = state.cashedOut,
+			kills = kills,
+			enemies = (find("EnemyService") and find("EnemyService").getCount()) or 0,
+		}
+	end
+	fn.Parent = game:GetService("ServerStorage")
+end
+
 function RunManager.start()
+	installStudioCommands()
 	for _, player in Players:GetPlayers() do
 		getRecord(player)
 		player.CharacterAdded:Connect(function(character)

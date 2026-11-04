@@ -6,44 +6,56 @@ Tous les nombres ci-dessous vivent dans `shared/Config/{Run,Worlds,Enemies,Bosse
 
 ---
 
-## 1. Machine à états de la run
+## 1. Machine à états de la run (v2, A04-02)
 
-`Types.RunPhase = "Loadout" | "Running" | "Boss" | "BossDefeated" | "FinalWave" | "Ended"`
+Source : `01-decisions-v2.md` section 2 (remplace la v1 : tiers et stages sont remplacés par des **mondes enchaînés**).
+
+`Types.RunPhase = "Loadout" | "Running" | "Boss" | "BossDefeated" | "FinalWave" | "Ended"`. La phase du contrat `FinalWave` porte l'**Overtime** (le HUD lit déjà `finalWaveSeconds` comme un chrono qui monte) ; `RunState.overtime` le dit en clair.
 
 ```
-Loadout ──(tous les joueurs ont un loadout, ou délai)──> Running (stage 1, chrono 10:00)
+Loadout ──(tous les joueurs ont un loadout, ou délai)──> Running (monde 1, chrono 10:00)
 Running ──(Arche trouvée, joueurs dans l'arène ou 20 s)──> Boss
-Running ──(chrono 0)──> FinalWave
-Boss ──(boss vaincu)──> BossDefeated (60 s de farm, portail ouvert)
-Boss ──(chrono 0)──> FinalWave (le boss reste en vie et reste tuable)
-FinalWave ──(boss vaincu)──> BossDefeated
-BossDefeated ──(portail, stage < nb de stages du tier)──> Running (stage suivant, chrono 10:00)
-BossDefeated ──(portail, dernier stage)──> Ended (victoire)
-toute phase ──(plus aucun joueur actif ni à terre)──> Ended (défaite)
-Ended ──(Replay de tous, ou 10 s après le premier Replay)──> Running (même monde / tier, stage 1)
+Running / Boss ──(chrono 0:00)──> FinalWave = Overtime (le chrono monte, le boss reste tuable)
+Boss / Overtime ──(boss vaincu, monde < WorldsPerRun)──> BossDefeated (portail NEXT WORLD, 60 s)
+BossDefeated ──(tous dans le portail, ou 60 s)──> Running (monde suivant, chrono 10:00, nouvelle carte)
+Boss / Overtime ──(boss du dernier monde vaincu)──> Victory : FinalWave (Overtime infini) + portail CASH OUT
+Victory ──(tous les joueurs actifs dans le portail doré 2 s)──> Ended (victoire, cashedOut)
+toute phase ──(plus aucun joueur actif)──> Ended (défaite, ou victoire si le dernier boss est tombé)
+Ended ──(Replay de tous, ou 10 s après le premier Replay)──> Running (monde 1)
 ```
 
-| Id | Valeur | Rôle |
+| Id (`Config/Run`) | Valeur | Rôle |
 | --- | --- | --- |
-| `StageSeconds` | 600 s | Chrono par stage (10:00), remis à 10:00 à chaque stage |
-| `Waves` | à 360 s et 180 s restantes | Vagues renforcées : bandeau + son, 40 ennemis (× densité coop) en 4 s, densité ×1,3 pendant 45 s |
-| `ArcheRevealRadius` | 25 studs | Le premier joueur actif à moins de 25 studs de l'Arche la révèle à toute l'équipe (`Bus.BossRevealed`, `RunState.bossRevealed`, flèche HUD) |
+| `WorldsPerRun` | 3 | Nombre de mondes par run. **Réglage** : Clément doit encore confirmer l'enchaînement |
+| `WorldChain` | `BoisGrognon` ×3 | Monde de chaque étape. Vague 1 : on rejoue le stage existant (nouvelle graine, nouvelle carte) avec un paramètre de monde. Vague 2 : ids des mondes 2 et 3 |
+| `WorldScaling` | PV ×1 / ×1,8 / ×3 ; dégâts ×1 / ×1,35 / ×1,8 ; vitesse ×1 / ×1,05 / ×1,1 ; densité ×1 / ×1,15 / ×1,3 ; PV du boss ×1 / ×1,8 / ×3 | Force des ennemis par monde (remplace `TierHp`, `StageHpPer`…) |
+| `StageSeconds` | 600 s | Chrono par monde (10:00), remis à 10:00 à chaque monde |
+| `Overtime.StepSeconds` | 30 s | Un palier d'escalade toutes les 30 s d'Overtime |
+| `Overtime.SpawnPerStep` | +15 % | Densité voulue ×(1 + 0,15 k) |
+| `Overtime.HpPerStep` | +20 % | PV des ennemis qui apparaissent ×(1 + 0,20 k) |
+| `Overtime.DamagePerStep` | +10 % | Dégâts ennemis ×(1 + 0,10 k) |
+| `Overtime.ElitePointsPerStep` | +3 points | Part d'élites = `EliteChance` (0,5 %) + 3 % × k ; en Overtime le plafond d'élites vivantes saute |
+| `Overtime.Compound` | `false` | `true` : ×1,15^k au lieu de ×(1 + 0,15 k). Linéaire par défaut pour que le Keep going reste farmable longtemps |
+| `Overtime.CoinsPerStep` | 10 × monde | Pièces de survie par palier et par joueur actif |
+| `Overtime.OverflowToHp` | `true` | Au-delà du plafond technique `Balance.MaxEnemies` (300), l'excès de densité devient des PV : PV × (densité voulue / 300). Le joueur voit des ennemis plus forts, pas plus nombreux |
+| `CashOut.Radius` / `HoldSeconds` | 10 studs / 2 s | Tous les joueurs actifs dans le portail doré pendant 2 s = Cash out pour toute l'équipe |
+| `Waves` | à 360 s et 180 s restantes | Vagues renforcées : 40 ennemis (× densité coop) en 4 s, densité ×1,3 pendant 45 s |
+| `ArcheRevealRadius` | 25 studs | Le premier joueur actif à moins de 25 studs de l'Arche la révèle à toute l'équipe |
 | `ArenaRadius` | 60 studs | Arène centrée sur l'Arche |
-| `ArenaStartSeconds` | 20 s | Le combat démarre quand tous les joueurs actifs sont dans l'arène, ou 20 s après l'entrée du premier ; les retardataires sont téléportés au bord de l'arène |
-| `FarmSeconds` | 60 s | Fenêtre de farm après la mort du boss ; le portail est ouvert dès la mort |
-| `PortalRadius` | 8 studs | Tous les joueurs actifs dans le portail = départ immédiat ; sinon départ automatique à 60 s |
-| `FinalWaveCoinsPer30s` | 20 × tier | Monnaie versée à chaque joueur actif par tranche de 30 s survécue en Vague Finale (`LootService.addCoins`) |
-| `FinalWaveHpRamp` | +15 % PV ennemis / 30 s | La Vague Finale étouffe |
-| `LoadoutTimeout` | 45 s (5 s en Studio) | Passé ce délai, un joueur sans loadout reçoit `Cornu` + `Braise` |
+| `ArenaStartSeconds` | 20 s | Le combat démarre quand tous les joueurs actifs sont dans l'arène, ou 20 s après l'entrée du premier |
+| `FarmSeconds` | 60 s | Fenêtre après un boss (hors dernier monde) ; l'escalade d'Overtime est gelée jusqu'au portail |
+| `PortalRadius` | 8 studs | Tous les joueurs actifs dans le portail = départ immédiat |
+| `DifficultyDensityShare` | 0,5 | Rune Cursed : PV ennemis ×(1 + Difficulty moyenne), densité ×(1 + 0,5 × Difficulty moyenne) |
+| `LoadoutTimeout` | 45 s (5 s en Studio) | Passé ce délai, un joueur sans loadout reçoit `Knight` + `Braise` |
 | `ReplayTimeout` | 10 s | Rejouer : relance quand tout le monde a appuyé, ou 10 s après le premier |
 
-Tier = nombre de stages : T1 = 1 stage, T2 = 2 stages, T3 = 3 stages. Le stage 3 du T3 est le **boss final de monde**.
+**Après le boss du dernier monde** : bannière `Victory`, portail doré **CASH OUT** sur l'arène. Rester dedans = fin de run, gains sauvés (`RunSummary.cashedOut = true`). S'en éloigner = **Keep going** : l'Overtime continue sans fin (ou démarre tout de suite si le chrono n'était pas à zéro). Mourir après la victoire termine la run en victoire (le dernier boss est tombé).
 
-**Vague Finale** : densité cible = plafond (300), PV ×(1 + 0,15 par 30 s), pièces toutes les 30 s. Elle s'arrête si le boss meurt (passage en `BossDefeated`) ; sinon la run finit quand tout le monde est mort. Les secondes survécues vont dans `RunSummary.finalWaveSeconds`.
+**Boss** (décisions v2 section 6) : `Bosses.PhaseEnabled = false` (plus de phases 66 / 33 %), télégraphes de 1 s minimum (`Bosses.MinTelegraph`), le Grand Chêne garde 3 attaques (Quake Roots, Acorn Rain, Bark Wave). Plus d'enrage automatique ; seul le défi d'autel rend le boss furieux.
 
 **Flux à une place** (ARCHITECTURE section 7) : `Config.Run.UseLobbyPlace = false`. RunManager écoute aussi `SelectLoadout` (le handler de données traite le choix, RunManager note seulement que le joueur est prêt, puis lit `ProgressionService.getLoadout`). Solo : départ immédiat. MatchService (domaine data) lit `UseLobbyPlace`.
 
-Choix monde / tier : remote interne `SelectStage (C→S) (worldId, tier)` (fichier `shared/NetDefs/Run.luau`), vérifié par `ProgressionService.isStageUnlocked` s'il existe, sinon seul `BoisGrognon` T1 est accepté hors Studio (`Run.Debug.AllowAnyStageInStudio`).
+`SelectStage (C→S) (worldId, tier)` reste écouté (pour ne pas casser l'UI v1) mais n'a plus d'effet : la run part toujours du monde 1 de `WorldChain`.
 
 ## 2. Joueurs : PV, dégâts, coop
 
@@ -53,11 +65,12 @@ Ordre appliqué (serveur, une seule fonction, d'après « Downed, Revive and Ble
 
 1. Joueur non actif (à terre, fantôme, hors run) → 0.
 2. Invulnérable (`setInvulnerable`, choix de carte, relève) → 0.
-3. **Esquive** : `random() < min(Dodge, 0,6)` → 0 (plafond `DodgeCap = 0,6`).
-4. **Armure** : `dégâts × 100 / (100 + Armor)` (rendements décroissants ; 100 d'armure = −50 %).
-5. **Bouclier** : absorbe d'abord (`shield`), le reste va aux PV.
-6. **PV** : si PV ≤ 0 → **à terre** (jamais de mort du Humanoid).
-7. Retourne les dégâts réellement pris (bouclier + PV), fire `Bus.PlayerDamaged`.
+3. **Parade** (Knight / Valor) : un coup annulé toutes les 8 s (`PassiveService.tryBlock`).
+4. **Esquive** : `random() < min(Dodge, 0,6)` → 0 (plafond `DodgeCap = 0,6`).
+5. **Armure** : `dégâts × 100 / (100 + Armor)` (rendements décroissants ; 100 d'armure = −50 %).
+6. **Bouclier** : absorbe d'abord (`shield`), le reste va aux PV.
+7. **PV** : si PV ≤ 0 → **à terre** (jamais de mort du Humanoid).
+8. Retourne les dégâts réellement pris (bouclier + PV), fire `Bus.PlayerDamaged(player, taken, source)`. Les épines (Guardian, objets) ne répondent qu'à `source == "Contact"` (mêlée), dans PassiveService.
 
 | Stat | Base (sans StatsService) | Source |
 | --- | --- | --- |
@@ -255,16 +268,25 @@ Stage 2 des T2/T3 : le boss du monde en version **Furieux** (PV ×1,6, cooldowns
 
 Mort du boss : `Bus.BossDefeated(bossId, stage)`, un coffre `Boss` par joueur (`LootService.spawnChest(x, z, "Boss", player)`), passage en `BossDefeated`.
 
-## 6. Mode Survie (drapeau `Run.SurvivalEnabled = false`)
+## 6. Compteur de KO (A04-03)
 
-Horde infinie, pas d'Arche ni de boss. Chrono croissant. **Palier toutes les 2 min** : PV ennemis ×1,3 par palier, dégâts ×1,15, densité +12 % (plafond 300), une élite toutes les 60 s, un mini-boss toutes les 4 min, pièces toutes les 30 s comme la Vague Finale. Fin quand tout le monde est mort ; `finalWaveSeconds` = temps survécu.
+Pilier du jeu : le **classement hebdo du plus grand nombre de KO en une run**. Les KO sont comptés par le serveur uniquement.
+
+- Source unique : `Bus.EnemyKilled(id, kind, x, z, killer, isElite)`, tiré par `EnemyService.damage` quand un ennemi meurt. `killer` est le `source: Player` passé par le code serveur (armes, brûlure, poison, épines, passifs, compagnons). Aucun remote client ne touche au compteur.
+- `StatsService.getKills(player)`, `getEliteKills(player)`, `getRunKills() -> { [Player]: number }` ; remis à 0 par `resetRun`.
+- `Bus.KOScored(player, runKills, enemyKind, isElite)` à chaque KO (quêtes, classement, effets de KO).
+- Attribut joueur `RunKills` (serveur, répliqué, mis à jour à 5 Hz) et champ `kills` de `PlayerProgress` pour le HUD.
+- Fin de run : `RunSummary.kills` (lu chez StatsService) dans `Bus.RunEnded` : c'est la valeur que le domaine data envoie au classement.
+- Le boss compte pour 1 KO. Les ennemis retirés sans mort (changement de monde, recyclage) ne comptent pas.
+
+L'ancien mode Survie v1 est retiré : le **Keep going** après le dernier boss le remplace.
 
 ## 7. Remotes
 
 | Remote | Sens | Contenu |
 | --- | --- | --- |
-| `RunState` | S→C | contrat + changement et toutes les 1 s ; champ ajouté `mode` |
-| `Announce` | S→C | `{ kind, text, duration }` ; kinds : `Wave`, `ArcheRevealed`, `ArenaCountdown`, `BossStart`, `BossPhase`, `BossDefeated`, `Portal`, `FinalWave`, `FinalWaveCoins`, `Hazard`, `Downed`, `Revived`, `Died`, `Elite`, `MiniBoss`, `Weakness`, `SurvivalTier` |
+| `RunState` | S→C | contrat + changement et toutes les 1 s ; champs v2 : `worldIndex`, `worldCount`, `overtime`, `overtimeSeconds`, `overtimeStep`, `victory`, `cashOutPosition` (`stage` = `worldIndex`, `tier` = 1) |
+| `Announce` | S→C | `{ kind, text, duration }` ; kinds : `StageStart`, `Wave`, `ArcheRevealed`, `ArenaCountdown`, `BossStart`, `BossDefeated`, `Portal`, `Overtime`, `OvertimeStep`, `Victory`, `CashOut`, `Defeat`, `Hazard`, `Downed`, `Revived`, `Died`, `Elite`, `MiniBoss` |
 | `PlayerVitals` | S→C | contrat ; le même paquet contient `team` |
 | `BossState` | S→C | contrat + `telegraphs`, `stunned` |
 | `RunSummary` | S→C | `Types.RunSummary` après `ProgressionService.grantRunRewards` |

@@ -35,28 +35,29 @@ Grimoires.Order = {
 	"Cursed",
 } :: { string }
 
-local function rune(id: string, en: string, fr: string, descEn: string, descFr: string, maxLevel: number, perLevel: { [string]: number }, byLevel: { [string]: { number } }?): GrimoireDef
-	return { id = id, name = { en = en, fr = fr }, desc = { en = descEn, fr = descFr }, maxLevel = maxLevel, perLevel = perLevel, byLevel = byLevel }
+-- Texte joueur : anglais seul (décisions v2 section 1) ; noms français dans le dossier 10 section 6.
+local function rune(id: string, name: string, desc: string, maxLevel: number, perLevel: { [string]: number }, byLevel: { [string]: { number } }?): GrimoireDef
+	return { id = id, name = { en = name, fr = name }, desc = { en = desc, fr = desc }, maxLevel = maxLevel, perLevel = perLevel, byLevel = byLevel }
 end
 
 Grimoires.Defs = {
-	Damage = rune("Damage", "Damage Rune", "Rune de dégâts", "+8% damage per level", "+8 % de dégâts par niveau", 8, { Damage = 0.08 }),
-	AttackSpeed = rune("AttackSpeed", "Attack Speed Rune", "Rune de vitesse d'attaque", "+7% attack speed per level", "+7 % de vitesse d'attaque par niveau", 8, { AttackSpeed = 0.07 }),
-	Projectiles = rune("Projectiles", "Projectile Rune", "Rune de projectiles", "More projectiles, a bit more damage", "Plus de projectiles, un peu plus de dégâts", 8, {}, {
+	Damage = rune("Damage", "Damage Rune", "+8% damage per level", 8, { Damage = 0.08 }),
+	AttackSpeed = rune("AttackSpeed", "Attack Speed Rune", "+7% attack speed per level", 8, { AttackSpeed = 0.07 }),
+	Projectiles = rune("Projectiles", "Projectile Rune", "More projectiles, a bit more damage", 8, {}, {
 		Amount = { 1, 1, 2, 2, 3, 3, 4, 4 },
 		Damage = { 0, 0.04, 0.04, 0.08, 0.08, 0.12, 0.12, 0.16 },
 	}),
-	Area = rune("Area", "Area Rune", "Rune de zone", "+8% area per level", "+8 % de zone par niveau", 8, { Size = 0.08 }),
-	Duration = rune("Duration", "Duration Rune", "Rune de durée", "+10% duration per level", "+10 % de durée par niveau", 8, { Duration = 0.10 }),
-	Cooldown = rune("Cooldown", "Cooldown Rune", "Rune de recharge", "-4% cooldown per level", "-4 % de recharge par niveau", 8, { Cooldown = 0.04 }),
-	Crit = rune("Crit", "Crit Rune", "Rune critique", "+4% crit chance and +10% crit damage per level", "+4 % de critique et +10 % de dégâts critiques par niveau", 8, { CritChance = 0.04, CritDamage = 0.10 }),
-	Luck = rune("Luck", "Luck Rune", "Rune de chance", "+3 luck per level: rarer cards and loot", "+3 de chance par niveau : cartes et butin plus rares", 8, { Luck = 3 }),
-	Wisdom = rune("Wisdom", "Wisdom Rune", "Rune de sagesse", "+10% XP per level", "+10 % d'XP par niveau", 8, { XpGain = 0.10 }),
-	Magnet = rune("Magnet", "Magnet Rune", "Rune aimant", "+3 studs pickup range per level", "+3 studs de ramassage par niveau", 8, { Magnet = 3 }),
-	Vitality = rune("Vitality", "Vitality Rune", "Rune de vitalité", "+15 max HP and +0.1 HP/s per level", "+15 PV max et +0,1 PV/s par niveau", 8, { MaxHp = 15, Regen = 0.1 }),
-	Armor = rune("Armor", "Armor Rune", "Rune d'armure", "+3 armor per level", "+3 d'armure par niveau", 8, { Armor = 3 }),
-	Agility = rune("Agility", "Agility Rune", "Rune d'agilité", "+4% move speed and +2% dodge per level", "+4 % de vitesse et +2 % d'esquive par niveau", 8, { MoveSpeed = 0.04, Dodge = 0.02 }),
-	Cursed = rune("Cursed", "Cursed Rune", "Rune maudite", "Tougher, more numerous enemies, but more loot, XP and damage", "Ennemis plus durs et plus nombreux, mais plus de butin, d'XP et de dégâts", 5, { Difficulty = 0.10, LootBonus = 0.12, XpGain = 0.05, Damage = 0.05 }),
+	Area = rune("Area", "Area Rune", "+8% area per level", 8, { Size = 0.08 }),
+	Duration = rune("Duration", "Duration Rune", "+10% duration per level", 8, { Duration = 0.10 }),
+	Cooldown = rune("Cooldown", "Cooldown Rune", "-4% cooldown per level", 8, { Cooldown = 0.04 }),
+	Crit = rune("Crit", "Crit Rune", "+4% crit chance and +10% crit damage per level", 8, { CritChance = 0.04, CritDamage = 0.10 }),
+	Luck = rune("Luck", "Luck Rune", "+3 luck per level: rarer cards and loot", 8, { Luck = 3 }),
+	Wisdom = rune("Wisdom", "Wisdom Rune", "+10% XP per level", 8, { XpGain = 0.10 }),
+	Magnet = rune("Magnet", "Magnet Rune", "+3 studs pickup range per level", 8, { Magnet = 3 }),
+	Vitality = rune("Vitality", "Vitality Rune", "+15 max HP and +0.1 HP/s per level", 8, { MaxHp = 15, Regen = 0.1 }),
+	Armor = rune("Armor", "Armor Rune", "+3 armor per level", 8, { Armor = 3 }),
+	Agility = rune("Agility", "Agility Rune", "+4% move speed and +2% dodge per level", 8, { MoveSpeed = 0.04, Dodge = 0.02 }),
+	Cursed = rune("Cursed", "Cursed Rune", "Tougher, more numerous enemies, but more loot, XP and damage", 5, { Difficulty = 0.10, LootBonus = 0.12, XpGain = 0.05, Damage = 0.05 }),
 } :: { [string]: GrimoireDef }
 
 -- Le StatBlock final part d'ici (Types.StatName). Chaque stat doit avoir une entrée.
@@ -100,26 +101,26 @@ Grimoires.StatCaps = {
 
 -- Libellés courts pour écrire les descriptions des cartes (anglais = texte joueur).
 Grimoires.StatLabel = {
-	Damage = { fr = "dégâts", en = "damage", pct = true },
-	AttackSpeed = { fr = "vitesse d'attaque", en = "attack speed", pct = true },
-	Amount = { fr = "quantité", en = "amount", pct = false },
-	Size = { fr = "taille", en = "size", pct = true },
-	Duration = { fr = "durée", en = "duration", pct = true },
-	Cooldown = { fr = "recharge", en = "cooldown", pct = true },
-	CritChance = { fr = "chance de critique", en = "crit chance", pct = true },
-	CritDamage = { fr = "dégâts critiques", en = "crit damage", pct = true },
-	Luck = { fr = "chance", en = "luck", pct = false },
-	XpGain = { fr = "XP", en = "XP", pct = true },
-	Magnet = { fr = "aimant", en = "magnet", pct = false },
-	MaxHp = { fr = "PV max", en = "max HP", pct = false },
-	Armor = { fr = "armure", en = "armor", pct = false },
-	Regen = { fr = "PV/s", en = "HP/s", pct = false },
-	MoveSpeed = { fr = "vitesse", en = "move speed", pct = true },
-	Dodge = { fr = "esquive", en = "dodge", pct = true },
-	Thorns = { fr = "épines", en = "thorns", pct = true },
-	Bounces = { fr = "rebonds", en = "bounces", pct = false },
-	Difficulty = { fr = "difficulté", en = "difficulty", pct = true },
-	LootBonus = { fr = "butin", en = "loot", pct = true },
+	Damage = { en = "damage", fr = "damage", pct = true },
+	AttackSpeed = { en = "attack speed", fr = "attack speed", pct = true },
+	Amount = { en = "amount", fr = "amount", pct = false },
+	Size = { en = "size", fr = "size", pct = true },
+	Duration = { en = "duration", fr = "duration", pct = true },
+	Cooldown = { en = "cooldown", fr = "cooldown", pct = true },
+	CritChance = { en = "crit chance", fr = "crit chance", pct = true },
+	CritDamage = { en = "crit damage", fr = "crit damage", pct = true },
+	Luck = { en = "luck", fr = "luck", pct = false },
+	XpGain = { en = "XP", fr = "XP", pct = true },
+	Magnet = { en = "magnet", fr = "magnet", pct = false },
+	MaxHp = { en = "max HP", fr = "max HP", pct = false },
+	Armor = { en = "armor", fr = "armor", pct = false },
+	Regen = { en = "HP/s", fr = "HP/s", pct = false },
+	MoveSpeed = { en = "move speed", fr = "move speed", pct = true },
+	Dodge = { en = "dodge", fr = "dodge", pct = true },
+	Thorns = { en = "thorns", fr = "thorns", pct = true },
+	Bounces = { en = "bounces", fr = "bounces", pct = false },
+	Difficulty = { en = "difficulty", fr = "difficulty", pct = true },
+	LootBonus = { en = "loot", fr = "loot", pct = true },
 } :: { [string]: { fr: string, en: string, pct: boolean } }
 
 -- Valeur cumulée d'une stat pour une Rune à un niveau (0 si niveau < 1).

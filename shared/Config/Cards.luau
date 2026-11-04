@@ -45,15 +45,15 @@ local Cards = {
 	},
 
 	Text = {
-		NewWeapon = { fr = "Nouvelle arme", en = "New weapon" },
-		NewGrimoire = { fr = "Nouvelle Rune", en = "New Rune" },
-		Level = { fr = "niv.", en = "Lv" },
-		Fusion = { fr = "FUSION", en = "FUSION" },
-		Heal = { fr = "Goûter", en = "Snack" },
-		HealDesc = { fr = "Soigne 30 % des PV max", en = "Heals 30% of max HP" },
-		Coins = { fr = "Tirelire", en = "Piggy bank" },
-		CoinsDesc = { fr = "+20 pièces", en = "+20 coins" },
-		Damage = { fr = "dégâts", en = "damage" },
+		NewWeapon = { en = "New weapon", fr = "New weapon" },
+		NewGrimoire = { en = "New Rune", fr = "New Rune" },
+		Level = { en = "Lv", fr = "Lv" },
+		Fusion = { en = "FUSION", fr = "FUSION" },
+		Heal = { en = "Snack", fr = "Snack" },
+		HealDesc = { en = "Heals 30% of max HP", fr = "Heals 30% of max HP" },
+		Coins = { en = "Piggy bank", fr = "Piggy bank" },
+		CoinsDesc = { en = "+20 coins", fr = "+20 coins" },
+		Damage = { en = "damage", fr = "damage" },
 	},
 
 	-- Mots affichés pour les deltas de niveau des armes (clé de stat -> texte joueur).

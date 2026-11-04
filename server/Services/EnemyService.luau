@@ -1011,6 +1011,11 @@ function EnemyService.clearNonBoss()
 	end
 end
 
+-- Commandes de test Studio (RunManager) : avance l'horloge du directeur avec le chrono de la run.
+function EnemyService._debugSkip(seconds: number)
+	director.stageStart -= seconds
+end
+
 function EnemyService._elapsed(): number
 	return os.clock() - director.stageStart
 end

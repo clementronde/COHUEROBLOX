@@ -397,7 +397,7 @@ local function step()
 	if phase > b.phase then
 		b.phase = phase
 		b.dirty = true
-		announce("BossPhase", { fr = `{b.name.fr} : phase {phase} !`, en = `{b.name.en}: phase {phase}!` }, 2.5)
+		announce("BossPhase", { en = `{b.name.en}: phase {phase}!`, fr = `{b.name.en}: phase {phase}!` }, 2.5)
 		if b.def.weakness.kind == "Height" and phase == b.def.weakness.minPhase then
 			b.nextRootAt = now + 3
 		end
@@ -542,6 +542,11 @@ function BossService.despawn()
 	stateRemote:FireAllClients({ bossId = b.bossId, hpFrac = 0, phase = b.phase, defeated = false, removed = true, telegraphs = {} })
 end
 
+-- Run-domain internal (commandes de test de RunManager) : id d'entité EnemyService du boss.
+function BossService._entityId(): number?
+	return if boss then boss.entity else nil
+end
+
 function BossService.isActive(): boolean
 	return boss ~= nil
 end
@@ -608,7 +613,7 @@ local function onEnemyKilled(id: number, _kind: number, _x: number, _z: number)
 			end
 		end
 	end
-	announce("BossDefeated", { fr = `{b.name.fr} est vaincu !`, en = `{b.name.en} is defeated!` }, 3)
+	announce("BossDefeated", { en = `{b.name.en} is defeated!`, fr = `{b.name.en} is defeated!` }, 3)
 	Bus.BossDefeated:fire(b.bossId, b.stage)
 end
 
