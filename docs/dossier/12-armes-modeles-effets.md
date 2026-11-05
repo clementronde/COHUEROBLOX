@@ -583,6 +583,6 @@ Commités :
 - import, installation et Play dans COHUE ;
 - réglage des orientations (pièces en vol, arme en main) ;
 - fusions et paliers (contract request A04 pour les ids visuels et les niveaux) ;
-- effets des ennemis et des boss (conversion de `EnemyAttackFX`, et de `EnemyRenderer` et `BossRenderer` avec A03) ;
+- effets des ennemis : `EnemyAttackFX` est converti. Il clone `Assets.FX.Enemies.Sweep`, `Burst`, `Shot`, `Land` et `Boss`, posés par `A14_fx_install.luau`. Ces effets sont mats, à la couleur du profil de l'ennemi, avec la même interface pour `EnemyRenderer`. Restent les tirs ennemis (`EnemyRenderer`) et les télégraphes des boss (`BossRenderer`), dans des fichiers de A03, à convertir avec lui ;
 - contrôle qualité.
 

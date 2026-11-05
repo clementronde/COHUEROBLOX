@@ -487,4 +487,59 @@ end
 segment(folder(SP, "ChainBolt"), C.Gold, 0.14, 0.7)
 ringBurst(folder(SP, "MiniBomb"), "Area", "area", C.Ember, { flash = 2.5, smoke = 3, sparks = 8, core = C.Gold, life = 0.35 })
 
-print("A14 : effets posés dans ReplicatedStorage.Assets.FX (Weapons, Special, Shared, Shapes)")
+-- 7. Attaques des ennemis (EnemyAttackFX) : couleur posée par le code selon le profil de l'ennemi,
+-- peu lumineuses (le Neon et la lumière sont pour le joueur), formes mates
+local EN = folder(FX, "Enemies")
+do
+	local m = newModel(EN, "Sweep", "enemy", 0.4, 1.2)
+	local z = zone(m, 0.6)
+	emitter(z, "Swipe", { Texture = TEX.Spark, LightEmission = 0.3, Burst = 6, Size = NumberSequence.new(1.1, 0),
+		Speed = NumberRange.new(6, 9), Lifetime = NumberRange.new(0.2, 0.3), Spread = Vector2.new(35, 10),
+		Shape = Enum.ParticleEmitterShape.Disc, Squash = NumberSequence.new(-1.5) })
+	emitter(z, "Debris", { Texture = TEX.Spark, LightEmission = 0.2, Burst = 5, Size = NumberSequence.new(0.5, 0),
+		Speed = NumberRange.new(5, 9), Lifetime = NumberRange.new(0.3, 0.45), Acceleration = Vector3.new(0, -25, 0) })
+end
+do
+	local m = newModel(EN, "Burst", "enemy", 0.4, 0.08)
+	shape(m, "FX_Ring", C.White, { S = 1, Grow = 0.3, Fade0 = 0.3, Fade1 = 1, Matte = true })
+	local z = zone(m, 0.6)
+	emitter(z, "Dust", { Texture = TEX.Smoke, LightEmission = 0, Brightness = 1, Burst = 4, PerRadius = true,
+		Size = NumberSequence.new(1.4, 2.4), Speed = NumberRange.new(2, 4), Lifetime = NumberRange.new(0.35, 0.5),
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 1) }),
+		Shape = Enum.ParticleEmitterShape.Disc })
+	emitter(z, "Debris", { Texture = TEX.Spark, LightEmission = 0.2, Burst = 6, Size = NumberSequence.new(0.5, 0),
+		Speed = NumberRange.new(6, 10), Lifetime = NumberRange.new(0.3, 0.45), Spread = Vector2.new(60, 60),
+		Acceleration = Vector3.new(0, -25, 0) })
+end
+do
+	local m = newModel(EN, "Shot", "enemy", 0.3, 1.6)
+	emitter(m.PrimaryPart, "Puff", { Texture = TEX.Smoke, LightEmission = 0.1, Brightness = 1, Burst = 3,
+		Size = NumberSequence.new(1.2, 2), Speed = NumberRange.new(2, 4), Lifetime = NumberRange.new(0.2, 0.3),
+		Spread = Vector2.new(25, 25) })
+	emitter(m.PrimaryPart, "Debris", { Texture = TEX.Spark, LightEmission = 0.2, Burst = 4, Size = NumberSequence.new(0.4, 0),
+		Speed = NumberRange.new(6, 10), Lifetime = NumberRange.new(0.15, 0.25), Spread = Vector2.new(25, 25) })
+end
+do
+	local m = newModel(EN, "Land", "enemy", 0.45, 0.08)
+	shape(m, "FX_RingThick", C.White, { S = 1, Grow = 0.25, Fade0 = 0.35, Fade1 = 1, Matte = true })
+	local z = zone(m, 0.7)
+	emitter(z, "Dust", { Texture = TEX.Smoke, LightEmission = 0, Brightness = 1, Burst = 6, PerRadius = true,
+		Size = NumberSequence.new(1.6, 2.8), Speed = NumberRange.new(3, 5), Lifetime = NumberRange.new(0.4, 0.55),
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1) }),
+		Shape = Enum.ParticleEmitterShape.Disc })
+end
+do
+	local m = newModel(EN, "Boss", "enemy", 0.6, 0.08)
+	shape(m, "FX_RingThick", C.White, { S = 1, Grow = 0.2, Fade0 = 0.2, Fade1 = 1, Matte = true })
+	shape(m, "FX_Disc", C.White, { S = 0.95, Grow = 0.5, Fade0 = 0.75, Fade1 = 1, Matte = true })
+	local z = zone(m, 0.7)
+	emitter(z, "Dust", { Texture = TEX.Smoke, LightEmission = 0, Brightness = 1, Burst = 10, PerRadius = true,
+		Size = NumberSequence.new(2.5, 4.5), Speed = NumberRange.new(3, 6), Lifetime = NumberRange.new(0.5, 0.8),
+		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.45), NumberSequenceKeypoint.new(1, 1) }),
+		Shape = Enum.ParticleEmitterShape.Disc })
+	emitter(z, "Debris", { Texture = TEX.Spark, LightEmission = 0.2, Burst = 12, PerRadius = true, Size = NumberSequence.new(0.8, 0),
+		Speed = NumberRange.new(10, 16), Lifetime = NumberRange.new(0.4, 0.6), Spread = Vector2.new(60, 60),
+		Acceleration = Vector3.new(0, -30, 0), Shape = Enum.ParticleEmitterShape.Disc })
+end
+
+print("A14 : effets posés dans ReplicatedStorage.Assets.FX (Weapons, Special, Shared, Enemies, Shapes)")
