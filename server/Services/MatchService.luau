@@ -32,7 +32,7 @@ export type RunConfig = {
 	worldId: string?,
 	tier: number?,
 	members: { number },
-	loadouts: { [string]: { classId: string, companionId: string } }?,
+	loadouts: { [string]: { classId: string, companionId: string, companionId2: string? } }?,
 	owner: number?,
 	sourcePlaceId: number,
 	createdAt: number,
@@ -48,7 +48,7 @@ local teleportingSince: { [Player]: number } = {}
 -- Run-server state
 local runConfig: RunConfig? = nil
 local arrived: { [number]: boolean } = {}
-local arrivalLoadout: { [Player]: { classId: string, companionId: string } } = {}
+local arrivalLoadout: { [Player]: { classId: string, companionId: string, companionId2: string? } } = {}
 
 local function readUseLobbyPlace(): boolean
 	local module = Config:FindFirstChild("Run")
@@ -261,7 +261,7 @@ function MatchService.startRun(group: { Player }, worldId: string, tier: number)
 	end
 	local ps = progression()
 	local members: { number } = {}
-	local loadouts: { [string]: { classId: string, companionId: string } } = {}
+	local loadouts: { [string]: { classId: string, companionId: string, companionId2: string? } } = {}
 	for _, p in group do
 		if not p.Parent or busy[p] or not dataService().canMutate(p) then
 			return false
@@ -271,7 +271,8 @@ function MatchService.startRun(group: { Player }, worldId: string, tier: number)
 		end
 		local classId, companionId = ps.getLoadout(p)
 		table.insert(members, p.UserId)
-		loadouts[tostring(p.UserId)] = { classId = classId, companionId = companionId }
+		local second = ps.getCompanionLoadout(p)[2] -- Tamer : 2e compagnon (A12-01)
+		loadouts[tostring(p.UserId)] = { classId = classId, companionId = companionId, companionId2 = second }
 	end
 	for _, p in group do
 		busy[p] = true
@@ -379,7 +380,7 @@ local function admit(player: Player)
 	if config.loadouts then
 		local l = config.loadouts[tostring(player.UserId)]
 		if type(l) == "table" then
-			arrivalLoadout[player] = { classId = l.classId, companionId = l.companionId }
+			arrivalLoadout[player] = { classId = l.classId, companionId = l.companionId, companionId2 = l.companionId2 }
 		end
 	end
 end
@@ -388,7 +389,7 @@ local function applyArrivalLoadout(player: Player)
 	local l = arrivalLoadout[player]
 	if l then
 		arrivalLoadout[player] = nil
-		progression().setLoadout(player, l.classId, l.companionId) -- re-validated against unlocks
+		progression().setLoadout(player, l.classId, l.companionId, l.companionId2) -- re-validated (classe, collection)
 	end
 end
 

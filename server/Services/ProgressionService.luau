@@ -243,6 +243,11 @@ local function unlockedIn(data: Data?, kind: string, id: string): boolean
 		end
 		return price <= 0 or stored(data, "Item", id)
 	end
+	if kind == "Companion" then
+		-- v2 : la collection capturée (A12-01), plus de règle de déblocage.
+		local c = data and data.companions
+		return type(c) == "table" and type(c.owned) == "table" and c.owned[id] ~= nil
+	end
 	local rules = Progression.Unlocks[kind]
 	if not rules then
 		return false
@@ -430,28 +435,10 @@ local function metaBonusesOf(data: Data?): { weaponSlots: number, grimoireSlots:
 	}
 end
 
-local function eggCandidates(data: Data?): { string }
-	local companions = optionalConfig("Companions")
-	local pool: { string } = {}
-	local eggs = companions and companions.Eggs
-	if type(eggs) == "table" and type(eggs.EggLines) == "table" then
-		for _, l in eggs.EggLines do
-			if type(l) == "string" and LINE_SET[l] then
-				table.insert(pool, l)
-			end
-		end
-	else
-		for _, l in Progression.Lines do
-			table.insert(pool, l)
-		end
-	end
-	local out: { string } = {}
-	for _, l in pool do
-		if not unlockedIn(data, "Companion", l) then
-			table.insert(out, l)
-		end
-	end
-	return out
+-- v2 (A12-01) : un compagnon se gagne uniquement par capture (01-decisions-v2 §5). Un œuf gagné
+-- (quêtes v1, défi hebdo) n'éclôt plus en créature : il donne les jetons de repli (Eggs.DuplicateTokens).
+local function eggCandidates(_data: Data?): { string }
+	return {}
 end
 
 function ProgressionService.getWeeklyChallenge(): { week: number, classId: string, companionId: string, modifier: string, worldId: string, tier: number, endsAt: number }
@@ -459,12 +446,11 @@ function ProgressionService.getWeeklyChallenge(): { week: number, classId: strin
 	local week = Progression.weekIndex(now)
 	local rng = Random.new(week * 7919 + 17)
 	local classes = Progression.Classes
-	local lines = Progression.Lines
 	local mods = Progression.Weekly.Modifiers
 	return {
 		week = week,
 		classId = classes[rng:NextInteger(1, #classes)],
-		companionId = lines[rng:NextInteger(1, #lines)],
+		companionId = "", -- v2 : compagnon libre (collection capturée, chacun la sienne)
 		modifier = mods[rng:NextInteger(1, #mods)],
 		worldId = Progression.Weekly.WorldId,
 		tier = Progression.Weekly.Tier,
@@ -493,6 +479,11 @@ local function buildView(player: Player, data: Data): { [string]: any }
 		end
 	end
 	unlocks.Item = itemBucket
+	local companionBucket: { [string]: boolean } = {}
+	for id in data.companions.owned do
+		companionBucket[id] = true
+	end
+	unlocks.Companion = companionBucket -- contrat v1 : vue des espèces possédées
 
 	local quests = table.create(#Quests.List)
 	for i, def in Quests.List do
@@ -584,6 +575,19 @@ local function buildView(player: Player, data: Data): { [string]: any }
 		passes = passes,
 		vip = passes.VIP == true,
 		companionStartTech = table.clone(data.companionStartTech),
+		-- Collection v2 (A09-07) : owned[espèce] = { n, at }, equipped = { espèce1, espèce2? } (sans keys).
+		companions = {
+			owned = (function()
+				local owned = {}
+				for id, e in data.companions.owned do
+					if type(e) == "table" then
+						owned[id] = { n = tonumber(e.n) or 1, at = tonumber(e.at) or 0 }
+					end
+				end
+				return owned
+			end)(),
+			equipped = ProgressionService.getCompanionLoadout(player),
+		},
 		koRecord = koRecord,
 		season = seasonView,
 	}
@@ -699,25 +703,143 @@ function ProgressionService.recordStat(player: Player, key: string, amount: numb
 end
 
 ---------------------------------------------------------------------------------------------------
--- Loadout
+-- Loadout et collection de compagnons (A12-01, dossier 40 §3 et §4, regles-v2 §3)
 ---------------------------------------------------------------------------------------------------
 local selected: { [Player]: boolean } = {}
 
+-- Id de classe canonique v2. Accepte les alias v1 encore envoyés par l'UI (Cornu -> Knight, résolus
+-- par Config.Classes) pendant la transition.
+local function canonicalClass(classId: any): string?
+	if not validId(classId, 32) then
+		return nil
+	end
+	if CLASS_SET[classId] then
+		return classId
+	end
+	local classes = optionalConfig("Classes")
+	local def = classes and classes[classId]
+	if type(def) == "table" and type(def.id) == "string" and CLASS_SET[def.id] then
+		return def.id
+	end
+	return nil
+end
+
+-- Espèce capturable (CompanionService.isSpecies) ; sans CompanionService, un id bien formé.
+local function validSpecies(id: any): boolean
+	if not validId(id, 48) then
+		return false
+	end
+	local companions = Registry.find("CompanionService")
+	if companions and type(companions.isSpecies) == "function" then
+		local ok, yes = pcall(companions.isSpecies, id)
+		return ok and yes == true
+	end
+	return true
+end
+
+local function slotsFor(classId: string): number
+	local companions = Registry.find("CompanionService")
+	if companions and type(companions.slotsFor) == "function" then
+		local ok, n = pcall(companions.slotsFor, classId)
+		if ok and isFiniteNumber(n) then
+			return math.clamp(math.floor(n), 1, 2)
+		end
+	end
+	return if classId == "Tamer" then 2 else 1
+end
+
+local function ownsSpecies(data: Data?, id: string): boolean
+	local c = data and data.companions
+	return type(c) == "table" and type(c.owned) == "table" and c.owned[id] ~= nil
+end
+
+function ProgressionService.hasCompanion(player: Player, speciesId: string): boolean
+	if not isPlayer(player) or type(speciesId) ~= "string" then
+		return false
+	end
+	return ownsSpecies(dataService().peek(player), speciesId)
+end
+
+-- Espèces équipées, déjà validées : possédées, capturables, sans doublon, au plus slotsFor(classe).
+function ProgressionService.getCompanionLoadout(player: Player): { string }
+	local out: { string } = {}
+	local data = if isPlayer(player) then dataService().peek(player) else nil
+	local c = data and data.companions
+	if type(c) ~= "table" or type(c.equipped) ~= "table" then
+		return out
+	end
+	local classId = canonicalClass(data and data.loadout and data.loadout.classId) or Progression.DefaultLoadout.classId
+	local max = slotsFor(classId)
+	for i = 1, 2 do
+		local id = c.equipped[i]
+		if #out < max and type(id) == "string" and ownsSpecies(data, id) and validSpecies(id) and not table.find(out, id) then
+			table.insert(out, id)
+		end
+	end
+	return out
+end
+
+-- Contrat : (classId, companionId). companionId = 1re espèce équipée, "" si aucune.
 function ProgressionService.getLoadout(player: Player): (string, string)
 	local def = Progression.DefaultLoadout
 	local data = if isPlayer(player) then dataService().peek(player) else nil
 	if not data or type(data.loadout) ~= "table" then
-		return def.classId, def.companionId
+		return def.classId, ""
 	end
-	local classId = data.loadout.classId
-	local companionId = data.loadout.companionId
-	if type(classId) ~= "string" or not unlockedIn(data, "Class", classId) then
+	local classId = canonicalClass(data.loadout.classId)
+	if not classId or not unlockedIn(data, "Class", classId) then
 		classId = def.classId
 	end
-	if type(companionId) ~= "string" or not unlockedIn(data, "Companion", companionId) then
-		companionId = def.companionId
+	local list = ProgressionService.getCompanionLoadout(player)
+	return classId :: string, list[1] or ""
+end
+
+-- Capture accordée par CompanionService (regles-v2 §3.1.7) : un seul mutate, clé d'idempotence
+-- dans le profil. Ne cède jamais. Profil non modifiable -> "Unavailable" (refusée, jamais différée).
+function ProgressionService.grantCapture(player: Player, speciesId: any, captureKey: any): (string, boolean)
+	if not isPlayer(player) or not validSpecies(speciesId) or type(captureKey) ~= "string" or #captureKey == 0 or #captureKey > 120 then
+		return "Unavailable", false
 	end
-	return classId, companionId
+	local result, isNew = "Unavailable", false
+	local ok = withProfile(player, function(d, done)
+		local c = d.companions
+		if c.keys[captureKey] then
+			result = "AlreadyGranted"
+			return
+		end
+		local now = os.time()
+		c.keys[captureKey] = now
+		local entry = c.owned[speciesId]
+		if type(entry) == "table" then
+			entry.n = (tonumber(entry.n) or 0) + 1
+		else
+			c.owned[speciesId] = { n = 1, at = now }
+			isNew = true
+		end
+		-- Garder les MaxKeys clés les plus récentes (les vieilles runs ne reviennent jamais).
+		local count, oldestKey, oldestAt = 0, nil :: string?, math.huge
+		for k, t in c.keys do
+			count += 1
+			if type(t) == "number" and t < oldestAt then
+				oldestKey, oldestAt = k, t
+			end
+		end
+		if count > Progression.Collection.MaxKeys and oldestKey then
+			c.keys[oldestKey] = nil
+		end
+		-- Premier compagnon : équipé d'office (collection vide à la première run).
+		if #c.equipped == 0 then
+			c.equipped[1] = speciesId
+		end
+		result = "Granted"
+	end)
+	if not ok then
+		return "Unavailable", false
+	end
+	if result == "Granted" then
+		dataService().saveSoon(player)
+	end
+	return result, isNew
 end
 
 function ProgressionService.hasSelectedLoadout(player: Player): boolean
@@ -733,28 +855,43 @@ local function loadoutChangeAllowed(): boolean
 	return not ok or phase == "Loadout" or phase == "Ended"
 end
 
--- Validated loadout change (remote and MatchService arrival). Returns accepted.
-function ProgressionService.setLoadout(player: Player, classId: any, companionId: any): boolean
-	if not validId(classId, 32) or not validId(companionId, 32) then
-		return false
-	end
-	if not CLASS_SET[classId] or not LINE_SET[companionId] then
+-- Choix validé (remote et arrivée MatchService). companionId / companionId2 : "" ou nil = aucun.
+-- Chaque espèce doit être possédée ; la 2e seulement si slotsFor(classe) == 2 ; pas de doublon.
+function ProgressionService.setLoadout(player: Player, classId: any, companionId: any, companionId2: any): boolean
+	local cls = canonicalClass(classId)
+	if not cls then
 		return false
 	end
 	local data = dataService().peek(player)
-	if not data or not unlockedIn(data, "Class", classId) or not unlockedIn(data, "Companion", companionId) then
+	if not data or not unlockedIn(data, "Class", cls) then
+		return false
+	end
+	local list: { string } = {}
+	for _, id in { companionId, companionId2 } do
+		if id == nil or id == "" then
+			continue
+		end
+		if not validSpecies(id) or not ownsSpecies(data, id) or table.find(list, id) then
+			return false
+		end
+		table.insert(list, id)
+	end
+	if #list > slotsFor(cls) then
 		return false
 	end
 	local ok = withProfile(player, function(d)
-		d.loadout.classId = classId
-		d.loadout.companionId = companionId
+		d.loadout.classId = cls
+		d.loadout.companionId = list[1] or ""
+		d.companions.equipped = list
 	end)
 	if ok then
 		selected[player] = true
-		ProgressionService.logCustom(player, "ClassPicked", 1, { classId })
-		ProgressionService.logCustom(player, "CompanionPicked", 1, { companionId })
+		ProgressionService.logCustom(player, "ClassPicked", 1, { cls })
+		if list[1] then
+			ProgressionService.logCustom(player, "CompanionPicked", 1, { "Species" })
+		end
 		onboarding(player, 3, "LoadoutSelected")
-		ProgressionService.LoadoutSelected:fire(player, classId, companionId)
+		ProgressionService.LoadoutSelected:fire(player, cls, list[1] or "")
 	end
 	return ok
 end
@@ -1223,7 +1360,7 @@ function ProgressionService.grantRunRewards(player: Player, summary: Types.RunSu
 			d.weekly.done = false
 			d.weekly.bestSeconds = 0
 		end
-		if victory and not d.weekly.done and classId == challenge.classId and line == challenge.companionId then
+		if victory and not d.weekly.done and classId == challenge.classId and (challenge.companionId == "" or line == challenge.companionId) then
 			d.weekly.done = true
 			weeklyNow = true
 			local w = Progression.Weekly
@@ -1288,11 +1425,11 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Remote handlers
 ---------------------------------------------------------------------------------------------------
-local function onSelectLoadout(player: Player, classId: any, companionId: any)
+local function onSelectLoadout(player: Player, classId: any, companionId: any, companionId2: any)
 	if not loadoutChangeAllowed() then
 		return
 	end
-	if not ProgressionService.setLoadout(player, classId, companionId) then
+	if not ProgressionService.setLoadout(player, classId, companionId, companionId2) then
 		markDirty(player) -- resend the real state so the client UI resyncs
 	end
 end

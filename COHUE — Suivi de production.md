@@ -415,7 +415,7 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 
 | ID | Tâche | Livrable | Dépend de | Priorité | Statut |
 | --- | --- | --- | --- | --- | --- |
-| A12-01 | Sauvegarde v2 (collection, classes débloquées, cosmétiques, records de KO) et migration | DataService | A05-01 | P0 — bloquant | À faire |
+| A12-01 | Sauvegarde v2 (collection, classes débloquées, cosmétiques, records de KO) et migration | DataService | A05-01 | P0 — bloquant | À valider |
 | A12-02 | Classements hebdo et all-time des KO, reset lundi 00:00 UTC | Service de classement | A04-03 | P0 — bloquant | À valider |
 | A12-03 | Environ 150 quêtes liées aux nouveaux contenus | Config/Quests | A04-10 | P1 — lancement | À faire |
 | A12-04 | Boutique cosmétique, pass VIP et pass saisonnier conformes aux règles Roblox | MonetizationService, Products |  | P1 — lancement | À valider |

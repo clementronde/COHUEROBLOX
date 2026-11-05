@@ -7,7 +7,7 @@ Principe : tout ce qui donne de la puissance se gagne en jouant. Le serveur calc
 
 ---
 
-## 1. Profil joueur — schéma v1
+## 1. Profil joueur — schéma 2 (v2, A12-01)
 
 Une clé par joueur : `User_<UserId>` dans le DataStore `PlayerData_v1` (≤ 50 caractères, motif statique `{UserId}` pour les demandes d'effacement). En Studio, l'attribut `ServerStorage.TestProfileKey = "nom"` (≤ 20 car.) joue sur `TEST_<nom>_<UserId>` : les tests ne touchent jamais la vraie sauvegarde, et les classements ne sont pas écrits.
 
@@ -21,7 +21,7 @@ Le **Profil** (`Data`), valeurs par défaut d'un nouveau joueur (nouvelle table 
 
 | Champ | Type | Défaut | Rôle |
 | --- | --- | --- | --- |
-| `schema` | number | 1 | Version de schéma (section 2) |
+| `schema` | number | 2 | Version de schéma (section 2) |
 | `createdAt` | number | `os.time()` | Première connexion (bucket de retour J1/J8-28) |
 | `lastJoinAt` | number | `os.time()` | Dernière connexion |
 | `sessions` | number | 0 | Nombre de sessions |
@@ -41,10 +41,12 @@ Le **Profil** (`Data`), valeurs par défaut d'un nouveau joueur (nouvelle table 
 | `companionStartTech` | `{[line]: techId}` | `{}` | Technique de départ choisie (validée par le niveau de Lien, lue par CompanionService) |
 | `eggs` | number | 0 | Œufs gratuits non éclos |
 | `eggsHatched` | number | 0 | Compteur |
-| `cosmetics` | `{[cosmeticId]: true}` | `{}` | Cosmétiques possédés (hors gratuits et pass, dérivés) |
+| `cosmetics` | `{[cosmeticId]: true}` | `{}` | Cosmétiques possédés (hors gratuits, pass et saison, dérivés) |
 | `equipped` | `{[slot]: cosmeticId}` | `{}` | Équipement cosmétique |
 | `settings` | `{ keepHat, colorblind, reduceFlashes: boolean, textScale: number }` | `false, false, false, 1` | Réglages |
-| `loadout` | `{ classId, companionId }` | `Cornu`, `Braise` | Dernier choix |
+| `loadout` | `{ classId, companionId }` | `Knight`, `""` | Dernier choix (companionId = 1re espèce équipée, compat) |
+| `companions` | `{ v, owned, equipped, keys }` | `1, {}, {}, {}` | Collection capturée (section 5, Compagnons v2) |
+| `seasons` | `{[seasonId]: number}` | `{}` | XP de pass saisonnier (section 9) |
 | `weekly` | `{ week, done, bestSeconds, everDone }` | `-1, false, 0, false` | Défi hebdo (section 10) |
 | `boards` | `{ week, kills, bestFinalWave, lastRunKey, best, weekBest, quarantined }` | `-1, 0, 0, "", {}, {}, {}` | Relevés du classement KO en une run (section 13) ; `kills`/`bestFinalWave` : compteurs v1 conservés |
 | `receipts` | `{[PurchaseId]: number}` | `{}` | Marqueurs de reçus traités (même document que l'objet accordé) |
@@ -57,7 +59,7 @@ Règles de forme (vault « Data Schema Design and Migrations ») : tableaux dens
 
 ## 2. Migrations
 
-- `schema` entier sur chaque profil, `CURRENT_SCHEMA = 1` dans `DataService`.
+- `schema` entier sur chaque profil, `CURRENT_SCHEMA = 2` dans `DataService`. **Étape 1 → 2** (A12-01) : `loadout` repasse à une classe v2 (défaut `Knight` si la classe v1 est inconnue) sans compagnon, `companions` créé ; maîtrise, Lien, `unlocks.Companion` et cosmétiques v1 restent dans le profil, ignorés. Un serveur v1 refusera un profil v2 : publier la place de run avant le lobby.
 - Chaîne d'étapes `STEPS[n]` (n → n+1) : ordonnées, déterministes, sans `yield`, jamais modifiées après publication ; on ajoute une étape.
 - **Schéma plus récent que le serveur → chargement refusé** (statut `failed`, rien n'est écrit, le joueur est renvoyé avec un message). Indispensable avec deux places publiées séparément et les mises à jour progressives.
 - Champs **ajoutés** sans changement de structure : `reconcile` les remplit au chargement sans jamais écraser.
@@ -118,19 +120,17 @@ Bonus de Vague Finale plafonné à 20 paliers (10 min). Plafond de sécurité pa
 
 Ids : ARCHITECTURE section 3. Un déblocage est **dérivé** des quêtes terminées et de la config, ou **stocké** (achat en argent, œuf). `ProgressionService.isUnlocked(player, kind, id)`.
 
-### Classes (6.3) — jamais vendues
+### Classes v2 (01-decisions-v2 §3, A12-01) — jamais vendues
 | Classe | Déblocage | Quête | Condition (clé de stat, objectif) |
 | --- | --- | --- | --- |
-| Cornu, Plumeline, Mecano | Gratuit | — | — |
-| Felyne | Quête | `Q_Felyne` | `Kills` ≥ 5 000 |
-| Rocailleux | Quête | `Q_Rocailleux` | `DamageTaken` ≥ 50 000 |
-| Sporelin | Quête | `Q_Sporelin` | `ShrinesCompleted` ≥ 25 |
-| Ecaille | Quête | `Q_Ecaille` | `BossesDefeated` ≥ 5 |
-| Astrel | Quête | `Q_Astrel` | `ChestsOpened` ≥ 100 |
-| Cristallin | Quête | `Q_Cristallin` | `BestRunLevel` ≥ 30 (record) |
-| Tentaculos | Quête | `Q_Tentaculos` | `FullBuildStageClears` ≥ 1 (boss battu avec 4 armes **et** 4 Grimoires) |
+| Knight, Archer, Mage | Gratuit | — | — |
+| Guardian | Quête | `Q_Guardian` | `DamageTaken` ≥ 50 000 |
+| Rogue | Quête | `Q_Rogue` | `Kills` ≥ 5 000 |
+| Cleric | Quête | `Q_Cleric` | `ShrinesCompleted` ≥ 25 |
+| Barbarian | Quête | `Q_Barbarian` | `BossesDefeated` ≥ 5 |
+| Tamer | Quête | `Q_Tamer` | `CompanionsCaptured` ≥ 10 |
 
-Écart assumé avec l'exemple du 00 (« finir un stage avec 5 armes ») : 4 armes max hors Tentaculos (00, 8), donc impossible avant de l'avoir.
+Les ids v1 envoyés par l'UI (`Cornu`…) sont acceptés par `SelectLoadout` via les alias de `Config.Classes` (transition), stockés en v2. Les quêtes v1 `Q_Felyne`… `Q_Tentaculos`, `Q_Volt`, `Q_Givre`, `Q_Echo` sont retirées (leurs entrées de `questsDone` restent, ignorées).
 
 ### Armes (16)
 - Gratuites (pool de départ, 6 pour la phase 0) : `HacheBoomerang`, `PlumesDards`, `CleTourelle`, `ToupieScie`, `BouleBowling`, `PistoletBulles`.
@@ -145,10 +145,14 @@ Ids : ARCHITECTURE section 3. Un déblocage est **dérivé** des quêtes termin�
 ### Objets
 Le domaine combat possède `Config.Items`. Règle : un objet sans champ `unlock` ou avec `unlock = "Free"` est dans le pool ; sinon `Common`/`Rare` gratuits, `Epic` 60 et `Legendary` 120 étoiles d'argent dans la boutique (`Shop_Item_<id>`). Si `Config.Items` est absent, tout objet est considéré débloqué (ne jamais bloquer le jeu).
 
-### Compagnons (7.3)
-- Départ : `Braise`, `Ronce`, `Maree`.
-- `Volt` : quête `Q_Volt` (`DamageDealt` ≥ 250 000) ; `Givre` : `Q_Givre` (`FinalWaveSecondsTotal` ≥ 600) ; `Echo` : `Q_Echo` (`RunsPlayed` ≥ 25).
-- Ou **œuf gratuit** : éclosion uniforme parmi les lignées de `Config.Companions.Eggs.EggLines` non possédées (taux affichés = 1/N, calculés par le serveur et envoyés dans `Profile.eggOdds`). Si tout est possédé : 40 jetons. Œufs gagnés par quêtes, Lien niveau 10 (première fois par lignée) et défi hebdo. **Aucun œuf n'est jamais vendu**, ni en Robux, ni en argent, ni en jetons.
+### Compagnons v2 : capture et collection (dossier 40 §3, A12-01)
+- Plus de déblocage ni d'œuf : un compagnon se **capture** en run. Collection vide à la première run (défaut, question de Clément au dossier 40 §11.1).
+- `profile.companions = { v = 1, owned = {[espèce] = { n, at }}, equipped = { espèce1, espèce2? }, keys = {[captureKey] = os.time} }` ; espèce = `Config.Enemies[kind].name`.
+- `ProgressionService.grantCapture(player, speciesId, captureKey) -> ("Granted" | "AlreadyGranted" | "Unavailable", isNew)` : un seul `mutate` (clé d'idempotence + `owned`), puis `saveSoon`. Profil non modifiable → `"Unavailable"` (refusée, jamais différée). 200 clés gardées (`Progression.Collection.MaxKeys`). La première capture est équipée d'office.
+- `getCompanionLoadout(player) -> {string}` (possédées, `CompanionService.isSpecies`, sans doublon, ≤ `CompanionService.slotsFor(classe)`), `hasCompanion(player, speciesId)`, `isUnlocked(player, "Companion", id)` = possédée.
+- `SelectLoadout(classId, companionId?, companionId2?)` : `""`/nil = aucun ; chaque espèce possédée ; la 2e seulement si `slotsFor == 2` (Tamer). Même contrôle à l'arrivée sur le serveur de run (`MatchService`, la config de run porte `companionId2`). `getLoadout` renvoie `(classId, espèce1 or "")`.
+- Œufs v1 encore gagnés : `HatchEgg` donne les jetons de repli (`Eggs.DuplicateTokens`), plus de créature.
+- Quêtes `Q_Capture_1..3` (`CompanionsCaptured` 1/10/50) et `Q_Species_1..3` (`CompanionNewSpecies` 3/10/25), clés envoyées par CompanionService. Les quêtes d'évolution, d'Ultime et de Lien sont retirées.
 
 ### Mondes et tiers
 - `BoisGrognon` : départ. `DunesCroustillantes` : `TrialShrinesCompleted` ≥ 10 (autels d'épreuve, tous mondes, enregistré par ShrineService). `RecreFantome` : `Win_DunesCroustillantes_T2` ≥ 1.
@@ -177,32 +181,38 @@ Le domaine combat possède `Config.Items`. Règle : un objet sans champ `unlock`
 
 ## 8. Cosmétiques (`Config.Cosmetics`)
 
-Emplacements (`slot`) : `Tint:<classId>`, `Pose:<classId>`, `CompanionTint:<line>`, `CompanionPose:<line>`, `Title`, `Emote`, `Footstep`, `Aura` (+ `StartTech:<line>` qui prend un id de technique, pas un cosmétique). Un cosmétique a `slot` de base (`Tint`, `Pose`, `CompanionTint`, `CompanionPose`, `Title`, `Emote`, `Footstep`, `Aura`), une `source` et une restriction optionnelle `classId`/`line`. Sources : `Free` (3 teintes par classe, `Tint_<classe>_Base1..3`), `Mastery`, `Bond`, `Tokens` (prix en jetons), `Quest`, `Weekly`, `Pass` (`TeintesPremium`, `Emotes`, `VIP`), `Product`. Les teintes premium s'appliquent à n'importe quelle classe. `EquipCosmetic(slot, id?)` : `nil` déséquipe ; sinon le serveur vérifie que l'emplacement existe, que l'objet est possédé et compatible.
+Emplacements : `Tint:<classId>` (skin d'équipement), `Pose:<classId>` (pose de victoire), `Title`, `Emote`, `Footstep`, `Trail`, `KoEffect`, `CompanionHat`, `CompanionColor`, `Aura` (aura de compagnon) ; les trois derniers s'appliquent à tous les compagnons équipés. Restent de la v1 : `CompanionTint:<line>`, `CompanionPose:<line>` (Lien) et `StartTech:<line>` (id de technique). Un `Tint` ou une `Pose` sans `classId` (premium, saison) va sur toutes les classes. Sources : `Free`, `Mastery`, `Bond`, `Tokens` (jetons), `Quest`, `Weekly`, `Pass` (champ `pass`, rempli depuis `Products.Passes`), `Season` (champs `season`, `tier`, `track`). `EquipCosmetic(slot, id?)` : `nil` déséquipe ; sinon le serveur vérifie emplacement, compatibilité et possession. Le rendu clone un modèle nommé d'après l'id (ex. `Assets.FX.Trail_Comet`, A01/A07/A05) : rien n'est construit par script.
 
-## 9. Monétisation (`Config.Products`) — conforme 11.3
+## 9. Monétisation (`Config.Products`, A12-04) — 100 % cosmétique
 
-Interdits (vérifiés à la relecture) : aucun objet aléatoire payant, aucune résurrection payante, classes jamais vendues, aucune puissance vendue (pas de relance de carte, pas de stat, pas d'XP), aucun œuf payant, aucune monnaie achetable.
+Interdits (vérifiés à la relecture) : stat payante, résurrection payante, classe vendue, produit aléatoire payant, œuf payant, monnaie achetable, saut de palier de saison payant.
 
-**Pass** (ids `0` + TODO, icônes personnalisées à fournir) :
-| Clé | Contenu | Prix de repli affiché si la lecture échoue |
+**Tout est vendu en pass de jeu** (corrige S-10) : Roblox refuse lui-même de revendre un pass possédé, même si le client appelle `PromptGamePassPurchase` directement. `Products.Products` (produits développeur) est **vide**, et `MonetizationService` refuse au démarrage un produit qui porterait des cosmétiques. `ProcessReceipt` reste en place (une seule affectation, règles de reçus de `00-vision.md` §11.3) pour un futur produit réachetable.
+
+| Pass (clé) | Contenu | Prix de repli |
 | --- | --- | --- |
-| `TeintesPremium` | 6 teintes universelles `Tint_Premium_*` | 199 |
-| `Emotes` | 6 emotes de victoire `Emote_*` | 149 |
-| `VIP` | Salon privé gratuit (serveur réservé persistant, `vipRoomId`) + titre doré `Title_VIP` | 299 |
+| `VIP` | Salon privé gratuit (`vipRoomId`, section 15) + `Title_VIP` + `Trail_VIP_Gold` | 299 |
+| `Season1` | Piste premium de la saison 1 (rétroactive) | 399 |
+| `PremiumSkins` | 6 skins `Tint_Premium_*` (toutes classes) | 199 |
+| `FireSkins` / `OceanSkins` | 3 skins chacun | 99 |
+| `KoEffects` | `KoEffect_Confetti`, `_Stars`, `_Bubbles` | 149 |
+| `Trails` | `Trail_Rainbow`, `_Comet`, `_Leaves` | 129 |
+| `VictoryEmotes` | 6 emotes `Emote_*` | 149 |
+| `VictoryPoses` | `Pose_Hero`, `_Throne`, `_Flip` | 99 |
+| `SparkleSteps` | `Footstep_Etoiles`, `_Bulles` | 79 |
+| `CompanionHats` | 4 chapeaux | 129 |
+| `CompanionColors` | 4 couleurs | 99 |
+| `CompanionAuras` | `Aura_Aurore`, `Aura_Ombre` | 99 |
 
-**Produits développeur** (cosmétiques permanents, une fois par joueur, refusés **au moment de l'invite** si déjà possédés) : `PackTeintesFeu`, `PackTeintesOcean` (3 teintes chacun), `EffetPasEtoiles`, `EffetPasBulles` (effets de pas), `AuraCompagnonAurore`, `AuraCompagnonOmbre` (auras purement visuelles).
+Ids `0` + TODO (Creator Dashboard). Ordre de la boutique : `Products.ShopOrder` (A09-07). Prix affichés via `GetProductInfoAsync(id, Enum.InfoType.GamePass)` côté client ; le prix de la config n'est qu'un repli. Achat : `RequestPurchase(clé)` → le serveur vérifie (profil modifiable, id ≠ 0, pas déjà possédé, saison en cours pour un pass saisonnier) puis `PromptGamePassPurchase`. Possession : cache serveur par pass, vérifiée à l'arrivée (3 essais), inconnu ≠ faux (revérifié après 30 s), mise à jour par `PromptGamePassPurchaseFinished`. Les cosmétiques de pass sont **dérivés** de la possession, jamais stockés.
 
-Règles :
-- **Prix affichés via `GetProductInfoAsync`** côté client (prix régional, tests de prix, réduction Plus) ; le prix de la config n'est qu'un repli. Les cosmétiques payants ne s'échangent pas (pas de commerce), donc pas de garde de `PriceLevel`. Prix régional des produits : opt-in possible plus tard.
-- Achat : le client demande `RequestPurchase(clé)`, le serveur vérifie (profil prêt, id ≠ 0, pas déjà possédé) puis appelle `PromptProductPurchase` / `PromptGamePassPurchase`.
-- **`ProcessReceipt` : une seule affectation** (MonetizationService). Ordre : produit inconnu → `NotProcessedYet` ; joueur absent du serveur → `NotProcessedYet` ; attente du profil (15 s) ; profil non modifiable (non chargé, libéré pour téléportation, perdu) → `NotProcessedYet` ; marqueur `PurchaseId` déjà dans le profil → sauvegarde immédiate puis `PurchaseGranted` ; sinon **octroi + marqueur + journal dans le même profil sans `yield`**, puis **sauvegarde immédiate** (`DataService.saveNow`), puis `PurchaseGranted` ; échec de sauvegarde → `NotProcessedYet` (le marqueur reste en mémoire, le prochain passage sauvegarde). Garde `inFlight` par `PurchaseId`. Les produits retirés gardent leur code d'octroi.
-- Pass : cache serveur par joueur, vérifié à l'arrivée (3 essais, recul 1-2 s), inconnu ≠ faux (revérifié après 30 s), mis à jour par `PromptGamePassPurchaseFinished` côté serveur.
-- Analytics de revenu : `receiptInfo.CurrencySpent`, jamais le prix de la config.
-- Réserve de conception (« parent test » du vault) : le **titre doré VIP** est un statut visible qui ne dépend que de l'argent. Demandé par le 00 ; à revalider avant la candidature Select 9-15.
-- Abonnement Roblox : hors périmètre v1 (TODO).
+**Pass saisonnier** (`Products.Seasons`) : saison `S1`, 30 paliers de 100 XP. XP de saison gagnée **en jouant** à chaque run terminée : `20 + floor(KO / 25) + 10 × mondes finis`, plafond 120 par run (≈ 30-40 runs). Piste gratuite (6 récompenses) pour tous, piste premium (11) avec le pass `Season1`, y compris les paliers déjà atteints. Possession dérivée : `seasons[S1] ≥ palier × 100` (+ pass pour la piste premium), aucune réclamation. Dates `startsAt`/`endsAt` à `0` (= saison ouverte) : **TODO Clément**. Le pass n'est proposé que pendant sa saison ; il faut aussi le retirer de la vente au Dashboard à la fin. Profil : `season = { id, xp, tier, tiers, xpPerTier, premium, endsAt }` ; `RunSummary.seasonXp` en plus.
+
+Réserves : titre doré VIP = statut payant visible (« parent test » du vault), à revalider avant Select 9-15. Abonnement Roblox hors périmètre.
 
 ## 10. Défi hebdo
 
+v2 (A12-01) : le défi impose la classe (parmi les 8 classes v2) mais plus le compagnon (`companionId = ""`), puisque chacun a sa propre collection.
 Semaine `week = floor((os.time() − 345 600) / 604 800)` (réinitialisation le lundi 00:00 UTC), **une seule formule** (`Config.Progression.weekIndex`) pour le défi et les classements. Le défi est tiré de façon déterministe de `week` : classe (parmi les 10), compagnon (parmi les 6), modificateur (`NoJump`, `OneHitDown`, `LavaFloor`, `DoubleElites`, `GlassCannon`, `Fog`), monde `BoisGrognon` tier 1. Réussite = victoire avec la classe et le compagnon imposés ; récompense une fois par semaine : 1 œuf + 50 jetons + titre `Title_Weekly` la première fois. L'application du modificateur en run appartient au domaine run (demande de contrat : lire `ProgressionService.getWeeklyChallenge()`).
 
 ## 11. Quêtes (`Config.Quests`) — 164 quêtes

@@ -6,52 +6,49 @@ export type UnlockRule = { free: boolean?, quest: string?, silver: number?, clas
 
 local Progression = {}
 
--- Ids (docs/ARCHITECTURE.md section 3)
+-- Classes v2 (01-decisions-v2 §3 ; ids de shared/Config/Classes.luau, domaine avatar).
+-- Knight, Archer, Mage gratuites ; les autres par quête. Jamais vendues.
 Progression.Classes = {
-	"Cornu",
-	"Plumeline",
-	"Mecano",
-	"Felyne",
-	"Rocailleux",
-	"Sporelin",
-	"Ecaille",
-	"Astrel",
-	"Cristallin",
-	"Tentaculos",
+	"Knight",
+	"Archer",
+	"Mage",
+	"Guardian",
+	"Rogue",
+	"Cleric",
+	"Barbarian",
+	"Tamer",
 } :: { string }
 
+-- Lignées v1 (évolution, Lien, œufs) : plus de contenu en v2 (capture et collection, dossier 40).
+-- Gardées pour lire les vieux profils et les cosmétiques de Lien déjà accordés.
 Progression.Lines = { "Braise", "Ronce", "Maree", "Volt", "Givre", "Echo" } :: { string }
 
 Progression.Worlds = { "BoisGrognon", "DunesCroustillantes", "RecreFantome" } :: { string }
 Progression.MaxTier = 3
 
--- Class start weapons, same order as Classes (ARCHITECTURE section 3).
+-- Arme de départ de chaque classe (lue dans Config.Classes[classId].startWeapon, domaine avatar).
 Progression.StartWeapon = {
-	Cornu = "HacheBoomerang",
-	Plumeline = "PlumesDards",
-	Mecano = "CleTourelle",
-	Felyne = "GriffesEclair",
-	Rocailleux = "PoingSeisme",
-	Sporelin = "NuageSpores",
-	Ecaille = "SouffleBraise",
-	Astrel = "Meteorite",
-	Cristallin = "EclatsPrisme",
-	Tentaculos = "FouetTentacule",
+	Knight = "Broadsword",
+	Archer = "Longbow",
+	Mage = "FireStaff",
+	Guardian = "QuakeHammer",
+	Rogue = "ThrowingDaggers",
+	Cleric = "HolyAura",
+	Barbarian = "SpinningAxes",
+	Tamer = "BeastWhip",
 } :: { [string]: string }
 
 -- Unlock rules per kind. Quest unlocks are derived from questsDone (never stored twice).
 Progression.Unlocks = {
 	Class = {
-		Cornu = { free = true },
-		Plumeline = { free = true },
-		Mecano = { free = true },
-		Felyne = { quest = "Q_Felyne" },
-		Rocailleux = { quest = "Q_Rocailleux" },
-		Sporelin = { quest = "Q_Sporelin" },
-		Ecaille = { quest = "Q_Ecaille" },
-		Astrel = { quest = "Q_Astrel" },
-		Cristallin = { quest = "Q_Cristallin" },
-		Tentaculos = { quest = "Q_Tentaculos" },
+		Knight = { free = true },
+		Archer = { free = true },
+		Mage = { free = true },
+		Guardian = { quest = "Q_Guardian" },
+		Rogue = { quest = "Q_Rogue" },
+		Cleric = { quest = "Q_Cleric" },
+		Barbarian = { quest = "Q_Barbarian" },
+		Tamer = { quest = "Q_Tamer" },
 	},
 	Weapon = {
 		HacheBoomerang = { free = true },
@@ -87,14 +84,7 @@ Progression.Unlocks = {
 		Chance = { silver = 120 },
 		Interdit = { quest = "Q_GrimoireInterdit" },
 	},
-	Companion = {
-		Braise = { free = true },
-		Ronce = { free = true },
-		Maree = { free = true },
-		Volt = { quest = "Q_Volt" },
-		Givre = { quest = "Q_Givre" },
-		Echo = { quest = "Q_Echo" },
-	},
+	-- Companion : plus de regle en v2. Un compagnon se capture (ProgressionService.hasCompanion).
 } :: { [string]: { [string]: UnlockRule } }
 
 -- Items (Config.Items is owned by combat): an item with no `unlock` field, or unlock = "Free",
@@ -113,7 +103,11 @@ Progression.WorldUnlock = {
 	RecreFantome = { stat = "Win_DunesCroustillantes_T2", goal = 1 },
 } :: { [string]: { free: boolean?, stat: string?, goal: number? } }
 
-Progression.DefaultLoadout = { classId = "Cornu", companionId = "Braise" }
+-- companionId "" = aucun : la collection est vide à la première run (dossier 40 §11.1, défaut).
+Progression.DefaultLoadout = { classId = "Knight", companionId = "" }
+
+-- Collection de compagnons (A12-01) : clés d'idempotence de capture gardées dans le profil.
+Progression.Collection = { MaxKeys = 200 }
 
 -- Silver per run (doc 11.1)
 Progression.Silver = {
