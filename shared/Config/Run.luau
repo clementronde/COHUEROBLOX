@@ -45,9 +45,27 @@ local Run = {
 	},
 	-- Après le boss du dernier monde : portail doré « Cash out ». Tous les joueurs actifs dedans
 	-- pendant HoldSeconds = fin de run, gains sauvés. Sinon on continue (Keep going).
+	-- A04-v3 : Cash out par joueur (60-ui-ux, Victory = choix par joueur). Chacun part seul, par le
+	-- bouton (remote VictoryChoice) ou en restant HoldSeconds dans le portail ; les autres continuent.
 	CashOut = {
 		Radius = 10,
 		HoldSeconds = 2,
+	},
+	-- A04-v3 : passage de niveau = le jeu se fige pour tout le monde (décision de Clément, 5 nov.).
+	-- Ennemis, projectiles, armes, chrono, autels, compagnons et joueurs figés tant qu'un joueur
+	-- choisit. Coop : CoopSeconds pour choisir, puis la 1re carte est prise. Solo : SoloSeconds
+	-- (0 = pas de limite, pas de compte à rebours). Enabled = false : ancien mode (8 s, sans pause).
+	LevelUpPause = {
+		Enabled = true,
+		CoopSeconds = 15,
+		SoloSeconds = 0,
+	},
+	-- A04-v3 : lobby dans la place unique (65-lobby §10). La run part StartDelay s après le premier
+	-- PLAY, avec les joueurs prêts seulement (tout de suite si tout le serveur est prêt). Fin de run
+	-- (défaite, victoire ou Cash out) : retour au lobby ReturnSeconds s après le résumé, ou au bouton.
+	Lobby = {
+		StartDelay = 3,
+		ReturnSeconds = 5,
 	},
 
 	-- Timers

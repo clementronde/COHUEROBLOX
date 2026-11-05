@@ -32,6 +32,17 @@ return {
 	PlayerDied = Signal.new(),
 	-- RunManager: (player: Player, amount: number, source: string) -- source "Contact" = mêlée
 	PlayerDamaged = Signal.new(),
+	-- RunManager (A04-v3, demande A05) : (player: Player, source: string). Tout coup reçu par un
+	-- joueur actif, tiré au début de damagePlayer, avant invulnérabilité, parade, esquive et bouclier.
+	-- Jamais pendant le gel du passage de niveau (aucun coup n'existe alors).
+	PlayerHit = Signal.new(),
+	-- RunManager (A04-v3) : (frozen: boolean, pausedSeconds: number). true au début du gel du
+	-- passage de niveau, false à la reprise avec la durée du gel (pour décaler ses minuteries).
+	RunFrozen = Signal.new(),
+	-- RunManager (A04-v3) : (player: Player, summary: RunSummary). Un joueur quitte la run en
+	-- Cash out pendant que les autres continuent (Keep going). Sa run est finie : nettoyer ce qui
+	-- lui appartient (compagnon, offres). Le dernier à partir déclenche RunEnded comme avant.
+	PlayerCashedOut = Signal.new(),
 	-- LootService: (player: Player, chestKind: string)
 	ChestOpened = Signal.new(),
 	-- ShrineService: (players: {Player}, shrineKind: string)

@@ -4,6 +4,8 @@
 -- de run 10/20/30. Pièces provisoires en attendant les Accessories de A01 (vague 1, A04).
 -- Ancien design (traits physiques v1) : docs/dossier/50-classes-avatar-mouvement.md section 3.
 -- API (ARCHITECTURE section 4): applyClass(player, classId) · setTraitStage(player, stage) · clear(player)
+-- applyClass marche aussi au lobby (palier 1) : RunManager l'appelle au chargement du profil, au PLAY
+-- et au retour au lobby (A04-v3, 65-lobby §10).
 -- Player attributes set here (server-owned): ClassId, TraitStage, KnockbackImmune.
 
 local Players = game:GetService("Players")
@@ -16,6 +18,7 @@ local Config = Shared:WaitForChild("Config")
 local Classes = require(Config:WaitForChild("Classes"))
 local Types = require(Shared:WaitForChild("Types"))
 local Movement = require(Config:WaitForChild("Movement"))
+local RunConfig = require(Config:WaitForChild("Run"))
 
 local Bus = require(ServerScriptService:WaitForChild("Server"):WaitForChild("Bus"))
 
@@ -683,6 +686,11 @@ function TraitService.init()
 	end)
 
 	Bus.RunEnded:connect(function(summaries: { [Player]: any }?)
+		-- A04-v3 : place unique avec lobby. L'équipement reste ; RunManager remet le palier 1 au
+		-- retour au lobby (applyClass), et les joueurs restés au lobby gardent le leur.
+		if not RunConfig.UseLobbyPlace then
+			return
+		end
 		local cleared: { [Player]: boolean } = {}
 		if type(summaries) == "table" then
 			for player in summaries do

@@ -1,6 +1,7 @@
 --!strict
--- Level-up card offers (dossier 10, section 4; doc 5.2): 3 cards, 8 s, no pause, invulnerable and
--- slowed while choosing, auto-pick of the rarest card on timeout, queued level-ups.
+-- Level-up card offers (dossier 10, section 4; doc 5.2): 3 cards, queued level-ups. A04-v3 : la run
+-- se fige pour tout le monde pendant le choix (RunManager.setChoosing, Run.LevelUpPause) ; coop
+-- 15 s puis la 1re carte, solo sans limite. Pause coupée : ancien mode 8 s, ralenti, invulnérable.
 -- CardChoice (C->S) is validated strictly: rate limit, types, offerId, action, index, charges.
 
 local Players = game:GetService("Players")
@@ -10,6 +11,7 @@ local RunService = game:GetService("RunService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Cards = require(Config:WaitForChild("Cards"))
+local RunConfig = require(Config:WaitForChild("Run"))
 local Grimoires = require(Config:WaitForChild("Grimoires"))
 local Rarities = require(Config:WaitForChild("Rarities"))
 local Weapons = require(Config:WaitForChild("Weapons"))
@@ -350,7 +352,8 @@ local function sendOffer(player: Player, offer: Offer)
 	offerRemote:FireClient(player, {
 		offerId = offer.offerId,
 		cards = offer.cards,
-		expiresIn = math.max(0, offer.expiresAt - os.clock()),
+		-- nil = sans limite (pause solo) : pas de compte à rebours côté client
+		expiresIn = if offer.expiresAt < math.huge then math.max(0, offer.expiresAt - os.clock()) else nil,
 		banish = if s then s.banish else 0,
 		skip = if s then s.skip else 0,
 		reroll = if s then s.reroll else 0,
@@ -383,6 +386,20 @@ local function tryOpen(player: Player)
 	}
 	d.offer = offer
 	local run = Registry.find("RunManager")
+	-- A04-v3 : pause globale. Coop : Run.LevelUpPause.CoopSeconds ; solo : SoloSeconds (0 = sans
+	-- limite). Le gel protège tout le monde : ni invulnérabilité ni ralenti de carte (S-05 fermé).
+	if run and run.setChoosing then
+		local P = RunConfig.LevelUpPause
+		local coop = run.getRunPlayers and #run.getRunPlayers() > 1
+		local seconds: number? = if coop then P.CoopSeconds elseif P.SoloSeconds > 0 then P.SoloSeconds else nil
+		local ok, paused = pcall(run.setChoosing, player, true, seconds)
+		if ok and paused == true then
+			offer.expiresAt = if seconds then os.clock() + seconds else math.huge
+			sendOffer(player, offer)
+			return
+		end
+	end
+	-- Ancien mode (pause coupée) : 8 s, joueur ralenti et invulnérable jusqu'au choix.
 	if run then
 		if run.setInvulnerable then
 			pcall(run.setInvulnerable, player, Cards.OfferSeconds, "Card")
@@ -409,6 +426,27 @@ local function closeOffer(player: Player, d: PlayerCards)
 	end
 	offerRemote:FireClient(player, { offerId = offer.offerId, closed = true })
 	tryOpen(player)
+	-- Pas d'autre niveau en attente : ce joueur a fini de choisir (la run reprend s'il était le dernier).
+	if not d.offer and run and run.setChoosing then
+		pcall(run.setChoosing, player, false)
+	end
+end
+
+-- Fin de run pour ce joueur (Cash out, fin de run) : l'offre disparaît sans être appliquée.
+local function dropOffer(player: Player)
+	local d = data[player]
+	if not d then
+		return
+	end
+	if d.offer then
+		offerRemote:FireClient(player, { offerId = d.offer.offerId, closed = true })
+	end
+	d.offer = nil
+	d.pending = 0
+	local run = Registry.find("RunManager")
+	if run and run.setChoosing then
+		pcall(run.setChoosing, player, false)
+	end
 end
 
 local function applyCard(player: Player, card: Card, m: Meta)
@@ -558,13 +596,12 @@ function CardService.init()
 		end
 	end)
 	Bus.RunEnded:connect(function()
-		for p, d in data do
-			if d.offer then
-				offerRemote:FireClient(p, { offerId = d.offer.offerId, closed = true })
-			end
-			d.offer = nil
-			d.pending = 0
+		for p in data do
+			dropOffer(p)
 		end
+	end)
+	Bus.PlayerCashedOut:connect(function(player: Player)
+		dropOffer(player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		data[player] = nil
@@ -584,7 +621,9 @@ function CardService.start()
 			local offer = d.offer
 			if offer then
 				if now >= offer.expiresAt then
-					pickIndex(player, d, rarestIndex(offer.cards))
+					-- Pause (coop) : la 1re carte, celle que la fenêtre sélectionne par défaut
+					-- (60-ui-ux 0.0 ter). Ancien mode : la plus rare.
+					pickIndex(player, d, if RunConfig.LevelUpPause.Enabled then 1 else rarestIndex(offer.cards))
 				end
 			elseif d.pending > 0 then
 				tryOpen(player) -- was downed or not yet in the run

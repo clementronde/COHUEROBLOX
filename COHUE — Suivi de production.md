@@ -308,6 +308,12 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 | A04-10 | Les 5 classes à débloquer | Config/Classes | A04-04 | P1 — lancement | À valider |
 | A04-11 | Tous les textes joueur en anglais | Configs |  | P1 — lancement | Fait |
 | A04-12 | Premier équilibrage : un joueur moyen bat le monde 1 dans 70 à 80 % des runs | Rapport | A13-04 | P1 — lancement | À faire |
+| A04-13 | Pause globale au passage de niveau (coop 15 s, solo sans limite), remote `LevelUpPause`, `RunManager.isFrozen`, S-05 fermé | RunManager, CardService, WeaponService (branche `claude/a04-v3`) | A08 (fenêtre L04c) | P0 — bloquant | Code fait, à tester en Play |
+| A04-14 | `Bus.PlayerHit(player, source)` au début de `damagePlayer` (demande A05) | Bus, RunManager (`claude/a04-v3`) |  | P0 — bloquant | Code fait, à tester en Play |
+| A04-15 | Lobby → run dans la place unique : départ avec les joueurs prêts, attribut `InRun`, `applyClass` au lobby, retour au lobby après toute fin de run, remote `ReturnToLobby` | RunManager, TraitService (`claude/a04-v3`) | A09 | P0 — bloquant | Code fait, à tester en Play |
+| A04-16 | Cash out par joueur (remote `VictoryChoice` ou portail doré), `Bus.PlayerCashedOut` | RunManager (`claude/a04-v3`) | A08 (VictoryBanner) | P1 — lancement | Code fait, à tester en Play |
+| A04-17 | Payload `Build` : `runes` / `runeSlots` ; `StatsService.takeXp` (demande A03) | StatsService (`claude/a04-v3`) |  | P1 — lancement | Fait |
+| A04-18 | PERF-02 : 40 effets d'arme par tick et par client au-delà des essentiels | WeaponService (`claude/a04-v3`) |  | P1 — lancement | Code fait, à mesurer (A13) |
 
 ### A06 — Mouvement et caméra
 

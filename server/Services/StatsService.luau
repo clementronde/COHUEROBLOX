@@ -1,6 +1,6 @@
 --!strict
 -- Per-player run build: XP/level, weapons, grimoires, items, final StatBlock (dossier 10, sections 1-4).
--- Cross-domain API (ARCHITECTURE.md section 4): get, addStat, addXp, getLevel, getBuild, grantItem, resetRun.
+-- Cross-domain API (ARCHITECTURE.md section 4): get, addStat, addXp, takeXp, getLevel, getBuild, grantItem, resetRun.
 -- Compteur de KO (A04-03) : getKills(player), getRunKills(), Bus.KOScored, attribut joueur RunKills.
 -- Combat-internal API (used by CardService / WeaponService / PassiveService): see "Domain API" below.
 
@@ -188,6 +188,9 @@ local function sendBuild(player: Player, s: RunState)
 		reroll = s.reroll,
 		weaponSlots = s.weaponSlots,
 		grimoireSlots = s.grimoireSlots,
+		-- A04-v3 : noms v2 (les Grimoires sont les Runes) ; le HUD lit les deux. Même table.
+		runes = grimoires,
+		runeSlots = s.grimoireSlots,
 	})
 end
 
@@ -256,6 +259,21 @@ function StatsService.addXp(player: Player, amount: number)
 	if gained then
 		markStats(s) -- per-level passives
 	end
+end
+
+-- A04-v3 (demande A03, Goblin Bomber) : retire jusqu'à `amount` XP de la barre en cours, sans
+-- jamais faire perdre un niveau. Renvoie l'XP réellement retirée.
+function StatsService.takeXp(player: Player, amount: number): number
+	local s = states[player]
+	if not s or not isFiniteNumber(amount) or amount <= 0 then
+		return 0
+	end
+	local taken = math.min(s.xp, amount)
+	if taken > 0 then
+		s.xp -= taken
+		s.progressDirty = true
+	end
+	return taken
 end
 
 function StatsService.getLevel(player: Player): number

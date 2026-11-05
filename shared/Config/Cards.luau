@@ -1,7 +1,8 @@
 --!strict
 -- Cartes de niveau et courbe d'XP (dossier 10, sections 3 et 4). Décisions v2 section 4 :
--- 3 choix, rareté visible, 8 s pour choisir sans pause (joueur ralenti et invulnérable),
--- Bannir / Passer / Relancer limités par run. Les textes des cartes sont en anglais.
+-- 3 choix, rareté visible, Bannir / Passer / Relancer limités par run. Les textes des cartes sont
+-- en anglais. Depuis le 5 nov. : pause globale (Run.LevelUpPause). OfferSeconds et SlowMultiplier
+-- ne servent plus qu'à l'ancien mode sans pause (Run.LevelUpPause.Enabled = false).
 
 local Cards = {
 	OfferSize = 3,
