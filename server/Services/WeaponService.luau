@@ -28,6 +28,8 @@ local PAD = SIM.EnemyPad
 local KIND = FxCodec.Kind
 local FX_RADIUS = 160
 local FX_MAX_PER_PLAYER = FxCodec.PerChunk * 2
+-- PERF-02 (plan de test §3) : au-delà des effets essentiels, 40 effets par tick et par client.
+local FX_BUDGET = 40
 local ATTACH_REFRESH = 4 -- permanent zones re-send their attach event this often (unreliable)
 local TELEPORT_STEP = 20 -- studs par tick au-delà desquels un déplacement est un téléport (S-07)
 
@@ -150,6 +152,7 @@ local pending: { Pending } = {}
 
 local fxQueue = FxCodec.newQueue()
 local fxIdx: { number } = {}
+local fxPick: { boolean } = {} -- sendFx : effets retenus pour le client en cours (remis à false)
 
 -- reused query buffers
 local qbuf: { number } = {}
@@ -1336,15 +1339,36 @@ local function sendFx()
 		if not ps.hasRoot then
 			continue
 		end
-		local m = 0
-		for i = 1, n do
-			local dx, dz = fxQueue.x[i] / FxCodec.Scale - ps.x, fxQueue.z[i] / FxCodec.Scale - ps.z
-			if dx * dx + dz * dz <= r2 then
-				m += 1
-				fxIdx[m] = i
-				if m >= FX_MAX_PER_PLAYER then
+		-- PERF-02 : d'abord les effets qui portent un état (fin de projectile, aura attachée) et ceux
+		-- du joueur lui-même, jusqu'à FX_MAX_PER_PLAYER ; puis ceux des autres, jusqu'à FX_BUDGET.
+		-- L'ordre de la file est gardé (une fin de projectile ne passe jamais avant sa naissance).
+		local picked = 0
+		for pass = 1, 2 do
+			local cap = if pass == 1 then FX_MAX_PER_PLAYER else FX_BUDGET
+			for i = 1, n do
+				if picked >= cap then
 					break
 				end
+				local kind = fxQueue.head[i] % 8
+				local essential = kind == KIND.End
+					or kind == KIND.Attach
+					or (kind == KIND.Projectile and fxQueue.p4[i] == ps.slot)
+				if essential ~= (pass == 1) then
+					continue
+				end
+				local dx, dz = fxQueue.x[i] / FxCodec.Scale - ps.x, fxQueue.z[i] / FxCodec.Scale - ps.z
+				if dx * dx + dz * dz <= r2 then
+					picked += 1
+					fxPick[i] = true
+				end
+			end
+		end
+		local m = 0
+		for i = 1, n do
+			if fxPick[i] then
+				fxPick[i] = false
+				m += 1
+				fxIdx[m] = i
 			end
 		end
 		if m > 0 then
