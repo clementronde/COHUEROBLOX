@@ -17,7 +17,7 @@ Pour chaque attaque, on décrit quatre moments : le **départ** (l'arme tire), l
 
 | | Existe aujourd'hui | Reste à faire |
 | --- | --- | --- |
-| Modèles tenus | 8 MeshParts voxel v1 dans `Assets.Weapons` (armes de départ), jamais utilisés par le code | 16 modèles en briques (8 refaits, 8 nouveaux) + 16 modèles de fusion |
+| Modèles tenus | 8 MeshParts voxel v1 dans `Assets.Weapons` (armes de départ), jamais utilisés par le code | 16 modèles en pixel art épaissi (8 refaits, 8 nouveaux) + 16 modèles de fusion |
 | Pièces en jeu | Aucune : `WeaponFX` fabrique des Parts Block / Ball / Cylinder de couleur unie | 10 pièces (flèche, dague, hache, boomerang, bombe, lance, météore, lame, tourelle, carreau) + variantes de fusion |
 | Effets d'armes | Aucun objet : des Parts plates (anneaux, plaques) fabriquées par script. Ni ParticleEmitter, ni Beam, ni Trail, ni lumière | 41 effets pour les 16 armes (section 8), plus ceux des fusions |
 | Autres effets dessinés par `WeaponFX` | 9 visuels spéciaux (parade, soin, fantôme, sifflet…) et le télégraphe rouge, tous en Parts fabriquées par script | 10 effets (section 4) |
@@ -63,14 +63,14 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 
 | Attaque | Règle | Départ | Trajectoire | Impact |
 | --- | --- | --- | --- | --- |
-| Coup de taille | cône 140° vers l'ennemi le plus proche, rayon 8, recul 4, 16 dégâts, 1,1 s | la lame tenue scintille | croissant de briques Steel à bord Neon Royal qui balaie le cône en 0,15 s | éclats Steel et petites étoiles sur l'arc extérieur |
+| Coup de taille | cône 140° vers l'ennemi le plus proche, rayon 8, recul 4, 16 dégâts, 1,1 s | la lame tenue scintille | croissant de lumière (bord blanc, corps Sky, halo) qui balaie le cône en 0,15 s | éclat blanc et étincelles sur chaque ennemi touché |
 | Revers (niv. 4) | 2e coup, 0,18 s après, derrière le joueur (`swingBack`) | — | même croissant, à l'opposé | idem |
 | Niveaux | niv. 3 et 8 : rayon +15 % · niv. 7 : angle +40° (180°) | | le croissant suit rayon et angle | |
 | Niveau 8 | | | liseré Gold sur le croissant (palier, section 10) | |
 | Fusion | « Royal Greatsword » (section 3) | | | |
 
 - **Existe** : `Weapon_Broadsword` (v1 voxel, pommeau en canard). Effet : plaque plate grise fabriquée par script.
-- **À faire** : modèle tenu en briques ; effet `Swing` (croissant) ; effet `Impact` ; accent Gold du niveau 8 ; fusion.
+- **À faire** : modèle tenu en pixel art ; effet `Swing` (croissant) ; effet `Impact` ; accent Gold du niveau 8 ; fusion.
 
 ### 2.2 Longbow — Archer (arme de départ)
 
@@ -92,7 +92,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 
 | Attaque | Règle | Départ | Trajectoire | Impact |
 | --- | --- | --- | --- | --- |
-| Boule de feu | 42 studs/s, explose au 1er ennemi ou en fin de course (1,3 s), 14 dégâts, 1,4 s | flash Ember au cristal du bâton | cube Neon Ember entouré de flammes (particules), petite lumière en qualité Haute | explosion de rayon 5 : anneau au sol, cubes de braise qui retombent |
+| Boule de feu | 42 studs/s, explose au 1er ennemi ou en fin de course (1,3 s), 14 dégâts, 1,4 s | flash Ember au cristal du bâton | boule de lumière blanc-or, halo braise, traînée (Trail), petite lumière en qualité Haute | explosion de rayon 5 : flash blanc, onde de choc orange au sol, étincelles, fumée douce |
 | Brûlure | 4 dégâts/s pendant 2 s | | | flammèches au sol dans la zone pendant 2 s (limite 4 de la section 1) |
 | Niveaux | niv. 3 : explosion +20 % · niv. 4 : 2 boules · niv. 5 : brûlure +3/s · niv. 8 : explosion +25 % | | | l'explosion suit le rayon |
 | Fusion | « Sun Staff » | | | |
@@ -106,7 +106,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 
 | Attaque | Règle | Départ | Trajectoire | Impact |
 | --- | --- | --- | --- | --- |
-| Onde de choc | cercle de rayon 9 autour du joueur, recul 8, 22 dégâts (+1 %/armure), 2,4 s | poussière sous le marteau tenu | anneau de dalles Stone et Leather qui se soulèvent vers l'extérieur | cailloux projetés au bord de l'onde |
+| Onde de choc | cercle de rayon 9 autour du joueur, recul 8, 22 dégâts (+1 %/armure), 2,4 s | poussière sous le marteau tenu | onde de choc au sol (anneau lumineux et poussière douce) qui s'élargit | poussière et étincelles au bord de l'onde |
 | Niveaux | niv. 3 et 7 : rayon +15 % · niv. 5 : 2e onde 0,3 s après | | | |
 | Niveau 8 | étourdit 0,3 s | | | étoiles au-dessus de la zone (teinte givre de `EnemyRenderer` aujourd'hui, limite 4) |
 | Fusion | « Mountain Maul » | | | |
@@ -133,7 +133,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 
 | Attaque | Règle | Départ | Trajectoire | Impact |
 | --- | --- | --- | --- | --- |
-| Aura | anneau permanent de rayon 6 qui suit le joueur, tic toutes les 0,5 s, 5 dégâts | la clochette tenue sonne | disque au sol en dalles Cream et Gold translucides, bord Neon Gold, qui pulse au rythme des tics | petites étincelles dorées dans la zone |
+| Aura | anneau permanent de rayon 6 qui suit le joueur, tic toutes les 0,5 s, 5 dégâts | la clochette tenue sonne | disque au sol Gold translucide, bord Neon Gold, qui pulse au rythme des tics | petites étincelles dorées dans la zone |
 | Soin du Cleric (Blessing) | 1,5 PV par tic aux joueurs dans l'aura | | | visuel spécial `Blessing` (section 4) |
 | Niveaux | niv. 3, 6 : rayon +15 % · niv. 8 : +20 % · niv. 4 : tic −15 % | | le disque suit le rayon | |
 | Fusion | « Grand Chime » | | | |
@@ -162,7 +162,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 
 | Attaque | Règle | Départ | Trajectoire | Impact |
 | --- | --- | --- | --- | --- |
-| Claque à 360° | cercle de rayon 8,5, recul 6, 15 dégâts, 1,7 s | le fouet tenu se déroule | lanière de briques Leather qui fait un tour complet en 0,2 s, pompon de cirque au bout | étoile « crack » Ember au bout de la lanière |
+| Claque à 360° | cercle de rayon 8,5, recul 6, 15 dégâts, 1,7 s | le fouet tenu se déroule | traînée de lumière Ember qui fait un tour complet en 0,2 s, pompon de cirque au bout | étoile « crack » Ember au bout de la lanière |
 | Niveaux | niv. 3, 6 : rayon +15 % · niv. 8 : +20 % · niv. 4 : 2e claque 0,25 s après | | | |
 | Fusion | « Ringmaster Lash » | | | |
 
@@ -215,7 +215,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 
 | Attaque | Règle | Départ | Trajectoire | Impact |
 | --- | --- | --- | --- | --- |
-| Bombe | sur un ennemi à ≤ 25 studs, explose après 0,8 s, rayon 6, recul 6, 24 dégâts, 2,6 s | la bombe sort du sac | bombe Ink à mèche (pièce) qui vole en cloche pendant 0,8 s (le point de départ manque, limite 3) ; télégraphe au sol, toujours dessiné | explosion : anneau, nuage de briques, débris |
+| Bombe | sur un ennemi à ≤ 25 studs, explose après 0,8 s, rayon 6, recul 6, 24 dégâts, 2,6 s | la bombe sort du sac | bombe Ink à mèche (pièce) qui vole en cloche pendant 0,8 s (le point de départ manque, limite 3) ; télégraphe au sol, toujours dessiné | explosion : flash blanc, onde orange, étincelles, fumée douce |
 | Niveaux | niv. 4, 7 : +1 bombe (3) · niv. 3 : rayon +15 % · niv. 8 : +20 % | | | l'explosion suit le rayon |
 | Fusion | « Cluster Sack » (mini-bombes : le moteur `cluster` et le visuel `MiniBomb` existent) | | | |
 
@@ -241,7 +241,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 
 | Attaque | Règle | Départ | Trajectoire | Impact |
 | --- | --- | --- | --- | --- |
-| Météores | 2 météores sur des ennemis au hasard (≤ 35 studs), 0,9 s de télégraphe, rayon 7, 40 dégâts, 3,2 s ; +1 % de météore par point de Chance | — | télégraphe au sol (toujours dessiné) ; rocher de briques en feu qui tombe du ciel pendant ces 0,9 s (calcul client) | cratère, éclats, flammes |
+| Météores | 2 météores sur des ennemis au hasard (≤ 35 studs), 0,9 s de télégraphe, rayon 7, 40 dégâts, 3,2 s ; +1 % de météore par point de Chance | — | télégraphe au sol (toujours dessiné) ; météore (pièce en pixel art) en feu, avec traînée lumineuse, qui tombe du ciel pendant ces 0,9 s (calcul client) | cratère, éclats, flammes |
 | Brûlure | 3 dégâts/s pendant 2 s | | | flammes au sol dans la zone pendant 2 s |
 | Niveaux | niv. 3, 7 : +1 météore (4) · niv. 4 : rayon +15 % · niv. 8 : +20 % | | | |
 | Fusion | « Star Shower » | | | |
@@ -256,7 +256,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 
 | Attaque | Règle | Départ | Trajectoire | Impact |
 | --- | --- | --- | --- | --- |
-| Lames en orbite | 3 petites lames permanentes, orbite serrée (rayon 3,5), 6 dégâts toutes les 0,35 s par ennemi | apparition à l'équipement | lame (pièce, disque de scie en briques Steel) qui tourne, traînée légère en qualité Haute | étincelles sur l'orbite |
+| Lames en orbite | 3 petites lames permanentes, orbite serrée (rayon 3,5), 6 dégâts toutes les 0,35 s par ennemi | apparition à l'équipement | lame (pièce, disque de scie en pixel art Steel) qui tourne, traînée légère en qualité Haute | étincelles sur l'orbite |
 | Niveaux | niv. 2, 5 : +1 lame · niv. 8 : +2 (7 lames) · niv. 4 : rotation +20 % · niv. 7 : rayon +15 % | | | |
 | Fusion | « Buzzsaw Halo » | | | |
 
@@ -316,9 +316,9 @@ Ces visuels ne sont pas des armes, mais `WeaponFX` les fabrique. Pour que `Weapo
 
 | Visuel (id réseau) | Source | Quand | Existe (Parts fabriquées par script) | À faire |
 | --- | --- | --- | --- | --- |
-| Parry (20) | Knight, Valor | parade d'un coup, toutes les 8 s ; zone de rayon 3,5 | anneau jaune | bouclier de briques Royal qui s'ouvre, étincelle « ting » |
+| Parry (20) | Knight, Valor | parade d'un coup, toutes les 8 s ; zone de rayon 3,5 | anneau jaune | bouclier de lumière Royal qui s'ouvre, étincelle « ting » |
 | Blessing (21) | Cleric, Blessing | soin d'un allié dans l'aura, au plus toutes les 1,5 s ; zone de rayon 2,5 | anneau doré | croix Gold qui monte au-dessus de l'allié |
-| Ghost (22) | objet Blankie Ghost (Legendary) | tous les 50 studs parcourus, projectile guidé | boule blanche | petit fantôme-doudou en briques Cream |
+| Ghost (22) | objet Blankie Ghost (Legendary) | tous les 50 studs parcourus, projectile guidé | boule blanche | petit fantôme-doudou en pixel art Cream |
 | Whistle (23) | objet Recess Whistle | toutes les 20 s, recul à 14 studs | anneau blanc | onde de sifflet (anneau et notes) |
 | Megaphone (24) | objet Megaphone | toutes les 12 s, étourdit à 10 studs | anneau jaune | cône de son, lettres « !! » |
 | Thorns (25) | Guardian Bulwark, objet Thumbtack | renvoi des coups de mêlée, rayon 6 | anneau marron | piques de pierre qui sortent autour du joueur |
@@ -433,11 +433,29 @@ Le niveau 8 ne demande pas d'objet en plus : les accents Gold sont des pièces m
 
 ---
 
-## 9. Conventions proposées
+## 9. Conventions (DA des armes du 5 nov., 2e version)
 
-**Modèles tenus** (`Assets.Weapons.<Id>`) : un `Model` en briques fines (0,25 à 0,5 stud), technique B de la DA (maille fusionnée, UV à l'échelle de la cellule, tenons par Resurface). Ce qui ne porte pas de tenons (Neon, cristal, flamme) est une MeshPart à part. 3 à 4 studs de long, détails d'au moins 2 × 2 briques. Prise au centre de la poignée, arme pointée vers +Y, attribut `GripOffset` (convention A01). 300 triangles visés, 800 au plus. Les accents du niveau 8 sont dans un sous-dossier `Max`, masqués par défaut.
+Le 5 nov., Clément a changé la DA des armes et des effets (« oui a tous ») : « Les armes sont en pixel mais avec des détails, par contre les effets sont réalistes, pas en pixel. » Les armes ne sont ni en voxels ni à tenons. Le décor, les créatures et l'équipement de classe restent dans la DA de A01 (plastique à tenons). Règle : **« des blocs pour ce qui existe, de la lumière pour ce qui se passe »**. Planche concept : `assets/a14/09-armes-effets-concept.jpg`, scripts `assets/a14/concept.py` (Blender 5.2) et `assets/a14/board.py`.
 
-**Effets** (`Assets.FX.Weapons.<Id>.<Rôle>`) : les ParticleEmitter sont posés éteints (`Enabled = false`), et le code appelle `:Emit(n)`. Les Beam et Trail sont posés avec leurs Attachments. Les couleurs viennent de la palette COHUE 16.
+**Armes et pièces en jeu** (`Assets.Weapons.<Id>`, flèche, dague, hache, bombe…) :
+- un sprite en pixels à plat, sur une grille de 24 à 32 px, dessiné dans `concept.py` (classe `Sprite`) ;
+- contour Ink de 1 px, volume dans les pixels (reflet clair en haut à gauche, ombre en bas à droite), détails peints à la main (reflets, gravures, gemme, gag) ;
+- une couleur dominante par arme, un seul petit accent Neon (gemme, cristal, corde, mèche) ;
+- épaissi de 2 à 6 px, la garde, la poignée et les objets ronds plus épais ;
+- 1 px = 0,125 stud, soit 32 px = 4 studs ;
+- une seule maille fusionnée par arme (maille gloutonne étanche de A01, couleur par sommet), plus une MeshPart Neon séparée ;
+- 400 à 1 400 triangles mesurés sur les 6 modèles de la planche, plafond fixé à 1 500 ;
+- pas de tenons ;
+- à téléverser : pas d'EditableMesh, qui ne s'enregistre pas ;
+- la prise est l'origine du modèle, l'arme pointe vers +Y, attribut `GripOffset` (convention A01) ;
+- au niveau 8, des accents Gold, posés dans un sous-dossier `Max` masqué par défaut ;
+- le même sprite sert d'icône : `assets/a14/sprites/<Arme>.png` (natif) et `<Arme>@8x.png`, à livrer à A08.
+
+**Effets** (`Assets.FX.Weapons.<Id>.<Rôle>`) : de la lumière seulement, jamais de cubes ni de pixels.
+- **Particules douces** : ParticleEmitter à textures rondes et floues (halo, flamme, fumée, étincelle étirée), posés éteints (`Enabled = false`) ; le code appelle `:Emit(n)`.
+- **Traînées et éclairs** : Beam et Trail avec dégradé de transparence, posés avec leurs Attachments.
+- **Anneaux et zones au sol** : plans ou anneaux Neon fins avec bloom (onde de choc, alerte, aura).
+- **Couleur des lumières** : un cœur blanc très lumineux, puis la couleur de l'arme en halo à intensité modérée, sinon l'orange vire au jaune et le jaune au blanc.
 
 **Budget mobile**, pour tenir avec 300 ennemis :
 - au plus 1 ParticleEmitter allumé en continu par arme ;
@@ -450,7 +468,10 @@ Le niveau 8 ne demande pas d'objet en plus : les accents Gold sont des pièces m
 - les effets du joueur brillent (Neon), ceux des ennemis restent Tomato sans Neon ;
 - Bubblegum est réservé à la capture : `MiniBomb` (rose aujourd'hui) change de couleur ;
 - **télégraphes** (validé par Clément le 5 nov.) : le cercle de la bombe et du météore du joueur passe du rouge à Ember ou Gold, en pointillé. Le rouge reste au danger des ennemis ;
-- Meteor Rain passe de son rouge-Tomato à Ember.
+- Meteor Rain passe de son rouge-Tomato à Ember ;
+- **code au sol proposé sur la planche** : anneau Gold en pointillé qui se remplit = alerte du joueur ; onde orange pleine avec flash blanc = coup du joueur ; rouge Tomato mat, sans lumière = ennemis.
+
+**Couleurs dominantes de la planche** : Broadsword bleu roi, Longbow vert feuille, Fire Staff braise, Bomb Bag raisin (bombe à bande raisin, pour la distinguer de la bombe noire du gobelin Bomber).
 
 **Une couleur par arme** (validé par Clément le 5 nov.). La DA §6 disait « tirs du joueur aux couleurs de la classe ». Mais les 16 armes sont équipables par toutes les classes : chaque arme a donc sa couleur (feu Ember, givre et éclair Sky, sacré Gold…), plus lisible quand on porte 4 armes. Contract request à A01 pour mettre la DA §6 à jour.
 
@@ -469,7 +490,7 @@ Je ne touche pas aux fichiers de ces agents. Chaque demande est petite et sans r
 | A01 | DA §6 : « une couleur par arme » au lieu de « aux couleurs de la classe » ; télégraphes du joueur en Ember ou Gold | décision de Clément du 5 nov. |
 | A04 (option) | Envoyer les coups critiques (un bit dans un évènement existant) | effet de critique pour l'Archer et la Crit Rune |
 | A03 (option) | Distinguer gel et étourdissement (aujourd'hui un seul bit « arrêté », teinte givre) | le Quake Hammer et le Megaphone étourdissent, ils ne gèlent pas |
-| A08 | Les icônes d'armes des cartes et du HUD peuvent être rendues à partir de mes modèles (ViewportFrame) | une seule source pour l'arme |
+| A08 | Icônes d'armes : utiliser les sprites de A14 (`assets/a14/sprites/<Arme>.png`, 32 px, et `@8x`, fond transparent, filtrage au plus proche), téléversés par A14 à la porte 3 ; 4 armes livrées avec la planche, les autres suivent | Clément : « le même sprite sert d'icône » |
 | A06 | Aucune ; l'arme tenue s'accroche à `RightGripAttachment` sans toucher à l'animation | — |
 
 Ce que je corrige moi-même dans `WeaponFX` (client, mon domaine, étape 4) : le style des carreaux de la tourelle, la couleur de `MiniBomb`, les télégraphes, et le clonage des objets au lieu des Parts fabriquées par script.
@@ -486,4 +507,17 @@ Ce que je corrige moi-même dans `WeaponFX` (client, mon domaine, étape 4) : le
 | Arme de départ tenue en main | Oui |
 | Couleurs | Une couleur par arme ; télégraphes du joueur en Ember ou Gold, le rouge reste aux ennemis |
 
-Suite : planche concept (étape 2), avec 3 ou 4 armes et 2 ou 3 effets en rendu, avant de tout modéliser (porte 2).
+## 12. Porte 2 : planche concept (5 nov. 2026)
+
+Planche : `assets/a14/09-armes-effets-concept.jpg`, dans la DA du 5 nov. (2e version, section 9). Elle montre :
+- 4 armes : Broadsword, Longbow, Fire Staff, Bomb Bag ;
+- 2 pièces : la bombe et la flèche ;
+- leurs icônes ;
+- 3 effets en vue rapprochée et en vue de jeu : coup de taille, boule de feu et explosion, alerte puis explosion de la bombe ;
+- le code couleur au sol, testé sur l'herbe et sur le sable ;
+- une séquence en 4 temps ;
+- un test avec 70 gobelins et 5 effets à la fois.
+
+Une première version « tout en tenons » a été abandonnée après le changement de DA. Ses relectures à l'aveugle ont laissé des règles qu'on garde : un sens par couleur et par forme au sol, des effets plus grands que nécessaire sur téléphone, le danger ennemi testé dans la horde.
+
+En attente : validation de Clément (porte 2).
