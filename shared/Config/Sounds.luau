@@ -48,9 +48,9 @@ Sounds.Categories = {
 Sounds.Volumes = {
 	Default = { master = 1, music = 0.7, sfx = 1 } :: { [Group]: number },
 	SettingKeys = { master = "masterVolume", music = "musicVolume", sfx = "sfxVolume" } :: { [Group]: string },
-	-- false tant que ProgressionService refuse ces clés (contract request A10) : le réglage reste
-	-- local à la session. true : envoyé par UpdateSettings (regroupé, max 1 envoi par SendDelay).
-	Persist = false,
+	-- true : envoyé par UpdateSettings (regroupé, max 1 envoi par SendDelay, sous la limite serveur
+	-- de 2/s) et sauvé dans Profile.settings (dossier 70 §1, §16). false : réglage local à la session.
+	Persist = true,
 	SendDelay = 0.5,
 }
 

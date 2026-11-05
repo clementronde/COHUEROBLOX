@@ -1390,6 +1390,11 @@ function CompanionService.init()
 		end
 		clearCages()
 	end)
+	-- Cash out en coop (RunManager) : le joueur quitte la run, son compagnon aussi (ses captures
+	-- sont déjà dans son RunSummary).
+	Bus.PlayerCashedOut:connect(function(player: Player)
+		removeOwner(player)
+	end)
 	Bus.StageStarted:connect(function()
 		clearCages()
 		for _, c in order do

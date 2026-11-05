@@ -132,6 +132,10 @@ local function slideTune(key: string, default: number): number
 end
 
 local function slowMult(): number
+	-- Gel du passage de niveau (RunManager) : immobile, pas le plancher de ralenti 0,05.
+	if player:GetAttribute("Frozen") then
+		return 0
+	end
 	local mult = player:GetAttribute("SlowMult")
 	local untilT = player:GetAttribute("SlowUntil")
 	local m = 1
@@ -394,8 +398,8 @@ end
 --     compte pas, sinon glisser-sauter remplacerait le timing), en pente ça convertit la vitesse gagnée.
 local function groundJump()
 	local h, r = humanoid, root
-	if not h or not r or h.Health <= 0 then
-		return
+	if not h or not r or h.Health <= 0 or player:GetAttribute("Frozen") then
+		return -- figé : un saut en tampon n'est pas consommé à l'atterrissage
 	end
 	local now = os.clock()
 	local base = math.max(baseWalk(), 1)
@@ -449,8 +453,8 @@ end
 
 local function onJumpAction(pressed: boolean)
 	local h = humanoid
-	if not pressed or not h or h.Health <= 0 then
-		return
+	if not pressed or not h or h.Health <= 0 or player:GetAttribute("Frozen") then
+		return -- figé (gel du passage de niveau) : aucun saut, rien en tampon
 	end
 	if h.SeatPart then
 		h.Sit = false

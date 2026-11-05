@@ -10,5 +10,6 @@ return {
 	Leaderboards = "RemoteEvent", -- server -> client: { [boardKey]: {{ userId, value }} }
 	MatchRequest = "RemoteEvent", -- client -> server: (worldId: string, tier: number)
 	MatchState = "RemoteEvent", -- server -> client: { state, reason: LocalizedText? }
+	MatchMode = "RemoteEvent", -- client -> server: (mode: "Solo" | "Party" | "Public"), avant SelectLoadout
 	DataNotice = "RemoteEvent", -- server -> client: { kind, text: LocalizedText, questId: string? }
 }

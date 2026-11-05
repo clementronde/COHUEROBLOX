@@ -104,9 +104,13 @@ export type RunSummary = {
 	companionId: string,
 	companionStage: number,
 	level: number,
+	-- Compagnons capturés pendant la run (CompanionService.getRunCaptures, rempli par RunManager)
+	captured: { string }?,
 	-- Filled by ProgressionService before RunSummary is sent to the client
 	silverEarned: number?,
 	questsProgressed: { { id: string, progress: number, goal: number, completed: boolean } }?,
+	seasonXp: number?,
+	weeklyRank: number?, -- rang hebdo parmi le dernier top lu, nil si hors top ou inconnu
 }
 
 return nil
