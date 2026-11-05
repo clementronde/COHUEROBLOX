@@ -31,6 +31,7 @@ export type Attack = {
 	spread: number?, -- degrees (Fan)
 	speed: number?, -- projectile speed (Fan)
 	summonKind: number?, -- enemy kind; 0 = world elites
+	projectile: string?, -- Fan : objet Assets.FX.Bosses.<fxFolder>.<projectile> (sinon Assets.FX.Enemies.Projectiles.Default)
 	whileRooted: boolean?, -- the only attacks the Oak uses while rooted
 }
 
@@ -51,6 +52,8 @@ export type Weakness = {
 export type Boss = {
 	id: string,
 	kind: number, -- Enemies kind id (16..19)
+	asset: string?, -- modèle Assets.Creatures.<asset> (BossRenderer) ; sans asset : Enemies[kind].asset
+	fxFolder: string?, -- dossier Assets.FX.Bosses.<fxFolder> (objets d'attaque, dossier 13 §9.2)
 	name: Types.LocalizedText,
 	hp: number,
 	moveSpeed: number,
@@ -87,6 +90,8 @@ local Bosses = {
 Bosses.List.GrandCheneRonchon = {
 	id = "GrandCheneRonchon",
 	kind = 16,
+	asset = "Boss_GrumpyGreatOak",
+	fxFolder = "GrumpyGreatOak",
 	name = { en = "The Grumpy Great Oak", fr = "The Grumpy Great Oak" },
 	hp = 5000,
 	moveSpeed = 3,
@@ -112,13 +117,15 @@ Bosses.List.GrandCheneRonchon = {
 Bosses.List.PharaonGrillePain = {
 	id = "PharaonGrillePain",
 	kind = 17,
+	asset = "Boss_HungryCoffin", -- boss v2 du monde 2 (attaques v2 avec A03-06)
+	fxFolder = "HungryCoffin",
 	name = { en = "The Toaster Pharaoh", fr = "The Toaster Pharaoh" },
 	hp = 6000,
 	moveSpeed = 6,
 	contactDamage = 20,
 	attacks = {
 		{ id = "TartinesBrulantes", label = { en = "Burning Toast", fr = "Burning Toast" }, kind = "Line", minPhase = 1, windup = 1.0, cooldown = 5, damage = 22, width = 6, length = 40 },
-		{ id = "Miettes", label = { en = "Crumbs", fr = "Crumbs" }, kind = "Fan", minPhase = 1, windup = 0.6, cooldown = 6, damage = 10, radius = 5, count = 7, spread = 60, speed = 18 },
+		{ id = "Miettes", label = { en = "Crumbs", fr = "Crumbs" }, kind = "Fan", minPhase = 1, windup = 0.6, cooldown = 6, damage = 10, radius = 5, count = 7, spread = 60, speed = 18, projectile = "Bone" },
 		{ id = "GrilleArdente", label = { en = "Red-Hot Grill", fr = "Red-Hot Grill" }, kind = "SelfCircle", minPhase = 2, windup = 1.2, cooldown = 9, damage = 30, radius = 14 },
 		{ id = "Momification", label = { en = "Mummify", fr = "Mummify" }, kind = "Summon", minPhase = 2, windup = 1.0, cooldown = 15, radius = 6, count = 5, summonKind = 5 },
 		{ id = "Ruee", label = { en = "Rush", fr = "Rush" }, kind = "Charge", minPhase = 3, windup = 1.2, cooldown = 8, damage = 28, width = 8, length = 50 },
@@ -135,13 +142,15 @@ Bosses.List.PharaonGrillePain = {
 Bosses.List.DirectriceEternelle = {
 	id = "DirectriceEternelle",
 	kind = 18,
+	asset = "Boss_EternalHeadmistress",
+	fxFolder = "EternalHeadmistress",
 	name = { en = "The Eternal Headmistress", fr = "The Eternal Headmistress" },
 	hp = 6500,
 	moveSpeed = 7,
 	contactDamage = 20,
 	attacks = {
 		{ id = "RegleTapante", label = { en = "Ruler Smack", fr = "Ruler Smack" }, kind = "TargetCircle", minPhase = 1, windup = 1.0, cooldown = 4.5, damage = 26, radius = 9 },
-		{ id = "AvionsEnPapier", label = { en = "Paper Planes", fr = "Paper Planes" }, kind = "Fan", minPhase = 1, windup = 0.6, cooldown = 5, damage = 11, radius = 5, count = 5, spread = 50, speed = 20 },
+		{ id = "AvionsEnPapier", label = { en = "Paper Planes", fr = "Paper Planes" }, kind = "Fan", minPhase = 1, windup = 0.6, cooldown = 5, damage = 11, radius = 5, count = 5, spread = 50, speed = 20, projectile = "PaperPlane" },
 		{ id = "RetenueGenerale", label = { en = "Detention for All", fr = "Detention for All" }, kind = "Ring", minPhase = 2, windup = 1.6, cooldown = 11, damage = 28, inner = 16, radius = 40 },
 		{ id = "AppelEnRang", label = { en = "Line Up!", fr = "Line Up!" }, kind = "Summon", minPhase = 2, windup = 1.0, cooldown = 14, radius = 6, count = 6, summonKind = 9 },
 	},

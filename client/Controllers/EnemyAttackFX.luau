@@ -9,6 +9,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Motion = require(script.Parent.EnemyMotion)
+local ArtLibrary = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ArtLibrary"))
 type Profile = Motion.Profile
 
 type Shape = { part: BasePart, base: Vector3, s: number, grow: number, fade0: number, fade1: number }
@@ -29,7 +30,7 @@ local HIDDEN = CFrame.new(0, -10000, 0)
 local LIMIT = 18
 local active: { Effect } = {}
 local pools: { [Model]: { Inst } } = {}
-local container: Folder
+local container: Folder? = nil
 local root: Instance?
 local warned: { [string]: boolean } = {}
 
@@ -167,10 +168,148 @@ function Effects.emit(profile: Profile, origin: Vector3, facing: Vector3, mode: 
 	table.insert(active, effect)
 end
 
+-- Télégraphes ennemis (dossier 13 §9.2, étape 4) ---------------------------------------------------
+-- Objets posés par Clément dans Assets.FX.Enemies.Telegraphs : Circle, Ring, Line. Contrat :
+--   * un Model, pivot au centre, au sol ;
+--   * `Zone` : l'étendue totale ; `Fill` : grandit jusqu'à l'impact ; `Safe` (Ring) : la zone sûre ;
+--   * Circle et Ring : le code met les deux grands axes de chaque pièce au diamètre voulu (l'axe le
+--     plus fin reste l'épaisseur : un disque Cylinder couché marche aussi) ;
+--   * Line : X = largeur, Z = longueur (le pivot est au milieu de la ligne) ;
+--   * couleur de Zone et Fill posée par le code (Tomato danger, Grape invocation, Gold point faible) ;
+--     transparences et matériaux viennent du modèle.
+-- Utilisé par BossRenderer (attaques de boss) et ici pour les mini-boss (mode "slam").
+export type Telegraph = {
+	template: Instance,
+	parts: { BasePart },
+	offsets: { CFrame },
+	roles: { string },
+	bases: { Vector3 },
+}
+
+local telegraphPools: { [Instance]: { Telegraph } } = {}
+local telegraphWarned: { [string]: boolean } = {}
+
+local function ensureContainer(): Folder
+	local folder = container
+	if not folder then
+		folder = Instance.new("Folder") -- dossier de rangement vide : invisible
+		folder.Name = "ClientEnemyAttackFX"
+		folder.Parent = Workspace
+		container = folder
+	end
+	return folder
+end
+
+function Effects.takeTelegraph(shape: string): Telegraph?
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	local fx = assets and assets:FindFirstChild("FX")
+	local enemies = fx and fx:FindFirstChild("Enemies")
+	local folder = enemies and enemies:FindFirstChild("Telegraphs")
+	local t = folder and folder:FindFirstChild(shape)
+	if not t then
+		if not telegraphWarned[shape] then
+			telegraphWarned[shape] = true
+			warn(`[EnemyAttackFX] télégraphe manquant : Assets.FX.Enemies.Telegraphs.{shape}`)
+		end
+		return nil
+	end
+	local pool = telegraphPools[t]
+	local reused = pool and table.remove(pool)
+	if reused then
+		return reused
+	end
+	local parent = ensureContainer()
+	local parts, offsets = ArtLibrary.clonePivoted(t)
+	local tg: Telegraph = { template = t, parts = parts, offsets = offsets, roles = {}, bases = {} }
+	for k, p in parts do
+		tg.roles[k] = p.Name
+		tg.bases[k] = p.Size
+		p.CFrame = HIDDEN
+		p.Parent = parent
+	end
+	return tg
+end
+
+function Effects.giveTelegraph(tg: Telegraph)
+	for _, p in tg.parts do
+		p.CFrame = HIDDEN
+	end
+	local pool = telegraphPools[tg.template]
+	if not pool then
+		pool = {}
+		telegraphPools[tg.template] = pool
+	end
+	table.insert(pool, tg)
+end
+
+local function fitDisc(part: BasePart, base: Vector3, diameter: number)
+	local d = math.max(0.1, diameter)
+	if base.X <= base.Y and base.X <= base.Z then
+		part.Size = Vector3.new(base.X, d, d)
+	elseif base.Y <= base.Z then
+		part.Size = Vector3.new(d, base.Y, d)
+	else
+		part.Size = Vector3.new(d, d, base.Z)
+	end
+end
+
+-- Place un télégraphe de cercle ou d'anneau : centre au sol, rayon, rayon intérieur, avancement u (0..1).
+function Effects.placeDisc(tg: Telegraph, center: CFrame, radius: number, inner: number, u: number, color: Color3?)
+	local grown = inner + (radius - inner) * math.clamp(u, 0, 1)
+	for k, p in tg.parts do
+		local role = tg.roles[k]
+		local d = if role == "Fill" then grown * 2 elseif role == "Safe" then inner * 2 else radius * 2
+		if role == "Safe" and inner <= 0 then
+			p.CFrame = HIDDEN
+			continue
+		end
+		fitDisc(p, tg.bases[k], d)
+		if color and (role == "Zone" or role == "Fill") then
+			p.Color = color
+		end
+		p.CFrame = center * tg.offsets[k]
+	end
+end
+
+-- Place un télégraphe de ligne : origine au sol, direction (unitaire), largeur, longueur, avancement u.
+function Effects.placeLine(tg: Telegraph, origin: Vector3, dir: Vector3, width: number, length: number, u: number, color: Color3?)
+	local filled = math.max(0.1, length * math.clamp(u, 0, 1))
+	for k, p in tg.parts do
+		local role = tg.roles[k]
+		local l = if role == "Fill" then filled else length
+		local base = tg.bases[k]
+		p.Size = Vector3.new(math.max(0.1, width), base.Y, l)
+		if color and (role == "Zone" or role == "Fill") then
+			p.Color = color
+		end
+		local mid = origin + dir * (l / 2)
+		p.CFrame = CFrame.lookAt(mid, mid + dir) * tg.offsets[k]
+	end
+end
+
+-- Télégraphe d'attaque de mini-boss (mode "slam") : affiché `windup` s, puis rendu au pool.
+type Slam = { tg: Telegraph, start: number, ends: number, center: CFrame, radius: number, inner: number }
+local slams: { Slam } = {}
+
+function Effects.slam(shape: string, position: Vector3, radius: number, inner: number, windup: number, color: Color3)
+	local tg = Effects.takeTelegraph(if shape == "Ring" then "Ring" else "Circle")
+	if not tg then
+		return
+	end
+	local now = os.clock()
+	local s: Slam = { tg = tg, start = now, ends = now + math.max(0.1, windup), center = CFrame.new(position + Vector3.new(0, 0.12, 0)), radius = radius, inner = inner }
+	Effects.placeDisc(tg, s.center, radius, inner, 0, color)
+	table.insert(slams, s)
+end
+
+local initialized = false
+
 function Effects.init()
-	container = Instance.new("Folder") -- dossier de rangement vide : invisible
-	container.Name = "ClientEnemyAttackFX"
-	container.Parent = Workspace
+	if initialized then
+		return
+	end
+	initialized = true
+	ensureContainer()
 	local assets = ReplicatedStorage:WaitForChild("Assets", 10)
 	local fx = assets and assets:FindFirstChild("FX")
 	root = fx and fx:FindFirstChild("Enemies")
@@ -188,6 +327,15 @@ function Effects.init()
 				continue
 			end
 			place(effect, u)
+		end
+		for i = #slams, 1, -1 do
+			local s = slams[i]
+			if now >= s.ends then
+				Effects.giveTelegraph(s.tg)
+				table.remove(slams, i)
+				continue
+			end
+			Effects.placeDisc(s.tg, s.center, s.radius, s.inner, (now - s.start) / (s.ends - s.start), nil)
 		end
 	end)
 end

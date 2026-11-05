@@ -3,12 +3,13 @@
 -- Les ids restent dans 1..31 (5 bits sur le réseau, EnemyCodec).
 -- Nombres = monde 1, solo ; EnemyService applique l'échelle du monde, de l'Overtime et de la coop.
 --
--- Visuel (A03-01) : `asset` = nom du gabarit posé par Clément (A01), cherché par EnemyRenderer dans
--- ReplicatedStorage.Assets (récursif, en pratique Assets.Creatures), puis dans
--- ReplicatedStorage.EnemyVisualRigs. Sans `asset`, le nom cherché est "Enemy_<name>".
--- Gabarit absent : repli sur `model` (Parts v1, seulement pour les entrées v1 gardées) ou sur un bloc
--- de la couleur `color`, et un avertissement unique dans la sortie.
--- `height` = hauteur de gameplay = hauteur dessinée ÷ 1,3 (EnemyRenderer dessine à ×1,3).
+-- Visuel (étape 4, dossier 13 §6 et §9.1) : `asset` = nom du modèle posé par Clément dans
+-- ReplicatedStorage.Assets.Creatures (ArtLibrary.find ; sans `asset` : "Enemy_<name>"). Rien n'est
+-- fabriqué par script : un modèle absent est signalé une fois dans la sortie et EnemyRenderer clone à
+-- sa place Assets.Creatures.Enemy_Placeholder s'il existe (sinon l'ennemi n'est pas dessiné).
+-- `height` et `radius` = gabarit de gameplay (contact, tirs, marqueurs si le modèle n'a pas ses
+-- attributs). Le dessin vient du modèle, posé à sa taille finale (attributs Height, Radius, Float).
+-- `color` ne sert plus qu'à teinter l'imposteur lointain (Assets.FX.Enemies.Impostor).
 --
 -- Comportements (A03-04, tout en données côté serveur dans EnemyService) :
 --   Support  : garde ses distances et lance une aura toutes les `auraEvery` s (soin, hâte des
@@ -20,15 +21,6 @@
 local Types = require(script.Parent.Parent.Types)
 
 export type Family = "Swarm" | "Jumper" | "Shooter" | "Armored" | "Support" | "Kamikaze" | "MiniBoss" | "Boss"
-
-export type ModelPart = {
-	shape: "Ball" | "Block" | "Cylinder" | "Wedge",
-	size: Vector3,
-	offset: Vector3,
-	color: Color3,
-	rot: Vector3?, -- degrees
-	neon: boolean?,
-}
 
 export type Def = {
 	id: number,
@@ -96,13 +88,25 @@ export type Def = {
 	-- Mini-boss
 	coinsPerHit: boolean?,
 	isBoss: boolean?,
-	model: { ModelPart }, -- repli v1 en Parts (vide pour le roster v2)
+	-- Tir : objet cloné par EnemyRenderer, Assets.FX.Enemies.Projectiles.<projectile> (sinon Default)
+	projectile: string?,
+	-- Mini-boss (contract request 5, dossier 13 §9.3) : une attaque de zone annoncée toutes les
+	-- slamEvery s, quand un joueur est à moins de slamRange. slamShape : "Front" = cercle devant lui,
+	-- "Self" = cercle centré sur lui, "Ring" = anneau de slamInner à slamRadius (se saute).
+	-- Annonce : EnemyAttackVisual "aim" (rayon), puis "boss" à l'impact ; état action pendant la préparation.
+	slamName: string?,
+	slamShape: ("Front" | "Self" | "Ring")?,
+	slamEvery: number?,
+	slamWindup: number?,
+	slamRadius: number?,
+	slamInner: number?,
+	slamDamage: number?,
+	slamRange: number?,
 }
 
 local function rgb(r: number, g: number, b: number): Color3
 	return Color3.fromRGB(r, g, b)
 end
-local V = Vector3.new
 
 -- Couleurs de repli (bloc dessiné si le gabarit manque), d'après le guide DA §6.
 local LIME = rgb(140, 200, 70) -- peau des gobelins
@@ -119,6 +123,7 @@ local Enemies: { [number]: Def } = {
 		label = { en = "Grumpy Acorn", fr = "Grumpy Acorn" },
 		world = "BoisGrognon",
 		family = "Swarm",
+		asset = "Enemy_GrumpyAcorn",
 		hp = 10,
 		speed = 10,
 		radius = 1.2,
@@ -126,11 +131,6 @@ local Enemies: { [number]: Def } = {
 		color = rgb(150, 105, 60),
 		contactDamage = 6,
 		xp = 1,
-		model = {
-			{ shape = "Ball", size = V(2.4, 2.2, 2.4), offset = V(0, 1.1, 0), color = rgb(176, 120, 64) },
-			{ shape = "Cylinder", size = V(0.7, 2.4, 2.4), offset = V(0, 2.1, 0), color = rgb(96, 64, 36), rot = V(0, 0, 90) },
-			{ shape = "Block", size = V(1.2, 0.25, 0.2), offset = V(0, 1.5, -1.15), color = rgb(30, 20, 15), rot = V(0, 0, -12) },
-		},
 	},
 	[2] = {
 		id = 2,
@@ -138,6 +138,7 @@ local Enemies: { [number]: Def } = {
 		label = { en = "Hopshroom", fr = "Hopshroom" },
 		world = "BoisGrognon",
 		family = "Jumper",
+		asset = "Enemy_Hopshroom",
 		hp = 18,
 		speed = 8,
 		radius = 1.4,
@@ -149,11 +150,6 @@ local Enemies: { [number]: Def } = {
 		leapWindup = 0.4,
 		leapAir = 0.8,
 		leapCooldown = 3.5,
-		model = {
-			{ shape = "Cylinder", size = V(1.6, 1.2, 1.2), offset = V(0, 0.8, 0), color = rgb(240, 230, 210), rot = V(0, 0, 90) },
-			{ shape = "Ball", size = V(3, 1.6, 3), offset = V(0, 2, 0), color = rgb(205, 55, 55) },
-			{ shape = "Ball", size = V(0.6, 0.6, 0.6), offset = V(0.7, 2.6, -0.6), color = rgb(255, 255, 255) },
-		},
 	},
 	[3] = {
 		id = 3,
@@ -161,6 +157,8 @@ local Enemies: { [number]: Def } = {
 		label = { en = "Diving Owl", fr = "Diving Owl" },
 		world = "BoisGrognon",
 		family = "Shooter",
+		asset = "Enemy_DivingOwl",
+		projectile = "Feather",
 		hp = 14,
 		speed = 9,
 		radius = 1.3,
@@ -175,12 +173,6 @@ local Enemies: { [number]: Def } = {
 		shotSpeed = 18,
 		shotDamage = 9,
 		shotRadius = 1.2,
-		model = {
-			{ shape = "Ball", size = V(2.4, 2.6, 2.2), offset = V(0, 1.6, 0), color = rgb(125, 95, 145) },
-			{ shape = "Wedge", size = V(3.6, 0.4, 1.4), offset = V(0, 1.8, 0.4), color = rgb(90, 70, 110) },
-			{ shape = "Ball", size = V(0.7, 0.7, 0.3), offset = V(-0.5, 2.1, -1.05), color = rgb(255, 220, 80) },
-			{ shape = "Ball", size = V(0.7, 0.7, 0.3), offset = V(0.5, 2.1, -1.05), color = rgb(255, 220, 80) },
-		},
 	},
 	[4] = {
 		id = 4,
@@ -203,7 +195,6 @@ local Enemies: { [number]: Def } = {
 		auraHeal = 0.25,
 		auraHaste = 1.25,
 		auraHasteTime = 3,
-		model = {},
 	},
 	-- Monde 2 : cimetière et marais (zombies). Id du monde : DunesCroustillantes tant qu'A02 ne l'a pas
 	-- renommé (contract request) ; le monde n'est pas dans Run.WorldChain pour l'instant.
@@ -221,7 +212,6 @@ local Enemies: { [number]: Def } = {
 		color = SKY_D,
 		contactDamage = 8,
 		xp = 1,
-		model = {},
 	},
 	[6] = {
 		id = 6,
@@ -241,7 +231,6 @@ local Enemies: { [number]: Def } = {
 		leapWindup = 0.45, -- la petite danse avant le grand jeté
 		leapAir = 0.7,
 		leapCooldown = 3,
-		model = {},
 	},
 	[7] = {
 		id = 7,
@@ -250,6 +239,7 @@ local Enemies: { [number]: Def } = {
 		world = "DunesCroustillantes",
 		family = "Shooter",
 		asset = "Enemy_ZombieGravedigger",
+		projectile = "DirtClod",
 		hp = 22,
 		speed = 9,
 		radius = 1.4,
@@ -270,7 +260,6 @@ local Enemies: { [number]: Def } = {
 		emergeWindup = 0.7,
 		emergeRadius = 4,
 		emergeDamage = 12,
-		model = {},
 	},
 	[8] = {
 		id = 8,
@@ -296,7 +285,6 @@ local Enemies: { [number]: Def } = {
 		puddleTime = 5,
 		puddleDps = 6,
 		puddleSlow = 0.6,
-		model = {},
 	},
 	-- Monde 3 : Récré Fantôme (fantômes) --------------------------------------------------------
 	[9] = {
@@ -313,7 +301,6 @@ local Enemies: { [number]: Def } = {
 		color = CREAM,
 		contactDamage = 8,
 		xp = 1,
-		model = {},
 	},
 	[10] = {
 		id = 10,
@@ -322,6 +309,7 @@ local Enemies: { [number]: Def } = {
 		world = "RecreFantome",
 		family = "Shooter",
 		asset = "Enemy_GhostPoltergeist",
+		projectile = "Book",
 		hp = 20,
 		speed = 10,
 		radius = 1.3,
@@ -338,7 +326,6 @@ local Enemies: { [number]: Def } = {
 		shotRadius = 1.2,
 		shotCount = 3, -- trois fournitures d'école en éventail
 		shotSpread = 30,
-		model = {},
 	},
 	[11] = {
 		id = 11,
@@ -361,7 +348,6 @@ local Enemies: { [number]: Def } = {
 		auraHaste = 1.45,
 		auraHasteTime = 3,
 		auraRally = true,
-		model = {},
 	},
 	[12] = {
 		id = 12,
@@ -380,7 +366,6 @@ local Enemies: { [number]: Def } = {
 		armor = 0.4,
 		weight = 6,
 		knockbackMult = 0.2,
-		model = {},
 	},
 	-- Mini-bosses ----------------------------------------------------------------------------
 	[13] = {
@@ -389,6 +374,14 @@ local Enemies: { [number]: Def } = {
 		label = { en = "Giant Stump", fr = "Giant Stump" },
 		world = "BoisGrognon",
 		family = "MiniBoss",
+		asset = "MiniBoss_GoblinChief", -- mini-boss v2 du monde 1 (le nom de config change avec A03-05)
+		slamName = "BigLadle",
+		slamShape = "Front",
+		slamEvery = 7,
+		slamWindup = 1.0,
+		slamRadius = 6,
+		slamDamage = 26,
+		slamRange = 12,
 		hp = 900,
 		speed = 7,
 		radius = 3.5,
@@ -399,13 +392,6 @@ local Enemies: { [number]: Def } = {
 		armor = 0.15,
 		weight = 8,
 		knockbackMult = 0.1,
-		model = {
-			{ shape = "Cylinder", size = V(5, 7, 7), offset = V(0, 2.5, 0), color = rgb(115, 78, 45), rot = V(0, 0, 90) },
-			{ shape = "Cylinder", size = V(0.4, 6.4, 6.4), offset = V(0, 5.1, 0), color = rgb(210, 170, 110), rot = V(0, 0, 90) },
-			{ shape = "Ball", size = V(1, 1, 0.4), offset = V(-1.2, 3.4, -3.4), color = rgb(255, 230, 90), neon = true },
-			{ shape = "Ball", size = V(1, 1, 0.4), offset = V(1.2, 3.4, -3.4), color = rgb(255, 230, 90), neon = true },
-			{ shape = "Ball", size = V(2.4, 1.2, 2.4), offset = V(1.5, 5.6, 1), color = rgb(70, 150, 60) },
-		},
 	},
 	[14] = {
 		id = 14,
@@ -413,6 +399,14 @@ local Enemies: { [number]: Def } = {
 		label = { en = "Piggy Camel", fr = "Piggy Camel" },
 		world = "DunesCroustillantes",
 		family = "MiniBoss",
+		asset = "MiniBoss_ZombieOgre", -- mini-boss v2 du monde 2
+		slamName = "TombstoneSlam",
+		slamShape = "Self",
+		slamEvery = 8,
+		slamWindup = 1.0,
+		slamRadius = 7,
+		slamDamage = 28,
+		slamRange = 8,
 		hp = 1100,
 		speed = 8,
 		radius = 3.5,
@@ -423,13 +417,6 @@ local Enemies: { [number]: Def } = {
 		weight = 8,
 		knockbackMult = 0.1,
 		coinsPerHit = true,
-		model = {
-			{ shape = "Ball", size = V(5, 4, 7), offset = V(0, 3, 0), color = rgb(240, 160, 180) },
-			{ shape = "Ball", size = V(2.4, 2.4, 2.4), offset = V(0, 5.4, 0.5), color = rgb(230, 145, 165) },
-			{ shape = "Ball", size = V(2.4, 2.2, 2.6), offset = V(0, 4.8, -4), color = rgb(240, 160, 180) },
-			{ shape = "Block", size = V(1.6, 0.2, 0.3), offset = V(0, 6.6, 0.5), color = rgb(60, 40, 40) },
-			{ shape = "Block", size = V(4, 1.6, 6), offset = V(0, 0.8, 0), color = rgb(200, 130, 150) },
-		},
 	},
 	[15] = {
 		id = 15,
@@ -437,6 +424,15 @@ local Enemies: { [number]: Def } = {
 		label = { en = "Spectral Proctor", fr = "Spectral Proctor" },
 		world = "RecreFantome",
 		family = "MiniBoss",
+		asset = "MiniBoss_SpectralProctor", -- mini-boss v2 du monde 3
+		slamName = "WhistleBlast",
+		slamShape = "Ring",
+		slamEvery = 8,
+		slamWindup = 1.0,
+		slamInner = 4,
+		slamRadius = 14,
+		slamDamage = 24,
+		slamRange = 13,
 		hp = 1200,
 		speed = 9,
 		radius = 3,
@@ -446,12 +442,6 @@ local Enemies: { [number]: Def } = {
 		xp = 40,
 		weight = 8,
 		knockbackMult = 0.1,
-		model = {
-			{ shape = "Ball", size = V(5, 6, 5), offset = V(0, 3.4, 0), color = rgb(165, 205, 255) },
-			{ shape = "Block", size = V(4, 0.6, 0.4), offset = V(0, 4.6, -2.4), color = rgb(30, 30, 50) },
-			{ shape = "Cylinder", size = V(0.6, 3.2, 3.2), offset = V(0, 6.6, 0), color = rgb(30, 50, 110), rot = V(0, 0, 90) },
-			{ shape = "Block", size = V(0.4, 3, 0.4), offset = V(2.8, 3.2, -0.5), color = rgb(240, 240, 255), neon = true },
-		},
 	},
 	-- Bosses (driven by BossService; drawn by BossRenderer, skipped by EnemyRenderer) ------
 	[16] = {
@@ -460,6 +450,7 @@ local Enemies: { [number]: Def } = {
 		label = { en = "The Grumpy Great Oak", fr = "The Grumpy Great Oak" },
 		world = "BoisGrognon",
 		family = "Boss",
+		asset = "Boss_GrumpyGreatOak",
 		hp = 5000,
 		speed = 3,
 		radius = 7,
@@ -469,7 +460,6 @@ local Enemies: { [number]: Def } = {
 		xp = 200,
 		knockbackMult = 0,
 		isBoss = true,
-		model = {},
 	},
 	[17] = {
 		id = 17,
@@ -477,6 +467,7 @@ local Enemies: { [number]: Def } = {
 		label = { en = "The Toaster Pharaoh", fr = "The Toaster Pharaoh" },
 		world = "DunesCroustillantes",
 		family = "Boss",
+		asset = "Boss_HungryCoffin", -- boss v2 du monde 2 (le nom de config change avec A03-06)
 		hp = 6000,
 		speed = 6,
 		radius = 5,
@@ -486,7 +477,6 @@ local Enemies: { [number]: Def } = {
 		xp = 200,
 		knockbackMult = 0,
 		isBoss = true,
-		model = {},
 	},
 	[18] = {
 		id = 18,
@@ -494,6 +484,7 @@ local Enemies: { [number]: Def } = {
 		label = { en = "The Eternal Headmistress", fr = "The Eternal Headmistress" },
 		world = "RecreFantome",
 		family = "Boss",
+		asset = "Boss_EternalHeadmistress",
 		hp = 6500,
 		speed = 7,
 		radius = 4,
@@ -503,7 +494,6 @@ local Enemies: { [number]: Def } = {
 		xp = 200,
 		knockbackMult = 0,
 		isBoss = true,
-		model = {},
 	},
 	[19] = {
 		id = 19,
@@ -520,7 +510,6 @@ local Enemies: { [number]: Def } = {
 		xp = 300,
 		knockbackMult = 0,
 		isBoss = true,
-		model = {},
 	},
 	-- Roster v2 (suite) -------------------------------------------------------------------------
 	[20] = {
@@ -543,7 +532,6 @@ local Enemies: { [number]: Def } = {
 		auraRadius = 12,
 		auraSlow = 0.6,
 		auraSlowTime = 2.5,
-		model = {},
 	},
 	[21] = {
 		id = 21,
@@ -559,7 +547,6 @@ local Enemies: { [number]: Def } = {
 		color = LIME,
 		contactDamage = 6,
 		xp = 1,
-		model = {},
 	},
 	[22] = {
 		id = 22,
@@ -568,6 +555,7 @@ local Enemies: { [number]: Def } = {
 		world = "BoisGrognon",
 		family = "Shooter",
 		asset = "Enemy_GoblinArcher",
+		projectile = "Arrow",
 		hp = 14,
 		speed = 9,
 		radius = 1.2,
@@ -582,7 +570,6 @@ local Enemies: { [number]: Def } = {
 		shotSpeed = 18,
 		shotDamage = 9,
 		shotRadius = 1.2,
-		model = {},
 	},
 	[23] = {
 		id = 23,
@@ -604,7 +591,6 @@ local Enemies: { [number]: Def } = {
 		blastDamage = 18,
 		xpSteal = 6,
 		xpStealDrop = 0.5,
-		model = {},
 	},
 }
 

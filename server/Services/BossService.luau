@@ -17,6 +17,7 @@ local Enemies = require(Config:WaitForChild("Enemies"))
 local Run = require(Config:WaitForChild("Run"))
 local Worlds = require(Config:WaitForChild("Worlds"))
 local Heightmap = require(Shared:WaitForChild("Heightmap"))
+local Codec = require(Shared:WaitForChild("EnemyCodec"))
 local Net = require(Shared:WaitForChild("Net"))
 local Registry = require(Shared:WaitForChild("Registry"))
 local Bus = require(script.Parent.Parent:WaitForChild("Bus"))
@@ -284,6 +285,9 @@ local function resolveTelegraph(b: BossRuntime, t: Telegraph, targets: { { playe
 		local spread = math.rad(attack.spread or 60)
 		local baseAngle = math.atan2(t.dirZ or 0, t.dirX or 1)
 		local full = (attack.spread or 0) >= 360
+		-- Objet du tir côté client (contract request 4) : kind du boss + rang de l'attaque dans sa liste.
+		local slot = table.find(b.def.attacks, attack) or 0
+		local style = Codec.packStyle(b.def.kind, if slot <= 7 then slot else 0)
 		for k = 1, count do
 			local a
 			if full then
@@ -291,7 +295,7 @@ local function resolveTelegraph(b: BossRuntime, t: Telegraph, targets: { { playe
 			else
 				a = baseAngle - spread / 2 + (if count > 1 then (k - 1) / (count - 1) else 0.5) * spread
 			end
-			enemies._fireProjectile(b.x, b.z, math.cos(a), math.sin(a), attack.speed or 18, (attack.damage or 10) * damageScale(), 1.4, 4.5, Heightmap.getY(b.x, b.z) + 4)
+			enemies._fireProjectile(b.x, b.z, math.cos(a), math.sin(a), attack.speed or 18, (attack.damage or 10) * damageScale(), 1.4, 4.5, Heightmap.getY(b.x, b.z) + 4, style)
 		end
 	elseif t.resolve == "Summon" and enemies then
 		local world = Worlds[(Heightmap.getLayout() or { worldId = Run.DefaultWorld }).worldId] or Worlds[Run.DefaultWorld]
