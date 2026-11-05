@@ -464,6 +464,9 @@ function LootService._spawnPoints(kind: string, n: number, seed: number): { Vect
 	return out
 end
 
+-- Envoi complet en cours, un paquet par tick (PERF-09, voir sendFull).
+local fullQueue: { [Player]: { chunks: { buffer }, nextIndex: number } } = {}
+
 local function clearWorld()
 	for _, e in all do
 		pushDelta(e, S.Removed)
@@ -473,6 +476,7 @@ local function clearWorld()
 	table.clear(coinsOnGround)
 	table.clear(pots)
 	table.clear(chests)
+	table.clear(fullQueue) -- un ensemble capturé avant le nettoyage ferait réapparaître le butin
 	gemCount, coinCount = 0, 0
 	merchant = nil
 end
@@ -710,6 +714,11 @@ local function sendDeltas()
 	dCount = 0
 end
 
+-- PERF-09 : l'ensemble complet est capturé en une fois (tous ses paquets portent le même tick, le
+-- client le reconstitue), puis envoyé à raison d'UN paquet par tick et par joueur. Sur un réseau
+-- mobile, 5 paquets non fiables partis d'un coup se perdaient ensemble. 5 paquets = 0,5 s, bien
+-- avant l'envoi complet suivant (FullSyncEvery = 10 ticks) ; un ensemble pas fini est remplacé.
+
 local function sendFull()
 	local r2 = Loot.InterestRadius * Loot.InterestRadius
 	for _, player in Players:GetPlayers() do
@@ -725,7 +734,20 @@ local function sendFull()
 					end
 				end
 			end
-			sendTo(player, Codec.Mode.Full, n)
+			fullQueue[player] = { chunks = Codec.encode(simTick, Codec.Mode.Full, sIds, sXs, sZs, sFlags, n), nextIndex = 1 }
+		end
+	end
+end
+
+local function drainFull()
+	for player, q in fullQueue do
+		local chunk = q.chunks[q.nextIndex]
+		if chunk and player.Parent then
+			snapshotRemote:FireClient(player, chunk)
+			q.nextIndex += 1
+		end
+		if not player.Parent or q.nextIndex > #q.chunks then
+			fullQueue[player] = nil
 		end
 	end
 end
@@ -750,6 +772,7 @@ local function step()
 	if simTick % Loot.FullSyncEvery == 0 then
 		sendFull()
 	end
+	drainFull()
 	for player, st in states do
 		if st.coinsDirty and player.Parent then
 			sendCoins(player)
@@ -1137,6 +1160,7 @@ function LootService.init()
 			end
 		end
 		states[player] = nil
+		fullQueue[player] = nil
 		xpPending[player] = nil
 		coinPending[player] = nil
 	end)

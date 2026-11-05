@@ -67,6 +67,7 @@ local fullTick = -1
 local fullChunks = 0
 local fullCount = 0
 local latestDeltaTick = 0
+local goneAt: { [number]: number } = {} -- id -> tick du delta qui l'a retiré (PERF-09)
 
 local moveParts: { BasePart } = {}
 local moveCFrames: { CFrame } = {}
@@ -218,6 +219,18 @@ end
 
 local function onRecord(tick: number, isFull: boolean, id: number, x: number, z: number, flags: number)
 	local kind, state = Codec.unpackFlags(flags)
+	if isFull then
+		-- PERF-09 : l'ensemble complet arrive en plusieurs ticks. Un paquet capturé avant un ramassage
+		-- ou une ouverture ne fait pas réapparaître l'objet.
+		local gone = goneAt[id]
+		if gone and gone >= tick then
+			return
+		end
+	elseif bit32.band(state, S.Collected + S.Removed) ~= 0 then
+		goneAt[id] = tick
+	else
+		goneAt[id] = nil -- apparition ou mise à jour (id réutilisé)
+	end
 	if not isFull and bit32.band(state, S.Collected) ~= 0 then
 		local e = entries[id]
 		if e and not e.flying and e.popAt == 0 then
@@ -268,6 +281,12 @@ local function onSnapshot(payload: unknown)
 			for _, e in entries do
 				if e.lastFull < tick and e.born < tick and not e.flying and e.popAt == 0 then
 					destroyEntry(e)
+				end
+			end
+			-- Un ensemble complet plus récent ne contiendra plus ces objets : on oublie leur retrait.
+			for id, gone in goneAt do
+				if gone < tick then
+					goneAt[id] = nil
 				end
 			end
 		end
