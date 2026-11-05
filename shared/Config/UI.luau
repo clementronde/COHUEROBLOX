@@ -215,7 +215,29 @@ UI.Cards = {
 	RingSize = 48,
 	WarnSeconds = 3,
 	ArmSeconds = 0.4, -- cards ignore taps this long after they appear (no accidental pick)
+	-- v3 level-up window (StarterGui.COHUE_LevelUp). Width/Height above are still read by ShrineUI.
+	Rarity = { Common = "Cream", Rare = "Royal", Epic = "Grape", Legendary = "Gold" }, -- brick colour
+	-- Stats panel, in this order. A stat the selected offer changes but that is not listed takes
+	-- the place of the last rows. Portrait phone: the first PortraitRows only, then "+N more".
+	StatRows = { "MaxHp", "Regen", "Armor", "Damage", "AttackSpeed", "Amount", "Size", "Cooldown", "CritChance", "Luck", "Magnet", "MoveSpeed" },
+	PortraitRows = 6,
+	ItemsShown = 8, -- 4 when weapons or Runes need a second row
+	FlySeconds = 0.35, -- picked icon flies into its inventory cell
+	-- Optional remote (A04, contract request): LevelUpPause { active, choosers = { userId }, endsIn }.
+	PauseRemote = "LevelUpPause",
 }
+
+-- Short stat names for the level-up stats panel (180 px). Missing = UI.Stats name.
+UI.StatShort = {
+	AttackSpeed = { fr = "Vit. d'attaque", en = "Attack Speed" },
+	Amount = { fr = "Projectiles", en = "Projectiles" },
+	Size = { fr = "Zone", en = "Area" },
+	CritChance = { fr = "Critique", en = "Crit" },
+	CritDamage = { fr = "Dégâts crit.", en = "Crit Damage" },
+	XpGain = { fr = "Gain d'XP", en = "XP Gain" },
+	MoveSpeed = { fr = "Vitesse", en = "Move Speed" },
+	MaxHp = { fr = "PV max", en = "Max HP" },
+} :: { [string]: L }
 
 UI.Minimap = {
 	Size = { phone = 120, tablet = 120, desktop = 120 }, -- logical px, x UIScale
@@ -346,6 +368,22 @@ UI.Strings = {
 	BanHint = { fr = "Touche une carte à bannir", en = "Tap a card to banish" },
 	BanTag = { fr = "BANNIR", en = "TAP TO BANISH" },
 	Cancel = { fr = "Annuler", en = "Cancel" },
+	-- Level-up window v3
+	LevelTitle = { fr = "NIVEAU {n} !", en = "LEVEL {n}!" },
+	Inventory = { fr = "INVENTAIRE", en = "INVENTORY" },
+	StatsTitle = { fr = "STATS", en = "STATS" },
+	WeaponsTitle = { fr = "ARMES", en = "WEAPONS" },
+	RunesTitle = { fr = "RUNES", en = "RUNES" },
+	ItemsTitle = { fr = "OBJETS", en = "ITEMS" },
+	NewTag = { fr = "NOUVEAU !", en = "NEW!" },
+	LevelFromTo = { fr = "Nv {a} → {b}", en = "Lv {a} → {b}" },
+	TapAgain = { fr = "TOUCHE ENCORE", en = "TAP AGAIN" },
+	Seconds = { fr = "{n} s", en = "{n}s" },
+	FrozenChoose = { fr = "Tout le monde est figé pendant ton choix", en = "Everyone is frozen while you choose" },
+	MateLeveled = { fr = "{name} MONTE DE NIVEAU !", en = "{name} LEVELED UP!" },
+	MatePicking = { fr = "{name} choisit une amélioration.", en = "{name} is picking an upgrade." },
+	FrozenBack = { fr = "Tout le monde est figé. Retour dans {n} s", en = "Everyone is frozen. Back in {n}s" },
+	MoreStats = { fr = "+{n} de plus", en = "+{n} more" },
 	ShrineCharge = { fr = "Autel {p} % · {n} joueur(s)", en = "Shrine {p}% · {n} player(s)" },
 	ShrineTitle = { fr = "Choisis un bonus d'autel", en = "Pick a shrine bonus" },
 	Ultimate = { fr = "Ultime", en = "Ultimate" },

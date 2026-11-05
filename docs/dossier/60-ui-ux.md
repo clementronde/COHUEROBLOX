@@ -157,6 +157,35 @@ Captures : `concept/captures/v32-niveau-gagne-coop-choix.png` et `v32-niveau-gag
 
 **Contract request (A04, serveur)** : pause globale de la run au passage de niveau (ennemis, projectiles, chrono, autels, compte à rebours de Victory figés). Propositions à valider par Clément : 15 s de choix en coop ; à 0, l'offre sélectionnée (la première par défaut) est prise ; si plusieurs joueurs montent de niveau en même temps, ils choisissent en parallèle et la run reprend quand le dernier a fini. Côté client : un remote `LevelUpPause` (qui choisit, fin du délai) pour afficher les deux vues.
 
+### 0.0 ter Montage de la v3 dans COHUE (« en dur »)
+
+Règle de Clément : rien de visible n'est construit par script en jeu. L'outil d'édition `tools/ui/build-ui-v3.luau` se lance une fois dans Studio (`execute_luau`, Edit) sur la place COHUE et pose de vrais objets que Clément voit, retouche et sauvegarde. Les scripts du jeu les retrouvent par leur nom (`UIKit.screen`, `UIKit.find`), les remplissent, les clonent pour les listes et les animent. Un gabarit absent est signalé dans la sortie, jamais recréé par le jeu.
+
+Relance : l'outil ne pose que ce qui manque, un écran absent de StarterGui ou une pièce absente d'`Assets.UI`. Pour refaire un écran déjà posé, on met son nom dans `REBUILD` : l'ancien part d'abord dans `ServerStorage.A08_UIBackup_<date>`.
+
+| Écran | Gabarit | Script | État |
+| --- | --- | --- | --- |
+| HUD (vitals, chrono, KO, record, armes, équipiers, boss, annonces) | `StarterGui.COHUE_HUD` | `HUD.luau` | Monté et testé en jeu le 5 nov. (5e150b8) |
+| À terre, fantôme | `COHUE_Downed`, `COHUE_Vignette` | `HUD.luau` | Monté le 5 nov. |
+| **Niveau gagné** (L04, L04b, L04c) | `COHUE_LevelUp`, `COHUE_Freeze`, `Assets.UI.LevelUpFreeze` | `CardUI.luau` | Monté et testé en jeu le 5 nov. (captures `studio-niveau-v3-*.jpg`). L'attente coop (L04c) attend `LevelUpPause` d'A04 |
+| Boutons tactiles, mini-carte, réglages, fin de run, capture, Victory, pings, autel | — | v2 faite par script | À convertir |
+
+Images : `shared/Config/UIAssets.luau` (tuile de tenons, 37 icônes, 4 armes d'A14). Les rayons derrière la fenêtre de niveau : `ui-assets/rays_512.png` (script `make_rays.py`), `rbxassetid://101399456269039`.
+
+Note de montage : un `require` déjà fait dans la session Studio garde l'ancienne version d'un module (ici `UIAssets`) ; une image ajoutée au module juste avant de lancer l'outil peut donc sortir vide. Vérifier les images posées après chaque montage.
+
+**À reprendre hors UI** (vu au test du 5 nov.) : `CompanionService` envoie ses textes de cartes en français (`def.desc.fr`, « Dégâts a → b »). La fenêtre prend le texte anglais de la config pour une nouvelle technique, mais pas pour une montée de niveau. La barre de debug « fps | enemies » (`DebugHud`) passe sur le chrono.
+
+**Fenêtre de niveau, comportement en jeu** :
+- Le monde pâlit (voile crème, désaturation par un `ColorCorrectionEffect` cloné dans la caméra) et les rayons tournent lentement. En « animations réduites » : fondus courts, rayons fixes, pas de rebond.
+- Inventaire à gauche (armes et Runes avec leur niveau, objets avec leur nombre), 3 offres au centre, stats à droite. La stat que l'offre sélectionnée change s'allume en vert avec sa future valeur. Une stat changée qui n'est pas dans la liste prend la place des dernières lignes.
+- Souris : survoler sélectionne, cliquer choisit. Manette : le focus sélectionne, A choisit. Touches 1-3 : choix direct ; R, X, B : Reroll, Skip, Banish. **Tactile : un toucher sélectionne (étiquette « TAP AGAIN »), un deuxième choisit**, pour qu'un enfant voie la stat changer avant de valider. Les cartes ignorent tout pendant 0,4 s après leur arrivée.
+- Choisir fait voler l'icône dans sa case d'inventaire (0,35 s), puis la fenêtre se ferme.
+- Le compte à rebours de la barre de titre s'affiche dès que le serveur annonce une fin d'offre (`expiresIn`). Tant qu'A04 n'a pas fait la pause, c'est l'offre actuelle de 8 s : le jeu continue derrière la fenêtre (joueur ralenti et invulnérable).
+- Portrait : la fenêtre en haut, inventaire et stats côte à côte dessous, 6 stats et « +6 more ». Tout se réduit pour tenir dans la zone sûre.
+
+**Contrat proposé à A04 pour `LevelUpPause`** (RemoteEvent serveur → tous les clients, à ajouter à `Net`) : `{ active: boolean, choosers: { userId }, endsIn: number? }`. `active = true` dès qu'un joueur commence à choisir, renvoyé à chaque changement de la liste, `active = false` quand la run reprend. Sans `endsIn`, pas de compte à rebours (solo). Le client branche ce remote s'il existe et s'en passe sinon.
+
 ### 0.1 Le style (v1 vernie, remplacé par 0.0 pour la brillance et les reflets)
 
 Chaque élément pressable ou important ressemble à un **bloc de jouet verni** :
