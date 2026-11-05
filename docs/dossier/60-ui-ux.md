@@ -63,7 +63,15 @@ Fond des maquettes : `docs/dossier/ui-assets/concept/run_scene.py`, une arène e
 | Victory | L'enjeu est écrit : « Your loot is safe. Pick one: », « Leave now with your loot », « Overtime: more KO! ». Plus de pastille dans le coin (elle ressemblait à une croix) : une barre « AUTO CASH OUT IN 12s » se vide en bas, Cash out par défaut à 0 (proposition, à valider). Le joueur peut changer d'avis tant que la barre n'est pas vide. Portraits des équipiers sur la carte choisie. |
 | **Niveau gagné** (nouveau) | Le jeu se fige et pâlit, des rayons tournent derrière. Fenêtre au centre « LEVEL 13! » : 3 offres en cartes de rareté (icône, nom, effet, étiquette NEW! ou Lv 2 → 4, rareté écrite), Reroll / Skip / Banish avec leurs compteurs. Inventaire à gauche (armes, Runes, objets, avec leur niveau), stats à droite : la stat que l'offre sélectionnée change s'allume en vert avec sa future valeur. Choisir une offre fait voler son icône dans la case d'inventaire, puis le jeu reprend. |
 
-**Contract request (A04, serveur)** : le passage de niveau doit mettre le jeu en pause (décision de Clément du 5 nov. 2026). En solo, c'est une pause complète. En coop, la règle reste à choisir (question posée à Clément) : tout le monde figé pendant le choix d'un joueur, ou seulement le joueur qui choisit, figé et invulnérable. Cela remplace « cartes sans pause, 8 s » de la section 4.
+**Décision de Clément (5 nov. 2026)** : au passage de niveau, le jeu se met en pause, **pour tout le monde en coop**. Cela remplace « cartes sans pause, 8 s » de la section 4.
+
+Pour qu'un joueur ne bloque pas l'équipe, l'interface prévoit en coop :
+- pour celui qui choisit, un compte à rebours dans la barre de titre (« 12s », horloge, barre qui se vide) et la ligne « Everyone is frozen while you choose » ;
+- pour les autres, le monde figé et une fenêtre « SAM LEVELED UP! » avec son portrait, « Everyone is frozen. Back in 12s » et la même barre.
+
+Captures : `concept/captures/v32-niveau-gagne-coop-choix.png` et `v32-niveau-gagne-coop-attente.png`. En solo : ni compte à rebours, ni fenêtre d'attente.
+
+**Contract request (A04, serveur)** : pause globale de la run au passage de niveau (ennemis, projectiles, chrono, autels, compte à rebours de Victory figés). Propositions à valider par Clément : 15 s de choix en coop ; à 0, l'offre sélectionnée (la première par défaut) est prise ; si plusieurs joueurs montent de niveau en même temps, ils choisissent en parallèle et la run reprend quand le dernier a fini. Côté client : un remote `LevelUpPause` (qui choisit, fin du délai) pour afficher les deux vues.
 
 ### 0.1 Le style (v1 vernie, remplacé par 0.0 pour la brillance et les reflets)
 
