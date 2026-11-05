@@ -42,14 +42,21 @@ UIAssets.Icons = {
 	scroll = "",
 	ticket = "",
 	acorn = "",
+	-- Armes en pixel art extrudé d'A14 (branche claude/a14-armes-5c1460, porte 2 pas encore validée).
+	weapon_Broadsword = "",
+	weapon_Longbow = "",
+	weapon_FireStaff = "",
+	weapon_BombBag = "",
 }
 
 -- Weapon / Rune / item ids (Config.Weapons, Config.Grimoires, Config.Items) -> icon key above.
 -- A14 will deliver the extruded pixel-art weapon sprites; they replace these entries.
 UIAssets.ById = {
-	Broadsword = "sword",
+	Broadsword = "weapon_Broadsword",
+	Longbow = "weapon_Longbow",
+	FireStaff = "weapon_FireStaff",
+	BombBag = "weapon_BombBag",
 	LightningChain = "lightning",
-	FireStaff = "firestaff",
 	SpinningAxes = "axes",
 	Damage = "rune_damage",
 	Area = "rune_area",
