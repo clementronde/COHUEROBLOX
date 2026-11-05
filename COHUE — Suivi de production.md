@@ -387,9 +387,12 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 | --- | --- | --- | --- | --- | --- |
 | A05-01 | Règles de la capture : cage, 2 s, interruption, sauvegarde | Note : `docs/dossier/40-compagnons.md` (APIs pour A03 §6.1 et A12 §3.2) |  | P0 — bloquant | À valider |
 | A05-02 | Refaire CompanionService : capture, collection, équipement, suivi et attaque | CompanionService | A05-01, A03-03 | P0 — bloquant | À valider |
-| A05-03 | Une attaque et 2 à 3 cartes de technique par espèce | Config/Companions | A05-02 | P1 — lancement | À faire |
+| A05-03 | Une attaque et 2 à 3 cartes de technique par espèce | Config/Companions (16 espèces, 39 techniques, dossier 40 §5.2) | A05-02 | P1 — lancement | À valider (branche claude/a05-v3 ; équilibrage pas mesuré en Play) |
 | A05-04 | Tamer : 2 compagnons, capture plus rapide | CompanionService | A04-10 | P1 — lancement | À valider |
 | A05-05 | Emplacements de personnalisation : chapeaux, couleurs, auras | CompanionRenderer | A12-04 | P1 — lancement | À faire |
+| A05-06 | Textes des cartes de compagnon en anglais ; remote CaptureState au format de 60-ui-ux (état Available) ; getRunCaptures pour RunSummary.captured | CompanionService, NetDefs/Companion | A08 | P1 — lancement | À valider (branche claude/a05-v3) |
+| A05-07 | Mode lobby de CompanionRenderer : compagnon équipé qui suit, collection dans l'enclos (client seul) | CompanionRenderer (dossier 40 §8.1) | A09, A12 | P1 — lancement | À valider (branche claude/a05-v3 ; pas testé en Studio) |
+| A05-08 | Gel du passage de niveau et coup bloqué : RunManager.isFrozen, Bus.PlayerHit, Bus.RunFrozen | CompanionService | A04-v3 | P0 — bloquant | À valider (branché avec repli ; actif quand claude/a04-v3 est fusionné) |
 
 ### A07 — VFX (vague 2)
 

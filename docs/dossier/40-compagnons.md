@@ -55,7 +55,7 @@ La barre **retombe à 0** si :
 
 Touché = **tout coup reçu** : contact, projectile, attaque de boss, **même bloqué** par l'invulnérabilité, l'esquive, le bouclier ou la parade (`regles-v2.md` §3.1.4). L'invulnérabilité ne doit pas aider à capturer.
 
-- Source voulue : un événement `Bus.PlayerHit(player, source)` tiré par `RunManager.damagePlayer` **avant** les tests d'invulnérabilité, de parade et d'esquive (contract request, section 10).
+- Source : `Bus.PlayerHit(player, source)`, tiré au début de `RunManager.damagePlayer`, **avant** invulnérabilité, parade, esquive et bouclier. Ajouté par A04 sur `claude/a04-v3` (commit 6d7f564, pas encore dans main le 5 nov.) ; CompanionService s'y branche dès qu'il existe.
 - Repli tant qu'il n'est pas dans main : `Bus.PlayerDamaged` (ne voit que les coups qui font des dégâts : un coup bloqué n'interrompt pas encore la capture, trou connu).
 
 ### 2.3 Rien côté client
