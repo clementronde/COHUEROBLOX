@@ -9,6 +9,7 @@
 -- Envoie : SelectLoadout(classId, companionId), une intention : le serveur valide et lance la run.
 -- Lancé par LoadoutUI tant que client/Main.client.luau ne le liste pas (demande au lead).
 
+local ContentProvider = game:GetService("ContentProvider")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SocialService = game:GetService("SocialService")
@@ -452,6 +453,12 @@ function LobbyController.start()
 	for _, gui in { lobbyGui, modesGui, menusGui } do
 		adoptScales(gui)
 	end
+	-- Icônes des menus chargées d'avance : sinon cadenas et icônes d'armes arrivent en retard.
+	task.spawn(function()
+		pcall(function()
+			ContentProvider:PreloadAsync({ lobbyGui :: any, modesGui :: any, menusGui :: any })
+		end)
+	end)
 	if modesGui then
 		modesGui.Enabled = false
 	end

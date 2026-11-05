@@ -134,7 +134,20 @@ Le code : `client/Controllers/Lobby/LobbyController.luau` retrouve ces objets, l
 
 Le serveur décide de tout : `SelectLoadout` dit seulement « prêt, avec cette classe ». Tant que A04 n'a pas fait la demande du §10, le serveur garde le comportement d'avant le lobby : la run démarre quand **tous** les joueurs du serveur sont prêts, et un joueur qui n'a rien choisi est déclaré prêt au bout de 45 s (5 s dans Studio). À la fin de la run, personne ne revient au lobby.
 
-Point d'apparition : `Workspace.SpawnLocation` est posé sur l'arrivée du lobby (meule de foin, rôle `Arrival`). Clément peut le déplacer où il veut sur sa carte.
+Point d'apparition : `Workspace.SpawnLocation` est posé sur l'arrivée du lobby, `Workspace.HubbubVillage.Ground.ArrivalPad` (rôle `Arrival`), en (0 ; 16,8 ; 901). Ancienne place notée dans son attribut `PrevPosition`. Clément peut le déplacer où il veut sur sa carte.
+
+**Monté et testé dans COHUE le 5 nov.** Captures : [HUD](img/65-cohue-hud.jpg), [Classes](img/65-cohue-classes.jpg), [choix du mode](img/65-cohue-modes.jpg).
+
+| Test en Play (Studio, 1 joueur) | Résultat |
+| --- | --- |
+| Apparition | Sur l'ArrivalPad du village (−3 ; 20 ; 903) à 1,4 s ; HUD du lobby affiché, HUD de run caché |
+| ENTRÉE puis 3 (PUBLIC) | `SelectLoadout("Cornu", "Braise")` reçu par le serveur à 1,95 s ; la run démarre à 2,19 s (avant le prêt automatique) ; téléportation dans la zone de run, HUD du lobby caché, HUD de run affiché |
+| Menu Classes (touche 1) | Knight « PICKED », 3 classes libres en bleu, 5 au cadenas en gris, icône de l'arme de départ |
+| Choix du mode (ENTRÉE) | SOLO / FRIENDS / PUBLIC avec leurs silhouettes et touches 1-3 |
+| Retour au lobby en fin de run | **Pas testable** : à faire par A04 (§10, demande n° 3) |
+| Sans PLAY | Le serveur lance la run seul au bout de 5 s dans Studio (demande A04 n° 1) |
+
+Console : aucune erreur des scripts du lobby.
 
 ---
 
@@ -344,7 +357,7 @@ Ouvert par PLAY. Trois cartes de mode : **Solo**, **Friends**, **Public**. Group
 | 4 | Aucune sortie brute | Composants A08 ; pas de texte d'aide sous les boutons |
 | 5 | Humour | Gob le chapelier, le Hibou Plongeur des quêtes, l'enclume qui brille, le podium |
 | 6 | quality-score | Auto-évaluation 7,9 / 10 (mouvement des menus non spécifié) : brouillon |
-| 7 | Vérifié en jeu | Non : rien n'est construit |
+| 7 | Vérifié en jeu | Oui pour le HUD, le choix du mode, le menu Classes et PLAY → run (Play Studio, 5 nov., §2.3). Retour au lobby : en attente d'A04 |
 
 ## 12. Décisions de Clément
 
