@@ -157,7 +157,8 @@ Une liste répétée (cartes, lignes du classement, emplacements) se fait avec u
 | `CompanionRenderer` | compagnons en Parts | A05, avec les mailles A01 |
 | `server/Services/TraitService` | équipement de classe (Accessory, Part, Fire, Smoke, Sparkles, lumière, particules) | A04, avec les modèles A01 |
 | `server/Services/StageService` | le monde de run (sol, rampes, lumières, panneaux) | A02 |
-| `WeaponFX`, `EnemyAttackFX`, `ShrineFX`, onde d'atterrissage de `MovementController` | effets | A07 |
+| `WeaponFX` | effets des armes | A14 |
+| `EnemyAttackFX`, `ShrineFX`, onde d'atterrissage de `MovementController` | effets | A07 |
 | `LootRenderer` | butin (Part, ProximityPrompt) et sa fenêtre (BillboardGui) | A04 pour le butin, A08 pour la fenêtre |
 | `DebugHud` | texte de debug | A08, en dernier |
 
