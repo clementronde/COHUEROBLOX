@@ -11,7 +11,7 @@ Fichiers du domaine : `server/Services/CompanionService.luau`, `shared/Config/Co
 3. Un joueur qui reste **2 s dans la cage sans être touché** capture la créature, **à 100 %**. Pas de hasard, pas d'objet, rien de payant. Le Tamer capture **50 % plus vite** (2 s ÷ 1,5 ≈ 1,33 s).
 4. La créature rejoint la **collection** du joueur, sauvée dans son profil (**A12**).
 5. Avant une run, le joueur **équipe 1 compagnon** de sa collection (**2 pour le Tamer**). En run, le compagnon suit son joueur et attaque seul.
-6. Pas d'évolution, pas de renommage. Les cartes de technique par espèce viennent avec A05-03 ; la personnalisation (chapeaux, couleurs, auras, Robux, purement visuelle) avec A05-05.
+6. Pas d'évolution, pas de renommage. Chaque espèce a son attaque et 2 ou 3 cartes de technique (§5.2) ; la personnalisation (chapeaux, couleurs, auras, Robux, purement visuelle) avec A05-05.
 
 ## 1. Espèces
 
@@ -121,11 +121,44 @@ Si `ProgressionService.grantCapture` n'existe pas, CompanionService garde la col
 | `Armored` | Charge | 10 | 1,3 s | 5 | 3 | Recul 4 studs |
 | `MiniBoss` | Coup lourd | 24 | 1,4 s | 8 | 6 | Étourdit 0,5 s |
 
-**Dégâts finaux** = base × (1 + 0,5 × `Damage` du propriétaire) × (1 + 0,04 × (niveau de run − 1)) × (1 + Friandise Puissance) × (1 + bonus Tamer 0,2). Le niveau de run remplace l'ancienne évolution : le compagnon grandit avec son joueur sans changer de forme.
+**Dégâts finaux** = base × (1 + 0,5 × `Damage` du propriétaire) × (1 + 0,04 × (niveau de run − 1)) × (1 + Friandise Puissance) × (1 + bonus Tamer 0,2) × (1 + techniques Power de ce compagnon). Vitesse d'attaque et portée : 1 + Friandise + technique. Le niveau de run remplace l'ancienne évolution : le compagnon grandit avec son joueur sans changer de forme.
 
-### 5.2 Cartes (en attendant A05-03)
+### 5.2 Attaque et techniques par espèce (A05-03, fait le 5 nov.)
 
-`getCardOptions` propose encore les **Friandises** génériques (cumulables 10 fois, Commune 60 % / Rare 30 % / Épique 10 %), qui touchent tous les compagnons du joueur :
+Chaque espèce v2 a sa propre attaque et 2 ou 3 **techniques** (`Companions.Species[nom]`). Une technique est une carte de niveau : « apprendre » (`CompanionTech`, rareté Rare) puis « améliorer » (`CompanionTechUp`, Commune), jusqu'au niveau 3. Elle ne touche que le compagnon de cette espèce. `getCardOptions` propose au plus 2 techniques des compagnons équipés, le reste en Friandises ; `applyCard` revalide tout (espèce équipée, niveau attendu, plafond).
+
+Genres de technique (`TechDef.stat`) : `Power` / `Haste` / `Reach` (+ % pour ce compagnon), `Splash` (studs de zone en plus), `Multishot` (ennemis en plus touchés à 60 % des dégâts, `TechShare`), `Status` (ajoute ou remplace un statut du même genre), `Pulse` (onde autour du compagnon toutes les N s).
+
+Valeurs par niveau : Power 15 / 25 / 40 %, Haste 12 / 20 / 30 %, Reach 15 / 25 / 40 % ; les autres sont dans le tableau.
+
+| Espèce | Attaque (dégâts / intervalle / portée, zone) | DPS de base | Techniques (niveaux 1 / 2 / 3) |
+| --- | --- | --- | --- |
+| GoblinGrunt | Ladle Bonk 9 / 1,0 s / 5, mêlée | 9 | Big Ladle (zone 2 / 3 / 4) · Soup's On (Haste) |
+| GoblinArcher | Slow Arrow 8 / 1,2 s / 26 | 6,7 | Split Shot (+1 / 2 / 3 cibles) · Sharp Tips (Power) · Eagle Eye (Reach) |
+| GoblinShaman | Spirit Bolt 6 / 1,2 s / 20, ralenti ×0,85 | 5 | Hex (ralenti ×0,75 / 0,65 / 0,55, 2 s) · Spirit Circle (onde r 8 toutes les 4 s : 10 / 14 / 18) |
+| GoblinBomber | Fizzle Bomb 16 / 2,2 s / 14, zone 5 | 7,3 en zone | Bigger Boom (Reach) · Short Fuse (Haste) · Sticky Tar (ralenti ×0,8 / 0,7 / 0,6) |
+| GlandGrincheux | Grumpy Headbutt 8 / 0,9 s / 5, mêlée, recul 2 | 8,9 | Grudge (Power) · Bonk (étourdit 0,3 / 0,4 / 0,5 s) |
+| ChampignonSauteur | Spore Pounce 14 / 1,6 s / 14, zone 4 | 8,8 en zone | Spore Cloud (poison 3 / 4 / 6 par s, 3 s) · Bouncy Cap (Haste) |
+| HibouPlongeur (vole) | Feather Dart 7 / 1,0 s / 24 | 7 | Feather Storm (+1 / 2 / 3 cibles) · Night Eyes (Reach) |
+| ZombieShambler | Grabby Swipe 10 / 1,1 s / 5, mêlée | 9,1 | Rotten Touch (poison 2 / 3 / 4) · Shamble Faster (Haste) |
+| ZombieRunner | Grand Jete 12 / 1,5 s / 16, zone 4 | 8 en zone | Pirouette (zone +1,5 / 2,5 / 3,5) · Encore (Haste) · Prima Ballerina (Power) |
+| ZombieGravedigger | Dirt Clod 9 / 1,4 s / 22, zone 2,5 | 6,4 en zone | Fresh Grave (ralenti ×0,7 / 0,6 / 0,5) · Bigger Shovel (Power) |
+| ZombieBloater | Belly Bump 9 / 1,2 s / 5, mêlée, zone 3 | 7,5 en zone | Stink Cloud (onde r 7 toutes les 3 s : 6 / 9 / 12) · Gassy (poison 2 / 3 / 4) |
+| GhostWisp (vole) | Spooky Nip 7 / 0,75 s / 5, mêlée | 9,3 | Chill Touch (ralenti ×0,8 / 0,7 / 0,6) · Flicker (Haste) |
+| GhostPoltergeist (vole) | Book Toss 6 / 1,3 s / 22, +1 cible | 4,6 + 2,8 | Homework Pile (+1 / 2 / 3 cibles) · Heavy Dictionary (étourdit 0,25 / 0,35 / 0,5 s) |
+| GhostBanshee (vole) | Wail 5 / 1,4 s / 12, zone 6, ralenti ×0,75 | 3,6 en grande zone | Shriek (Power) · Haunting Echo (Reach) |
+| GhostHallMonitor (vole) | Whistle Blast 7 / 1,3 s / 16, zone 3, étourdit 0,2 s | 5,4 en zone | Detention (étourdit 0,35 / 0,5 / 0,7 s) · Hall Pass (Haste) |
+| HauntedArmor | Pointer Lance 11 / 1,3 s / 5, mêlée, zone 3, recul 4 | 8,5 en zone | Iron Charge (Power) · Ruler Sweep (zone +1,5 / 2,5 / 3,5) · Shove (recul 6 / 8 / 10) |
+
+Les mini-boss capturables (SoucheGeante, ChameauTirelire, PionSpectral) gardent l'attaque `MiniBoss` de la famille, sans technique au lancement.
+
+**Équilibrage** : environ 9 DPS en mêlée sur une cible, 7 à distance (plus sûr), 4 à 6 en zone ou avec un statut. Une technique au niveau 3 vaut à peu près +35 à +45 % de valeur. Rien n'a été mesuré en jeu : à régler après les premiers essais.
+
+**Textes** : titres et descriptions en anglais, pris dans la config. Une amélioration s'affiche « Lv 2: +15% -> +25% damage ». `CompanionState.techs` liste `{ id, species, name, level, maxLevel }`. Clé de quête `CompanionTechsLearned` (1 par technique apprise).
+
+### 5.3 Friandises
+
+`getCardOptions` complète avec les **Friandises** génériques (cumulables 10 fois, Commune 60 % / Rare 30 % / Épique 10 %), qui touchent tous les compagnons du joueur :
 
 | id | Nom (EN) | Commune / Rare / Épique |
 | --- | --- | --- |
@@ -133,9 +166,9 @@ Si `ProgressionService.grantCapture` n'existe pas, CompanionService garde la col
 | `TreatHaste` | Fizzy Candy | +6 % / +9 % / +14 % vitesse d'attaque |
 | `TreatReach` | Spyglass Berry | +8 % / +12 % / +18 % portée et zones |
 
-A05-03 ajoutera 2 à 3 cartes de technique par espèce.
 
-### 5.3 Pas d'Ultime
+
+### 5.4 Pas d'Ultime
 
 Les décisions v2 ne gardent ni évolution ni Ultime. Le remote `CompanionUltimate` (déclaré dans `shared/Net`, domaine lead) n'est plus écouté ; `CompanionState.ultimateCharge` vaut toujours 0. **Question pour Clément** (section 11).
 
@@ -196,7 +229,7 @@ La cage clignote (transparence) pendant ses 3 dernières secondes. Le compagnon 
 
 ## 9. Clés de quêtes
 
-`ProgressionService.recordStat(player, key, n)` : `CompanionsCaptured` (1 par capture), `CompanionNewSpecies` (1 par nouvelle espèce), `CompanionKills` (n), `CompanionTreats` (1). Les clés v1 `CompanionEvolved`, `CompanionStage3`, `UltimatesUsed`, `CompanionTechsLearned` ne sont plus envoyées.
+`ProgressionService.recordStat(player, key, n)` : `CompanionsCaptured` (1 par capture), `CompanionNewSpecies` (1 par nouvelle espèce), `CompanionKills` (n), `CompanionTreats` (1). `CompanionTechsLearned` (1 par technique apprise, §5.2). Les clés v1 `CompanionEvolved`, `CompanionStage3`, `UltimatesUsed` ne sont plus envoyées.
 
 ## 10. Contract requests
 

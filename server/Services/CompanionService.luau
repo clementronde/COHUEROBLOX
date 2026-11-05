@@ -31,6 +31,8 @@ local Types = require(Shared:WaitForChild("Types"))
 local Bus = require(script.Parent.Parent:WaitForChild("Bus"))
 
 type AttackDef = Companions.AttackDef
+type TechDef = Companions.TechDef
+type StatusDef = Companions.StatusDef
 type LocalizedText = Types.LocalizedText
 
 local DT = 1 / Companions.SimHz
@@ -52,6 +54,7 @@ type Owner = {
 	reach: number,
 	tamerBonus: number,
 	treatStacks: { [string]: number },
+	techs: { [string]: number }, -- id de technique -> niveau (1..TechMaxLevel)
 	dmgMult: number,
 	stunnedUntil: number,
 	dead: boolean, -- mort définitive : sonné jusqu'à la fin de la run
@@ -66,7 +69,13 @@ export type Companion = {
 	slot: number,
 	kind: number,
 	species: string,
-	attack: AttackDef,
+	base: AttackDef, -- attaque de l'espèce, sans technique
+	attack: AttackDef, -- attaque effective (base + techniques : zone, statuts, cibles en plus)
+	power: number, -- bonus des techniques de ce compagnon
+	haste: number,
+	reach: number,
+	pulse: { interval: number, radius: number, damage: number }?,
+	pulseTimer: number,
 	flying: boolean,
 	x: number,
 	y: number,
@@ -108,6 +117,7 @@ local order: { Companion } = {}
 local claimed: { [number]: boolean } = {}
 local queryOut: { number } = {}
 local hitArea: { number } = {}
+local extraArea: { number } = {}
 
 local cages: { Cage } = {}
 local attempts: { [Player]: Attempt } = {}
@@ -241,6 +251,90 @@ local function attackFor(def: Enemies.Def): AttackDef
 	return Companions.Families[def.family] or Companions.Families[Companions.DefaultFamily]
 end
 
+-- Techniques (A05-03) -------------------------------------------------------------------------------
+
+local techIndex: { [string]: { species: string, def: TechDef } } = {}
+
+local function techsOf(species: string): { TechDef }
+	local override = Companions.Species[species]
+	return if override and override.techs then override.techs else {}
+end
+
+local function techValue(def: TechDef, level: number): number
+	local values = def.values
+	return values[math.clamp(level, 1, #values)] or 0
+end
+
+-- Paramètre principal d'un statut ajouté par une technique (Status), selon le genre de statut.
+local function statusWithValue(base: StatusDef, value: number): StatusDef
+	local s: StatusDef = table.clone(base)
+	if s.kind == "Burn" or s.kind == "Poison" then
+		s.dps = value
+	elseif s.kind == "Slow" then
+		s.mult = value
+	elseif s.kind == "Knockback" then
+		s.distance = value
+	else
+		s.duration = value
+	end
+	return s
+end
+
+-- Texte {v} d'une technique : pourcentage pour Power / Haste / Reach et le ralenti, nombre sinon.
+local function formatTechValue(def: TechDef, value: number): string
+	local pct = def.stat == "Power"
+		or def.stat == "Haste"
+		or def.stat == "Reach"
+		or (def.stat == "Status" and def.status ~= nil and def.status.kind == "Slow")
+	local n = if pct then value * 100 else value
+	if math.abs(n - math.round(n)) < 1e-6 then
+		return tostring(math.round(n))
+	end
+	return (string.gsub(string.format("%.2f", n), "0+$", ""))
+end
+
+-- Recalcule l'attaque effective d'un compagnon à partir de sa base et des techniques du propriétaire.
+local function rebuildAttack(c: Companion)
+	local a: AttackDef = table.clone(c.base)
+	local statuses: { StatusDef } = if a.status then table.clone(a.status) else {}
+	c.power, c.haste, c.reach, c.pulse = 0, 0, 0, nil
+	for _, def in techsOf(c.species) do
+		local level = c.owner.techs[def.id]
+		if not level then
+			continue
+		end
+		local v = techValue(def, level)
+		if def.stat == "Power" then
+			c.power += v
+		elseif def.stat == "Haste" then
+			c.haste += v
+		elseif def.stat == "Reach" then
+			c.reach += v
+		elseif def.stat == "Splash" then
+			a.splash = (a.splash or 0) + v
+		elseif def.stat == "Multishot" then
+			a.extraTargets = (a.extraTargets or 0) + math.floor(v)
+		elseif def.stat == "Status" and def.status then
+			-- Remplace un statut du même genre (pas de double recul), sinon l'ajoute.
+			local s = statusWithValue(def.status, v)
+			local replaced = false
+			for k, old in statuses do
+				if old.kind == s.kind then
+					statuses[k] = s
+					replaced = true
+				end
+			end
+			if not replaced then
+				table.insert(statuses, s)
+			end
+		elseif def.stat == "Pulse" and def.pulse then
+			c.pulse = { interval = def.pulse.interval, radius = def.pulse.radius, damage = v }
+		end
+	end
+	a.status = if #statuses > 0 then statuses else nil
+	c.attack = a
+end
+
 -- Classe et Tamer ---------------------------------------------------------------------------------
 
 local function passiveOf(classId: string?): { [string]: any }?
@@ -287,9 +381,16 @@ end
 
 local function sendState(o: Owner)
 	local list = table.create(#o.companions)
+	local techs = {}
 	for k, c in o.companions do
 		local def = Enemies[c.kind]
-		list[k] = { species = c.species, name = if def then def.label else NO_NAME, slot = c.slot }
+		list[k] = { species = c.species, name = if def then def.label else NO_NAME, slot = c.slot, attack = c.base.name.en }
+		for _, tech in techsOf(c.species) do
+			local level = o.techs[tech.id]
+			if level then
+				table.insert(techs, { id = tech.id, species = c.species, name = tech.name, level = level, maxLevel = Companions.TechMaxLevel })
+			end
+		end
 	end
 	local first = o.companions[1]
 	local firstDef = first and Enemies[first.kind]
@@ -300,7 +401,7 @@ local function sendState(o: Owner)
 		name = if firstDef then firstDef.label else NO_NAME,
 		ultimateCharge = 0,
 		stunned = isStunned(o, os.clock()),
-		techs = {},
+		techs = techs,
 		companions = list,
 		none = first == nil,
 	})
@@ -379,8 +480,9 @@ end
 local function attackTarget(c: Companion, enemies: any, id: number, tx: number, tz: number)
 	local a = c.attack
 	local o = c.owner
-	local amount = a.damage * o.dmgMult
-	local splash = if a.splash then a.splash * (1 + o.reach) else 0
+	local amount = a.damage * o.dmgMult * (1 + c.power)
+	local reach = 1 + o.reach + c.reach
+	local splash = if a.splash then a.splash * reach else 0
 	if splash > 0 then
 		local okQ, n = pcall(enemies.queryRadius, tx, tz, splash, hitArea)
 		if okQ and type(n) == "number" and n > 0 then
@@ -393,7 +495,46 @@ local function attackTarget(c: Companion, enemies: any, id: number, tx: number, 
 	else
 		hit(c, enemies, id, amount)
 	end
+	-- Cibles en plus (Multishot, Book Toss) : d'autres ennemis à portée, à TechShare des dégâts.
+	local extra = a.extraTargets or 0
+	if extra > 0 then
+		local okQ, n = pcall(enemies.queryRadius, c.x, c.z, a.range * reach, extraArea)
+		if okQ and type(n) == "number" then
+			local share = amount * Companions.TechShare
+			for k = 1, n do
+				if extra <= 0 then
+					break
+				end
+				local other = extraArea[k]
+				if other ~= id then
+					hit(c, enemies, other, share)
+					extra -= 1
+				end
+			end
+		end
+	end
 	markEvent(c, a.evKind, tx, tz, splash)
+end
+
+-- Onde d'une technique Pulse autour du compagnon (Spirit Circle, Stink Cloud).
+local function firePulse(c: Companion, enemies: any)
+	local pulse = c.pulse
+	if not pulse then
+		return
+	end
+	local o = c.owner
+	local radius = pulse.radius * (1 + o.reach + c.reach)
+	local amount = pulse.damage * o.dmgMult * (1 + c.power)
+	local okQ, n = pcall(enemies.queryRadius, c.x, c.z, radius, extraArea)
+	if okQ and type(n) == "number" then
+		for k = 1, n do
+			local ok, died = pcall(enemies.damage, extraArea[k], amount, o.player)
+			if ok and died then
+				o.pendingKills += 1
+			end
+		end
+	end
+	markEvent(c, NET.EvPulse, c.x, c.z, radius)
 end
 
 -- Suivi -------------------------------------------------------------------------------------------
@@ -455,9 +596,17 @@ local function updateCompanion(c: Companion, enemies: any?, now: number, frozen:
 		return
 	end
 	local stunned = isStunned(o, now)
-	c.timer -= DT * (1 + o.haste)
+	local speed = 1 + o.haste + c.haste
+	c.timer -= DT * speed
 	local a = c.attack
-	local range = a.range * (1 + o.reach)
+	local range = a.range * (1 + o.reach + c.reach)
+	if c.pulse and enemies and not stunned then
+		c.pulseTimer -= DT * speed
+		if c.pulseTimer <= 0 then
+			c.pulseTimer = c.pulse.interval
+			firePulse(c, enemies)
+		end
+	end
 	local targetId, tx, tz = nil, 0, 0
 	if enemies and not stunned then
 		if isDowned(o.player) then
@@ -571,7 +720,13 @@ local function addCompanion(o: Owner, kind: number)
 		slot = #o.companions + 1,
 		kind = kind,
 		species = def.name,
+		base = attackFor(def),
 		attack = attackFor(def),
+		power = 0,
+		haste = 0,
+		reach = 0,
+		pulse = nil,
+		pulseTimer = 0,
 		flying = override ~= nil and override.flying == true,
 		x = p.X,
 		y = math.max(Heightmap.getY(p.X, p.Z), p.Y - 3),
@@ -586,6 +741,7 @@ local function addCompanion(o: Owner, kind: number)
 	}
 	table.insert(o.companions, c)
 	table.insert(order, c)
+	rebuildAttack(c)
 	o.stateDirty = true
 end
 
@@ -646,6 +802,7 @@ local function createOwner(player: Player)
 		reach = 0,
 		tamerBonus = if passive and type(passive.companionDamage) == "number" then passive.companionDamage else 0,
 		treatStacks = {},
+		techs = {},
 		dmgMult = 1,
 		stunnedUntil = 0,
 		dead = false,
@@ -943,7 +1100,8 @@ local function step()
 	end
 end
 
--- Cartes (Friandises, en attendant A05-03) -------------------------------------------------------------
+-- Cartes : techniques d'espèce (A05-03) et Friandises -------------------------------------------------
+-- Textes joueur en anglais seul au lancement (60-ui-ux.md, demandes à Ironix).
 
 local function rollTreatRarity(): Types.Rarity
 	local roll = math.random()
@@ -956,19 +1114,57 @@ local function rollTreatRarity(): Types.Rarity
 	return "Common"
 end
 
--- Jusqu'à Cards.MaxOptions cartes compagnon pour le prochain niveau (CardService décide de la fréquence).
+local function shuffle<T>(list: { T })
+	for k = #list, 2, -1 do
+		local j = math.random(1, k)
+		list[k], list[j] = list[j], list[k]
+	end
+end
+
+-- Carte d'une technique : apprendre (niveau 1) ou améliorer ({v} devient « avant -> après »).
+local function techCard(def: TechDef, current: number): Types.Card
+	local nextLevel = current + 1
+	local nextValue = formatTechValue(def, techValue(def, nextLevel))
+	local value = if current > 0 then `{formatTechValue(def, techValue(def, current))} -> {nextValue}` else nextValue
+	local desc = string.gsub(def.desc, "{v}", value)
+	if current > 0 then
+		desc = string.gsub(Companions.Cards.TechUpPrefix, "{n}", tostring(nextLevel)) .. desc
+	end
+	return {
+		kind = if current > 0 then "CompanionTechUp" else "CompanionTech",
+		id = def.id,
+		rarity = (if current > 0 then Companions.Cards.TechUpRarity else Companions.Cards.TechRarity) :: Types.Rarity,
+		level = nextLevel,
+		title = def.name,
+		desc = desc,
+		icon = nil,
+	}
+end
+
+-- Jusqu'à Cards.MaxOptions cartes compagnon pour le prochain niveau (CardService décide de la fréquence) :
+-- au plus MaxTechOptions techniques des compagnons équipés, le reste en Friandises.
 function CompanionService.getCardOptions(player: Player): { Types.Card }
 	local o = owners[player]
 	if not o or #o.companions == 0 then
 		return {}
 	end
-	local pool: { Types.Card } = {}
+	local techCards: { Types.Card } = {}
+	for _, c in o.companions do
+		for _, def in techsOf(c.species) do
+			local current = o.techs[def.id] or 0
+			if current < math.min(Companions.TechMaxLevel, #def.values) then
+				table.insert(techCards, techCard(def, current))
+			end
+		end
+	end
+	shuffle(techCards)
+	local treatCards: { Types.Card } = {}
 	for id, def in Companions.Treats do
 		local stacks = o.treatStacks[id] or 0
 		if stacks < def.maxStacks then
 			local rarity = rollTreatRarity()
 			local pct = tostring(math.round(def.values[rarity] * 100))
-			table.insert(pool, {
+			table.insert(treatCards, {
 				kind = "CompanionTreat",
 				id = id,
 				rarity = rarity,
@@ -979,20 +1175,60 @@ function CompanionService.getCardOptions(player: Player): { Types.Card }
 			})
 		end
 	end
-	for k = #pool, 2, -1 do
-		local j = math.random(1, k)
-		pool[k], pool[j] = pool[j], pool[k]
+	shuffle(treatCards)
+	local pool: { Types.Card } = {}
+	for k = 1, math.min(#techCards, Companions.Cards.MaxTechOptions) do
+		table.insert(pool, techCards[k])
 	end
-	while #pool > Companions.Cards.MaxOptions do
-		table.remove(pool)
+	for _, card in treatCards do
+		if #pool >= Companions.Cards.MaxOptions then
+			break
+		end
+		table.insert(pool, card)
 	end
+	shuffle(pool)
 	return pool
+end
+
+local function applyTech(o: Owner, card: Types.Card)
+	local entry = techIndex[card.id]
+	if not entry then
+		return
+	end
+	local target: Companion? = nil
+	for _, c in o.companions do
+		if c.species == entry.species then
+			target = c
+		end
+	end
+	if not target then
+		return -- technique d'une espèce que le joueur n'a pas équipée : refusée
+	end
+	local current = o.techs[card.id] or 0
+	local maxLevel = math.min(Companions.TechMaxLevel, #entry.def.values)
+	-- La carte doit correspondre à l'état serveur : apprendre (0 -> 1) ou améliorer (n -> n+1).
+	if current >= maxLevel or (card.kind == "CompanionTech") ~= (current == 0) then
+		return
+	end
+	o.techs[card.id] = current + 1
+	rebuildAttack(target)
+	if current == 0 then
+		recordStat(o.player, Companions.QuestKeys.Techs, 1)
+	end
+	o.stateDirty = true
 end
 
 -- Applique une carte choisie. Revalide tout (genre, id, plafond).
 function CompanionService.applyCard(player: Player, card: Types.Card)
 	local o = owners[player]
-	if not o or type(card) ~= "table" or card.kind ~= "CompanionTreat" or type(card.id) ~= "string" then
+	if not o or type(card) ~= "table" or type(card.id) ~= "string" then
+		return
+	end
+	if card.kind == "CompanionTech" or card.kind == "CompanionTechUp" then
+		applyTech(o, card)
+		return
+	end
+	if card.kind ~= "CompanionTreat" then
 		return
 	end
 	local def = Companions.Treats[card.id]
@@ -1089,6 +1325,17 @@ function CompanionService.init()
 	for kind, def in Enemies do
 		if type(kind) == "number" and capturableDef(kind) then
 			speciesKind[def.name] = kind
+		end
+	end
+	for species, sdef in Companions.Species do
+		if not speciesKind[species] then
+			warnOnce("species_" .. species, `Companions.Species.{species} is not a capturable enemy name (ignored)`)
+		end
+		for _, tech in sdef.techs or {} do
+			if techIndex[tech.id] then
+				warnOnce("tech_" .. tech.id, `duplicate technique id {tech.id}`)
+			end
+			techIndex[tech.id] = { species = species, def = tech }
 		end
 	end
 	stateRemote = Net.event("CompanionState")

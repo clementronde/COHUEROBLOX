@@ -26,12 +26,33 @@ export type AttackDef = {
 	melee: boolean?, -- va au contact : se rapproche de la cible (dans la laisse)
 	splash: number?, -- rayon de zone autour de la cible
 	status: { StatusDef }?,
+	extraTargets: number?, -- ennemis en plus touchés à chaque attaque (à TechShare des dégâts)
 	evKind: number, -- effet visuel (Companions.Net.Ev*)
+}
+
+-- Technique d'espèce (A05-03) : une carte qui s'apprend (niveau 1) puis s'améliore (2, 3).
+-- values[n] = valeur au niveau n. Sens de la valeur selon `stat` :
+--   Power / Haste / Reach : bonus en fraction (0,15 = +15 %) pour ce compagnon seulement
+--   Splash : studs de zone en plus autour de la cible
+--   Multishot : ennemis en plus touchés (à TechShare des dégâts)
+--   Status : paramètre principal du statut ajouté (Burn/Poison : dps · Slow : mult · Stun/Freeze : durée · Knockback : distance)
+--   Pulse : dégâts d'une onde autour du compagnon toutes les `pulse.interval` s, rayon `pulse.radius`
+export type TechStat = "Power" | "Haste" | "Reach" | "Splash" | "Multishot" | "Status" | "Pulse"
+
+export type TechDef = {
+	id: string, -- unique dans tout le jeu : "<espèce>_<Nom>"
+	name: string, -- anglais (textes joueur en anglais au lancement)
+	stat: TechStat,
+	values: { number },
+	status: StatusDef?, -- Status : le statut ajouté (son paramètre principal vient de values)
+	pulse: { interval: number, radius: number }?,
+	desc: string, -- anglais ; {v} = valeur du niveau
 }
 
 -- Surcharge par espèce (A05-03).
 export type SpeciesDef = {
 	attack: AttackDef?,
+	techs: { TechDef }?,
 	height: number?, -- studs ; défaut = hauteur de l'ennemi × Render.HeightScale
 	flying: boolean?,
 }
@@ -99,6 +120,7 @@ Companions.Net = {
 	EvShot = 3,
 	EvCharge = 4,
 	EvHeavy = 5,
+	EvPulse = 6, -- onde d'une technique Pulse (evRadius = rayon)
 }
 
 local NET = Companions.Net
@@ -132,8 +154,186 @@ Companions.Families = {
 
 Companions.DefaultFamily = "Swarm" -- famille inconnue (nouvelle famille d'A03) : attaque de Swarm
 
--- Surcharges par espèce (clé = Config/Enemies[].name). Vide jusqu'à A05-03.
-Companions.Species = {} :: { [string]: SpeciesDef }
+-- Espèces (A05-03) -----------------------------------------------------------------------------------
+-- Clé = Config/Enemies[].name. Une attaque et 2 ou 3 techniques par espèce v2 (dossier 40 §5.2).
+-- Équilibrage (dossier 40 §5.4) : base ≈ 9 DPS en mêlée sur une cible, ≈ 7 DPS à distance,
+-- ≈ 6 DPS en zone ou avec un statut. Une technique au niveau 3 vaut ≈ +35 à +45 % de valeur.
+-- Les mini-boss gardent l'attaque de leur famille (MiniBoss), sans technique au lancement.
+
+Companions.TechMaxLevel = 3
+Companions.TechShare = 0.6 -- part des dégâts sur les cibles en plus (Multishot, extraTargets)
+
+local function A(name: string, damage: number, interval: number, range: number, evKind: number, extra: { [string]: any }?): AttackDef
+	local a: { [string]: any } = { name = T(name, name), damage = damage, interval = interval, range = range, evKind = evKind }
+	if extra then
+		for k, v in extra do
+			a[k] = v
+		end
+	end
+	return (a :: any) :: AttackDef
+end
+
+-- Raccourcis de techniques (les textes {v} sont formatés par CompanionService).
+local function techId(species: string, name: string): string
+	return species .. "_" .. (string.gsub(name, "%W", ""))
+end
+local function Power(species: string, name: string, desc: string?): TechDef
+	return { id = techId(species, name), name = name, stat = "Power", values = { 0.15, 0.25, 0.4 }, desc = desc or "+{v}% damage" }
+end
+local function Haste(species: string, name: string, desc: string?): TechDef
+	return { id = techId(species, name), name = name, stat = "Haste", values = { 0.12, 0.2, 0.3 }, desc = desc or "+{v}% attack speed" }
+end
+local function Reach(species: string, name: string, desc: string?): TechDef
+	return { id = techId(species, name), name = name, stat = "Reach", values = { 0.15, 0.25, 0.4 }, desc = desc or "+{v}% range and area" }
+end
+local function Splash(species: string, name: string, values: { number }, desc: string?): TechDef
+	return { id = techId(species, name), name = name, stat = "Splash", values = values, desc = desc or "Hits everything within {v} studs of the target" }
+end
+local function Multi(species: string, name: string, values: { number }, desc: string?): TechDef
+	return { id = techId(species, name), name = name, stat = "Multishot", values = values, desc = desc or "Also hits {v} more enemies" }
+end
+local function Status(species: string, name: string, status: StatusDef, values: { number }, desc: string): TechDef
+	return { id = techId(species, name), name = name, stat = "Status", values = values, status = status, desc = desc }
+end
+local function Pulse(species: string, name: string, interval: number, radius: number, values: { number }, desc: string): TechDef
+	return {
+		id = techId(species, name),
+		name = name,
+		stat = "Pulse",
+		values = values,
+		pulse = { interval = interval, radius = radius },
+		desc = desc,
+	}
+end
+
+Companions.Species = {
+	-- Monde 1 — Grumpy Woods --------------------------------------------------------------------
+	GoblinGrunt = { -- mêlée, 9 DPS
+		attack = A("Ladle Bonk", 9, 1.0, 5, NET.EvMelee, { melee = true }),
+		techs = {
+			Splash("GoblinGrunt", "Big Ladle", { 2, 3, 4 }),
+			Haste("GoblinGrunt", "Soup's On"),
+		},
+	},
+	GoblinArcher = { -- distance, 6,7 DPS
+		attack = A("Slow Arrow", 8, 1.2, 26, NET.EvShot),
+		techs = {
+			Multi("GoblinArcher", "Split Shot", { 1, 2, 3 }, "Arrows split to {v} more enemies"),
+			Power("GoblinArcher", "Sharp Tips"),
+			Reach("GoblinArcher", "Eagle Eye"),
+		},
+	},
+	GoblinShaman = { -- distance + ralenti, 5 DPS
+		attack = A("Spirit Bolt", 6, 1.2, 20, NET.EvShot, { status = { { kind = "Slow", mult = 0.85, duration = 1.5 } } }),
+		techs = {
+			Status("GoblinShaman", "Hex", { kind = "Slow", duration = 2 }, { 0.75, 0.65, 0.55 }, "Slows enemies to {v}% speed for 2s"),
+			Pulse("GoblinShaman", "Spirit Circle", 4, 8, { 10, 14, 18 }, "Every 4s, a spirit ring deals {v} damage around it"),
+		},
+	},
+	GoblinBomber = { -- zone lente, 7,3 DPS répartis
+		attack = A("Fizzle Bomb", 16, 2.2, 14, NET.EvPounce, { splash = 5 }),
+		techs = {
+			Reach("GoblinBomber", "Bigger Boom", "+{v}% blast size and range"),
+			Haste("GoblinBomber", "Short Fuse", "+{v}% throw speed"),
+			Status("GoblinBomber", "Sticky Tar", { kind = "Slow", duration = 1.5 }, { 0.8, 0.7, 0.6 }, "Blasts slow enemies to {v}% speed"),
+		},
+	},
+	GlandGrincheux = { -- mêlée + petit recul, 8,9 DPS
+		attack = A("Grumpy Headbutt", 8, 0.9, 5, NET.EvMelee, { melee = true, status = { { kind = "Knockback", distance = 2 } } }),
+		techs = {
+			Power("GlandGrincheux", "Grudge"),
+			Status("GlandGrincheux", "Bonk", { kind = "Stun" }, { 0.3, 0.4, 0.5 }, "Headbutts stun for {v}s"),
+		},
+	},
+	ChampignonSauteur = { -- bond en zone, 8,75 DPS
+		attack = A("Spore Pounce", 14, 1.6, 14, NET.EvPounce, { splash = 4 }),
+		techs = {
+			Status("ChampignonSauteur", "Spore Cloud", { kind = "Poison", duration = 3 }, { 3, 4, 6 }, "Landings poison for {v} damage per second"),
+			Haste("ChampignonSauteur", "Bouncy Cap", "+{v}% jump speed"),
+		},
+	},
+	HibouPlongeur = { -- distance, 7 DPS, vole
+		flying = true,
+		attack = A("Feather Dart", 7, 1.0, 24, NET.EvShot),
+		techs = {
+			Multi("HibouPlongeur", "Feather Storm", { 1, 2, 3 }, "Darts also hit {v} more enemies"),
+			Reach("HibouPlongeur", "Night Eyes"),
+		},
+	},
+
+	-- Monde 2 — Soggy Graves --------------------------------------------------------------------
+	ZombieShambler = { -- mêlée, 9,1 DPS
+		attack = A("Grabby Swipe", 10, 1.1, 5, NET.EvMelee, { melee = true }),
+		techs = {
+			Status("ZombieShambler", "Rotten Touch", { kind = "Poison", duration = 3 }, { 2, 3, 4 }, "Swipes poison for {v} damage per second"),
+			Haste("ZombieShambler", "Shamble Faster"),
+		},
+	},
+	ZombieRunner = { -- grand jeté en zone, 8 DPS
+		attack = A("Grand Jete", 12, 1.5, 16, NET.EvPounce, { splash = 4 }),
+		techs = {
+			Splash("ZombieRunner", "Pirouette", { 1.5, 2.5, 3.5 }, "Landing area +{v} studs"),
+			Haste("ZombieRunner", "Encore"),
+			Power("ZombieRunner", "Prima Ballerina"),
+		},
+	},
+	ZombieGravedigger = { -- motte en petite zone, 6,4 DPS
+		attack = A("Dirt Clod", 9, 1.4, 22, NET.EvShot, { splash = 2.5 }),
+		techs = {
+			Status("ZombieGravedigger", "Fresh Grave", { kind = "Slow", duration = 1.5 }, { 0.7, 0.6, 0.5 }, "Clods slow enemies to {v}% speed"),
+			Power("ZombieGravedigger", "Bigger Shovel"),
+		},
+	},
+	ZombieBloater = { -- coup de ventre en zone, 7,5 DPS
+		attack = A("Belly Bump", 9, 1.2, 5, NET.EvCharge, { melee = true, splash = 3 }),
+		techs = {
+			Pulse("ZombieBloater", "Stink Cloud", 3, 7, { 6, 9, 12 }, "Every 3s, a stink cloud deals {v} damage around it"),
+			Status("ZombieBloater", "Gassy", { kind = "Poison", duration = 3 }, { 2, 3, 4 }, "Bumps poison for {v} damage per second"),
+		},
+	},
+
+	-- Monde 3 — Haunted Recess ------------------------------------------------------------------
+	GhostWisp = { -- mêlée rapide, 9,3 DPS, flotte
+		flying = true,
+		attack = A("Spooky Nip", 7, 0.75, 5, NET.EvMelee, { melee = true }),
+		techs = {
+			Status("GhostWisp", "Chill Touch", { kind = "Slow", duration = 1.5 }, { 0.8, 0.7, 0.6 }, "Nips slow enemies to {v}% speed"),
+			Haste("GhostWisp", "Flicker"),
+		},
+	},
+	GhostPoltergeist = { -- 2 livres par lancer, 4,6 + 2,8 DPS, flotte
+		flying = true,
+		attack = A("Book Toss", 6, 1.3, 22, NET.EvShot, { extraTargets = 1 }),
+		techs = {
+			Multi("GhostPoltergeist", "Homework Pile", { 1, 2, 3 }, "Throws {v} more books"),
+			Status("GhostPoltergeist", "Heavy Dictionary", { kind = "Stun" }, { 0.25, 0.35, 0.5 }, "Books stun for {v}s"),
+		},
+	},
+	GhostBanshee = { -- cri en zone + ralenti, 3,6 DPS répartis, flotte
+		flying = true,
+		attack = A("Wail", 5, 1.4, 12, NET.EvHeavy, { splash = 6, status = { { kind = "Slow", mult = 0.75, duration = 1.5 } } }),
+		techs = {
+			Power("GhostBanshee", "Shriek"),
+			Reach("GhostBanshee", "Haunting Echo", "+{v}% scream size and range"),
+		},
+	},
+	GhostHallMonitor = { -- sifflet en petite zone + étourdit, 5,4 DPS, flotte
+		flying = true,
+		attack = A("Whistle Blast", 7, 1.3, 16, NET.EvHeavy, { splash = 3, status = { { kind = "Stun", duration = 0.2 } } }),
+		techs = {
+			Status("GhostHallMonitor", "Detention", { kind = "Stun" }, { 0.35, 0.5, 0.7 }, "Whistles stun for {v}s"),
+			Haste("GhostHallMonitor", "Hall Pass"),
+		},
+	},
+	HauntedArmor = { -- charge en zone + recul, 8,5 DPS
+		attack = A("Pointer Lance", 11, 1.3, 5, NET.EvCharge, { melee = true, splash = 3, status = { { kind = "Knockback", distance = 4 } } }),
+		techs = {
+			Power("HauntedArmor", "Iron Charge"),
+			Splash("HauntedArmor", "Ruler Sweep", { 1.5, 2.5, 3.5 }, "Charge area +{v} studs"),
+			Status("HauntedArmor", "Shove", { kind = "Knockback" }, { 6, 8, 10 }, "Knocks enemies back {v} studs"),
+		},
+	},
+} :: { [string]: SpeciesDef }
 
 -- Rendu (client) -----------------------------------------------------------------------------------
 -- Gabarits cherchés dans ReplicatedStorage.Assets (ArtLibrary.find, recherche récursive par nom).
@@ -155,9 +355,13 @@ Companions.Render = {
 	HopHz = 3,
 }
 
--- Cartes de niveau (en attendant les techniques par espèce, A05-03) ----------------------------------
+-- Cartes de niveau : techniques d'espèce (A05-03) et Friandises génériques ---------------------------
 Companions.Cards = {
 	MaxOptions = 3,
+	MaxTechOptions = 2, -- au plus 2 techniques parmi les 3 options, le reste en Friandises
+	TechRarity = "Rare", -- carte qui apprend une technique (CompanionTech)
+	TechUpRarity = "Common", -- carte qui l'améliore (CompanionTechUp)
+	TechUpPrefix = "Lv {n}: ", -- devant le texte d'une amélioration ; {v} y devient « avant -> après »
 	TreatRarityOdds = { { "Common", 0.6 }, { "Rare", 0.3 }, { "Epic", 0.1 } } :: { { any } },
 }
 
@@ -198,6 +402,7 @@ Companions.QuestKeys = {
 	NewSpecies = "CompanionNewSpecies",
 	Kills = "CompanionKills",
 	Treats = "CompanionTreats",
+	Techs = "CompanionTechsLearned", -- 1 par technique apprise (niveau 1)
 }
 
 -- Tests en Studio seulement (RunService:IsStudio()), jamais en jeu publié.
