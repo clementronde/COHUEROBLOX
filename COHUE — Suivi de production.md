@@ -69,19 +69,20 @@ Une chose à savoir sur « aucun ennemi max » : pour le joueur, la horde ne pla
 | ID | Agent | Périmètre | Outils et skills | Vague | Statut | Conversation |
 | --- | --- | --- | --- | --- | --- | --- |
 | A00 | Chef de projet | Doc de suivi, dossier, intégration des branches, place Studio partagée, portes de vague | Studio, git, Docs | 0 | En cours | Conversation principale |
-| A01 | DA et modeling | Guide de style voxel, équipement des 8 classes, créatures, boss, props | Blender, Meshy, Asset Pack, make-model, blender-modeling | 1 | En cours | a01-da-voxel |
+| A01 | DA et modeling | Guide de style voxel, équipement des 8 classes, créatures, boss, props | Blender, Meshy, Asset Pack, make-model, blender-modeling | 1 | En cours | a01-da-voxel (Clément) : kit d'assets en tenons posé dans COHUE |
 | A02 | Mondes et level design | Tuiles voxel des 3 mondes, assemblage semi-procédural, autels, lumière | Studio, make-map, worldbuilding | 2 | En cours | Code A02-01 et A02-08 sur claude/a02-assemblage, attend les tuiles de Clément |
-| A03 | Ennemis et boss | Familles d'ennemis, IA, Overtime, variantes capturables, 3 mini-boss, 3 boss | Studio, systems | 2 | À faire | Cantin (dev) |
+| A03 | Ennemis et boss | Familles d'ennemis, IA, Overtime, variantes capturables, 3 mini-boss, 3 boss | Studio, systems | 2 | En cours | Cantin (code) ; Clément : modèles faits avec Claude Design, fiches écrites par a03-ennemis |
 | A04 | Gameplay | 8 classes, 16 armes, 14 Runes, 40 objets, cartes, fusion, run de 3 mondes, compteur de KO | Studio, system-builder | 1 | En cours | Cantin (dev) |
 | A05 | Compagnons et capture | Capture, collection, IA des compagnons, personnalisation | Studio, systems | 2 | En cours | Cantin (dev) |
 | A06 | Mouvement et caméra | Caméra 3e personne, bunny-hop, glissade, contrôles tactiles, MovementGuard | Studio, make-anim | 1 | En cours | Cantin (dev) |
 | A07 | VFX | Armes, impacts, KO, capture, télégraphes de boss, ambiance Overtime | Studio, fwjelaa-vfx, VFX de l'Asset Pack | 2 | À faire | À lancer |
-| A08 | UI et HUD | Maquettes Figma puis HUD de run, cartes, chrono, compteur de KO, écran de fin | Figma, Studio, fwjelaa-ui, ui-builder | 1 | En cours | a08-ui-hud |
-| A09 | Menus et lobby | Maquettes Figma puis hub 3D, choix de classe, collection, boutique, tableaux de classement | Figma, Studio, make-map | 1 | En cours | a09-menus-lobby |
+| A08 | UI et HUD | Maquettes Figma puis HUD de run, cartes, chrono, compteur de KO, écran de fin | Figma, Studio, fwjelaa-ui, ui-builder | 1 | En cours | a08-ui-hud (Clément) : UI v3 en briques montée dans COHUE |
+| A09 | Menus et lobby | Maquettes Figma puis hub 3D, choix de classe, collection, boutique, tableaux de classement | Figma, Studio, make-map | 1 | En cours | a09-menus-lobby (Clément) : lobby jouable monté dans COHUE |
 | A10 | Sound design | Musiques et sons du Creator Store, SoundController, mixage | Studio, fwjelaa-sfx | 2 | En cours | Cantin (code), Clément (sons) |
 | A11 | Anti-triche et sécurité | Audit des remotes, de l'économie et des achats ; correctifs ; revue à chaque vague | anti-exploit-review, secure-remotes, agent red-team, /audit | 1 | En cours | Cantin (dev) |
 | A12 | Données, progression et monétisation | Sauvegarde, collection, quêtes, classements hebdo, boutique cosmétique, nom anglais | datastore-safety, monetization-compliance, agents revenue-modeler et market-analyst | 2 | À faire | Cantin (dev) |
 | A13 | Perf mobile et QA | Budgets de perf, plafond d'ennemis, tests, équilibrage, liste de bugs | performance-audit, debugging, agent scope-auditor | 3 | En cours | Cantin (dev) |
+| A14 | Armes : modèles et effets | 16 armes et 16 fusions en pixel art extrudé, effets lisses et lumineux (armes, ennemis, boss) posés en objets | Blender, Studio, fwjelaa-vfx, make-model | 2 | En cours | a14-armes (Clément) : armes et effets v1 dans COHUE, effets v2 prêts |
 
 ## Éléments à réaliser
 
@@ -487,6 +488,8 @@ Le plus gros risque est que plusieurs agents écrivent en même temps dans la m�
 
 | Date | Événement |
 | --- | --- |
+| 2026-11-05 | Côté créatif (Clément) : Clément fait les modèles d'ennemis avec Claude Design. Le premier, le fantôme, est dans COHUE (`Workspace.Ghostenemy`) : couleurs posées, taille ×2, il vole et tire son orbe. A03 écrit une fiche Claude Design par ennemi (`docs/dossier/fiches-claude-design/`, Goblin Grunt prêt, 20 à suivre). A14 a ses effets v2 prêts (ruban d'épée, traits de lumière, Bloom) et attend l'accord de Clément pour les écrire dans COHUE. |
+| 2026-11-05 | Côté créatif monté dans COHUE et fusionné : armes A14 en pixel art extrudé (35 modèles, 86 mailles) et leurs effets ; UI v3 en vraies briques d'A08 (HUD, écran à terre, fenêtre de niveau et gel coop, icônes des 32 armes) ; lobby jouable d'A09 (PLAY, barre du bas, choix Solo / Friends / Public, apparition au lobby). Décisions v2 §12 (rien construit par script, UI et effets compris) et §13 (créatif chez Clément, technique chez Cantin). |
 | 2026-11-05 | Vague dev de Cantin fusionnée dans main (600d5e3) : A02 (assemblage des tuiles, portails), A03 (familles v2, comportements, capturables), A05 (capture, CompanionService, Tamer), A06 (validation, tremplins et tyroliennes), A10 (SoundController), A11 (failles S-11 et S-16, tests d'exploits, revues), A12 (classements, boutique, sauvegarde v2), A13 (budgets de perf, plan de test, checklist). 95 fichiers passent tools/check.sh. Script Sync actif chez Cantin seulement, sur la racine du dépôt ; les deux Main renommés en Main.legacy.luau et Main.local.luau (noms de Studio). Play : apparition OK, aucune erreur de script. Reste : contract requests du lead (Bus.PlayerHit, RunManager.isFrozen, ARCHITECTURE.md), gabarits visuels et sons à fournir par Clément. |
 | 2026-11-05 | Partage du travail : Cantin reprend tout le développement (A03 à A06, A11 à A13, et la partie code de A02, A07 à A10) ; Clément garde le design et la 3D. A06 (garde serveur durci, suivis A11, relecture 3) et A03 (dossier 13) fusionnés dans main (384fc3c), 84 fichiers passent tools/check.sh. Les 5 scripts A06 rechargés dans COHUE, identiques à main. Play test : apparition OK, MovementGuard actif sans strike, aucune erreur de script. A14 (effets v2 non testés en Play) laissé à Clément. |
 | 2026-11-05 | Clément étend la règle « rien construit par script » à l'UI et aux effets. 23 modules fabriquent encore du visible (UI A08, rendus A03 et A05, équipement A04, mondes A02, effets A07) : chaque agent convertit les siens à son tour. Lobby Hubbub Village sauvegardé dans COHUE ; A01 prépare le test Resurface (style tout en tenons). |
