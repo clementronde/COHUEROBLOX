@@ -1,89 +1,129 @@
 # COHUE — Direction artistique (A01)
 
-**Statut : à valider par Clément (porte 1).** Rédigé le 4 nov. 2026 par l'agent A01 (DA et modeling). Ce guide s'applique à tout ce qui est modélisé ou coloré dans le jeu. Il complète `01-decisions-v2.md` section 7.
+**Statut : style changé le 5 nov. 2026 (briques à tenons), à valider par Clément (porte 1).** Guide rédigé le 4 nov. 2026 par l'agent A01 (DA et modeling) et réécrit le 5 nov. après le choix de Clément. Il s'applique à tout ce qui est modélisé ou coloré dans le jeu et complète `01-decisions-v2.md` section 7.
 
-COHUE est **un diorama voxel bien éclairé**. Les éléments sont faits de cubes de 0,25 stud, avec une palette de 16 couleurs vives. Les personnages sont saturés, le décor plus calme, la lumière basse et chaude. Les références de Clément (Megabonk, Octopath Traveler, Steal an Egg) donnent l'ambiance : silhouettes trapues, horde lisible, effet maquette, ton joyeux. On ne copie aucun de leurs visuels.
+COHUE est **un monde de briques à tenons, en plein soleil**. Tout est monté en briques de jouet chanfreinées, posées en quinconce, avec un tenon sur chaque dessus libre. Le sol est une grande plaque à tenons, d'une couleur par zone. Les personnages sont en briques fines, avec de gros yeux ronds. Le ciel est peint, bleu franc, avec de gros cumulus. La palette reste celle de COHUE (16 couleurs vives), et le ton reste joyeux et absurde.
+
+Références :
+- **Pour le style** : les exemples envoyés par Clément le 5 nov., des devlogs Roblox d'octobre 2026 (« Making a good Roblox game » de devZippy, zombies de GreenCapYT). Les captures restent chez Clément et ne sont pas copiées dans le dépôt.
+- **Pour le ton** : Megabonk, Octopath Traveler et Steal an Egg, qui restent valables.
+
+On s'en inspire sans copier aucun de leurs modèles, aucune de leurs cartes ni aucun de leurs visuels.
 
 Planches de référence (dossier `assets/style/`) :
 
-| Planche | Contenu |
+| Planche | Contenu | État |
+| --- | --- | --- |
+| [06-lobby-briques.png](../../assets/style/06-lobby-briques.png) | Le lobby compact en briques à tenons (maquette Blender), ce qu'on garde des exemples | **Nouveau style (5 nov.)** |
+| [01-palette-grain.png](../../assets/style/01-palette-grain.png) | Palette COHUE 16 avec ses tons, échelle avatar / gobelins, hiérarchie de saturation | v1 voxel : palette et échelle valables, rendu à refaire |
+| [02-silhouettes-familles.png](../../assets/style/02-silhouettes-familles.png) | Gobelins, zombies et fantômes en ébauche, silhouettes à 64 px, code couleur des rôles | v1 voxel : silhouettes et rôles valables, rendu à refaire |
+| [03-diorama-lumiere.png](../../assets/style/03-diorama-lumiere.png) | Ancienne cible d'ambiance (lumière basse, ombres violettes) | **Remplacée** par la section 10 |
+| [04-equipement-paliers.png](../../assets/style/04-equipement-paliers.png) | Knight, Archer, Mage aux niveaux 10, 20, 30 | v1 voxel : pièces et gags valables, rendu à refaire |
+| [05-armes-depart.png](../../assets/style/05-armes-depart.png) | Les 8 armes de départ | v1 voxel : formes et gags valables, rendu à refaire |
+
+Captures en jeu : `assets/style/captures/`. Elles montrent toutes la v1 voxel ou le lobby en Parts refusé.
+
+## 0. Pourquoi ce changement
+
+- **4 nov.** Le guide v1 est voxel : cubes de 0,25 stud lisses, ombrage cuit par face, décor en tons d'ombre. Les 23 premiers meshes (gobelins, équipement, armes, capture) sont téléversés dans ce style.
+- **5 nov., matin.** Clément refuse le premier lobby, posé en Parts dans COHUE : « beaucoup trop AI slop ».
+- **5 nov.** Il trouve la maquette voxel du lobby compact « très cool », mais ne veut pas du voxel comme style. Ses 20 exemples montrent tous la même famille : celle que le vault appelle « Classic brick / stud », remise au goût du jour (briques modélisées, lumière franche, ciel peint).
+
+| Ce qui reste | Ce qui change |
 | --- | --- |
-| [01-palette-grain.png](../../assets/style/01-palette-grain.png) | Palette COHUE 16 avec ses tons, échelle avatar / gobelins, hiérarchie de saturation |
-| [02-silhouettes-familles.png](../../assets/style/02-silhouettes-familles.png) | Gobelins livrés, zombies et fantômes en ébauche, silhouettes à 64 px, code couleur des rôles |
-| [03-diorama-lumiere.png](../../assets/style/03-diorama-lumiere.png) | Cible d'ambiance (Blender), avant / après du décor en jeu (Studio), recette de lumière |
-| [04-equipement-paliers.png](../../assets/style/04-equipement-paliers.png) | Knight, Archer, Mage aux niveaux 10, 20, 30, de face et de dos |
+| Palette COHUE 16 et ses tons | Le rendu : briques chanfreinées et tenons au lieu de cubes lisses |
+| La modélisation sur grille (`models.py`, `lobby.py`) : une cellule = une brique de 1 | Plus d'ombrage cuit par face : les chanfreins et la vraie lumière font le relief |
+| Proportions, silhouettes, code couleur des rôles, gags | Le décor n'est plus en tons d'ombre : sols unis aux tons de base, relief par les tenons |
+| Équipement et paliers, attaches R15, `ArtLibrary` | Personnages et ennemis : gros yeux ronds blancs |
+| Le plan du lobby compact (tête de gobelin, stations) | Lumière : plein jour, ciel peint bleu franc, cumulus (fin de l'ambiance violette) |
 
-Captures en jeu : `assets/style/captures/` (place de test `COHUE-A01`, lumière Studio par défaut).
+## 1. Ce que montrent les exemples
 
-## 1. Les 10 règles
+| Élément | Dans les exemples | Règle COHUE |
+| --- | --- | --- |
+| Construction | Tout est fait de briques et de plaques, avec un chanfrein sur chaque arête et des joints décalés (château, mesas, créatures) | Briques à tenons partout (section 3) |
+| Sol | Grande plaque à tenons, une couleur unie par zone (herbe, sable, neige) | Plaque à tenons ; chemins et places en dalles lisses |
+| Relief | Falaises et mesas en strates de plaques empilées | Coupe de l'île et falaises en strates |
+| Arbres | Troncs en briques, feuillage en plaques empilées (acacias plats, boules) | Arbres en plaques ; jamais d'arbre réaliste |
+| Personnages | Briques fines, gros yeux ronds blancs à pupille noire, bouche à dents carrées, accessoires en briques (couronne, chaîne, épaulettes) | Ennemis en briques de 0,25 avec yeux ronds |
+| Ciel | Peint : bleu franc en haut, horizon clair, gros cumulus crème, parfois un arc-en-ciel | Skybox peinte maison (A02) |
+| Accents | Neon cyan ou or sur les objets précieux (cristaux, lampadaires, machine) | Neon réservé au portail, à la capture, au butin, aux élites |
+| Ce qui est montré comme raté (« Before ») | Rochers et arbres réalistes au milieu des briques, glace aux textures bruitées, sol gris | À éviter : un seul style à l'écran |
 
-1. **Un seul grain par modèle.** Personnages, créatures, équipement, armes et petits props : 0,25 stud. Grands props et boss : 0,5 stud. Tuiles de terrain : 1 stud.
-2. **Rien de lisse.** Pas de sphère, de cylindre ni de mesh généré laissé tel quel : tout est voxelisé.
-3. **Seulement la palette COHUE 16**, avec 4 tons par couleur : `.l` (clair), base, `.d` (ombre), `.dd` (ombre profonde). Aucune autre couleur.
-4. **Aucune texture.** La couleur est stockée par sommet. On garde `MeshPart.Color` blanc pour la couleur exacte, toute autre valeur la teinte (gel, dégâts…).
-5. **Le décor est plus calme que les personnages.** Le décor utilise les tons `.d` et `.dd`. Les tons de base vifs et les tons `.l` sont réservés aux personnages et aux objets à ramasser.
+## 2. Les 10 règles
+
+1. **Tout est monté en briques chanfreinées**, joints décalés d'une rangée sur l'autre, en trois tailles : 0,25, 0,5 et 1 stud (section 3).
+2. **Un tenon sur chaque dessus libre**, sauf sur les dalles (chemins, places, planchers), qui restent lisses pour qu'on lise où marcher.
+3. **Seulement la palette COHUE 16** et ses tons `.l`, base, `.d`, `.dd`. Une brique a une seule couleur ; on admet ±4 % de clarté d'une brique à l'autre, mais aucun dégradé peint.
+4. **Les seules surfaces lisses** sont les yeux ronds des personnages, les effets Neon (portail, capture, butin, élites), le ciel et ses nuages, et l'eau. Tout le reste est en briques.
+5. **Les grandes surfaces sont unies** : une couleur par zone, le relief vient des tenons. Pas de mouchetis, pas de damier, pas de texture bruitée.
 6. **La famille se lit à la silhouette, le rôle à la couleur.** Le dessus de la tête porte la couleur du rôle, car la caméra est haute et voit surtout le dessus des ennemis.
-7. **Les yeux sont les pixels les plus clairs** d'un ennemi (Cream), avec des pupilles Ink.
-8. **Pas de Neon sur les ennemis ordinaires.** Le Neon est réservé à la capture, aux élites, aux annonces de boss et aux effets du joueur. Avec 100 ennemis, le bloom deviendrait une bouillie.
-9. **Chaque élément a un gag** : cocotte en casque, carotte dans le carquois, canard couronné sur la cape…
+7. **Gros yeux ronds blancs** à pupille Ink : ce sont les pixels les plus clairs d'un personnage. On y lit l'humeur (colère, panique, sommeil).
+8. **Pas de Neon sur les ennemis ordinaires.** Le Neon est réservé à la capture, aux élites, aux boss et aux effets du joueur. Avec 100 ennemis, le bloom deviendrait une bouillie.
+9. **Chaque élément a un gag, montré par un objet**, jamais écrit sur un panneau : cocotte en casque, carotte dans le carquois, jambes qui dépassent de la meule de foin.
 10. **Vérifié en jeu** : capture Studio à 20 studs au milieu de la horde, silhouette noire reconnaissable à 64 px.
 
-## 2. Le grain voxel
+## 3. La brique
 
-| Classe d'objet | Grain | Pourquoi |
+On modélise toujours sur une grille de cellules (code Python, voir section 13). Une cellule correspond à une brique de 1 × 1, avec un tenon. `assets/voxel/brick.py` transforme la grille en briques.
+
+| Classe d'objet | Taille de brique | Pourquoi |
 | --- | --- | --- |
-| Personnages, créatures, équipement, armes, petits props (< 5 studs) | **0,25 stud** (4 voxels par stud) | Une tête de gobelin fait 8 voxels de large : yeux 2 × 2 lisibles |
-| Grands props (arbres, rochers), mini-boss, boss | 0,5 stud (×2) | Garde les budgets bas sur les grandes surfaces |
-| Tuiles de terrain, falaises | 1 stud (×4) | Les tuiles s'emboîtent sur la grille des studs |
+| Personnages, créatures, équipement, armes, petits props et stations (< 15 studs) | **0,25 stud** | Une tête de gobelin fait 8 briques de large : yeux lisibles |
+| Grands props (arbres, rochers), héros de décor (portail), mini-boss, boss | 0,5 stud | Garde le nombre de briques bas sur les grandes formes |
+| Sol, falaises, tranches d'île | 1 stud | La grille des tenons du sol tombe sur celle des studs de Roblox |
 
-Les trois grains sont des multiples entiers, donc ils restent cohérents côte à côte. Pour un arbre au grain 0,5, on modélise au grain 0,25 puis on agrandit ×2.
+**Anatomie d'une brique** (valeurs de `brick.py`) :
 
-**Pas de clous (studs) en surface.** Le look diorama vient de la lumière et des ombres, pas d'une texture de brique. C'est aussi zéro mémoire de texture sur téléphone.
+| Élément | Valeur | Rôle |
+| --- | --- | --- |
+| Longueur | 1 à 3 cellules (sol : 6), largeur 1 | Assez court pour qu'on lise les briques, assez long pour ne pas faire de grille |
+| Pose | En X sur les couches paires, en Y sur les impaires ; joints décalés d'une rangée à l'autre | Appareil de maçonnerie : ça a l'air construit, pas quadrillé |
+| Chanfrein | 7 % de la cellule, 1 segment | Dessine le joint et accroche la lumière |
+| Tenon | Diamètre 60 % de la cellule, hauteur 18 %, 10 côtés | Signature du style |
+| Couleur | Une par brique, ±4 % de clarté | Les briques se distinguent sans bruit |
+| Matière | Plastique de jouet (rugosité 0,42 dans Blender) | Un léger reflet sur les chanfreins |
 
-**Ombrage cuit, sans casser la fusion des faces** : chaque face reçoit un ton selon sa direction, le même sur toute la face.
+**Où les tenons s'arrêtent** : dalles de chemin et de place, yeux, Neon, eau, verre. Le contraste entre une plaque à tenons et une dalle lisse indique où l'on marche.
 
-| Face | Ton cuit |
-| --- | --- |
-| Dessus | 12 % vers la lumière chaude `#FFF4D8` |
-| Dessous | 40 % vers l'ombre violette `#2A1C3D` |
-| Dos (+Y Blender) | 8 % d'ombre |
-| Côté droit du modèle | 4 % d'ombre |
+Les tons de matière se posent toujours à la main : une rangée `.d` au pied, une bande `.l` en haut d'un chapeau. Il n'y a plus d'ombrage cuit par face : le chanfrein et la lumière du jeu font ce travail.
 
-Les tons de matière se posent à la main : une rangée `.d` au pied, une bande `.l` en haut d'un chapeau. Les lignes sombres ne vont qu'aux jointures entre deux matières (ceinture, bord de capuche), jamais sur chaque marche.
-
-## 3. Palette COHUE 16
+## 4. Palette COHUE 16
 
 Les tons dérivés se calculent : `.l` = base mélangée à 35 % avec `#FFF4D8` ; `.d` = 35 % avec `#2A1C3D` ; `.dd` = 60 % avec `#2A1C3D`. Le code est dans `assets/voxel/cohue_voxel.py` (`PALETTE`, `tone()`).
 
 | Nom | Hex | Usage | Réserve |
 | --- | --- | --- | --- |
-| Ink | `#1C1726` | Contours, pupilles, coutures, bombe | |
-| Plum | `#4B3866` | Ombres froides, tissu sombre, cape du Mage | |
-| Bark | `#6E4227` | Bois sombre, chaussures, bordures | |
-| Leather | `#B5713A` | Cuir, bois clair, cordes | |
-| Cream | `#FFE8B8` | Blanc des yeux, dents, émail, fantômes | |
-| Stone | `#9C9488` | Pierre, os, gris neutre chaud | |
+| Ink | `#1C1726` | Pupilles, coutures, bombe | |
+| Plum | `#4B3866` | Ombres froides, tissu sombre, cape du Mage, bâches | |
+| Bark | `#6E4227` | Bois sombre, troncs, chaussures | |
+| Leather | `#B5713A` | Cuir, bois clair, cordes ; chemins en `.l` | |
+| Cream | `#FFE8B8` | Blanc des yeux, dents, papier, fantômes | |
+| Stone | `#9C9488` | Pierre, os ; dalles des places en `.l` | |
 | Steel | `#8EA6C2` | Métal, armure du Knight | |
-| Gold | `#FFC21A` | Rivets, liserés, couronne d'élite, pièces | Accents seulement : 5 % au plus d'une pièce |
+| Gold | `#FFC21A` | Rivets, liserés, couronne d'élite, pièces ; paille en `.d` | Accents seulement : 5 % au plus d'une pièce |
 | Ember | `#FF7A1A` | Rôle kamikaze, feu, orbe du Mage | |
 | Tomato | `#E63946` | Rôle mêlée, danger, tirs ennemis | |
 | **Bubblegum** | `#FF5FB0` | **Capture** (anneau, cage, interface de capture) | **Réservé à la capture, nulle part ailleurs** |
 | Grape | `#8C52E0` | Rôle soutien, magie, Mage | |
 | Royal | `#2D6BE6` | Knight | |
-| Sky | `#3FD0F5` | XP, magie froide | Sur un ennemi, seulement en `.d` / `.dd` (peau des zombies) ou comme XP volée (Bomber) |
-| Leaf | `#3DBE4A` | Archer ; décor en `.d` / `.dd` | |
-| Lime | `#8FD13F` | Peau des gobelins | Réservé aux gobelins. `#A6E03A` virait au jaune pur sous le soleil de Roblox (relecture du 4 nov.) |
+| Sky | `#3FD0F5` | XP, magie froide, eau | Sur un ennemi, seulement en `.d` / `.dd` (peau des zombies) ou comme XP volée (Bomber) |
+| Leaf | `#3DBE4A` | Archer ; herbe (plaque à tenons) | |
+| Lime | `#8FD13F` | Peau des gobelins | Réservé aux gobelins |
 
 **Hiérarchie de saturation**, du plus vif au plus calme :
 
-1. Les objets à ramasser (XP cyan, pièces or) sont les plus vifs et brillent en Neon (LootRenderer).
+1. Les objets à ramasser (XP cyan, pièces or) brillent en Neon : ce sont les seuls objets lisses et lumineux au sol.
 2. Le joueur et la capture : couleur de classe et rose Bubblegum.
-3. Les ennemis : peau de famille et couleur de rôle, en tons de base.
-4. Le décor : uniquement des tons `.d` et `.dd` sur les grandes surfaces (herbe Leaf.d / Leaf.dd, chemin Leather.d, pierre Stone.d).
+3. Les ennemis : peau de famille, couleur de rôle aux tons de base, yeux blancs.
+4. Le décor :
+   - grands sols aux tons de base, une couleur par zone (herbe Leaf, sable Gold.d, neige Cream) ;
+   - chemins et places en `.l` (Leather.l, Stone.l) ;
+   - tranches, dessous et strates en `.d` et `.dd`.
 
-La planche 3 montre la règle en jeu. Sur un sol au ton de base, la horde se fond dans l'herbe ; sur un sol en `.dd`, elle ressort.
+**À vérifier en jeu dès le premier monde.** En v1, un sol vif noyait la horde (planche 3). Avec les tenons, le sol a désormais une texture, et les yeux blancs font ressortir les ennemis. Si la capture de horde à 20 studs montre encore des gobelins Lime fondus dans l'herbe Leaf, on repasse l'herbe en Leaf.d pour les mondes de combat. Le lobby, lui, n'a pas de horde.
 
-## 4. Proportions
+## 5. Proportions
 
 Repère : l'avatar R15 par défaut mesure **5,46 studs** (tête 1,16 × 1,18 × 1,16, torse 1,94 × 1,70 × 1,00), mesuré dans Studio.
 
@@ -93,16 +133,17 @@ Repère : l'avatar R15 par défaut mesure **5,46 studs** (tête 1,16 × 1,18 × 
 | Ennemi d'essaim (gobelin, zombie, fantôme) | 3,5 à 4,25 studs dessinés | Environ 65 % de l'avatar ; tête = 40 à 45 % de la hauteur ; largeur ≥ 3 studs avec les oreilles ou les bras |
 | Élite | même maille ×1,25 | Couronne et anneau or en Neon (déjà dans EnemyRenderer) |
 | Ennemi moyen (bloater, armure hantée) | 4 à 5 studs | |
-| Mini-boss | 8 à 10 studs | Grain 0,5 |
-| Boss | 16 à 20 studs | Grain 0,5, plusieurs mailles sous 10 000 triangles |
+| Mini-boss | 8 à 10 studs | Briques de 0,5 |
+| Boss | 16 à 20 studs | Briques de 0,5, plusieurs mailles de moins de 20 000 triangles |
+| Héros de décor (portail du lobby) | ≥ 1,5 × tout ce qui l'entoure | La tête de gobelin fait 32 studs |
 | Pièce d'équipement | ≈ 1,4 × la partie du corps couverte | Un casque fait 2 studs de large pour une tête de 1,16 |
-| Arme tenue | 3 à 4 studs de long | Lame ou manche épais d'au moins 2 voxels |
+| Arme tenue | 3 à 4 studs de long | Lame ou manche épais d'au moins 2 briques |
 
-**Taille en jeu.** `EnemyRenderer` redimensionne la maille à `height × 1,3` (ART_SCALE). Pour garder des voxels de 0,25 stud, les hauteurs de `Config/Enemies` doivent valoir hauteur de la maille ÷ 1,3. Pour les gobelins : Grunt 2,9 · Archer 2,7 · Shaman 3,25 · Bomber 2,7 (voir Contract requests).
+**Taille en jeu.** `EnemyRenderer` redimensionne la maille à `height × 1,3` (ART_SCALE). Pour garder des briques de 0,25 stud, les hauteurs de `Config/Enemies` doivent valoir hauteur de la maille ÷ 1,3. Pour les gobelins : Grunt 2,9 · Archer 2,7 · Shaman 3,25 · Bomber 2,7 (voir Contract requests).
 
-## 5. Lisibilité dans la horde, sur téléphone
+## 6. Lisibilité dans la horde, sur téléphone
 
-Calcul de référence : écran paysage de 1080 px de haut, FieldOfView vertical de 70°. À 30 studs, on voit 42 studs de haut, soit environ 26 px par stud : un gobelin de 3,5 studs fait 90 px. À 60 studs, il fait 45 px et un voxel ne fait plus que 3 px. Un détail qui compte doit donc faire **au moins 2 × 2 voxels** (0,5 stud).
+Calcul de référence : écran paysage de 1080 px de haut, FieldOfView vertical de 70°. À 30 studs, on voit 42 studs de haut, soit environ 26 px par stud : un gobelin de 3,5 studs fait 90 px. À 60 studs, il fait 45 px, une brique de 0,25 ne fait plus que 3 px et ses tenons disparaissent. Un détail qui compte doit donc faire **au moins 2 × 2 briques** (0,5 stud). Les yeux ronds font au moins 0,5 stud de diamètre.
 
 **Code couleur des rôles, commun à toutes les familles.** Il est porté par le dessus de la tête et par les vêtements.
 
@@ -119,29 +160,31 @@ Calcul de référence : écran paysage de 1080 px de haut, FieldOfView vertical 
   - **gobelins** : forme en T, avec de grandes oreilles horizontales ;
   - **zombies** : forme en Γ, bras tendus devant et dos voûté ;
   - **fantômes** : dôme et bas ondulé, sans pieds, à 1 stud du sol.
-- Chaque ennemi a au plus 4 couleurs principales, plus Ink et Cream.
+- Chaque ennemi a au plus 4 couleurs principales, plus Ink et Cream (les yeux).
 - Les tirs ennemis sont Tomato, lents, sans Neon. Ceux du joueur sont aux couleurs de la classe et brillent. On distingue un tir ennemi d'un tir ami d'un coup d'œil.
-- **Capturable** : anneau carré au sol et cage flottante au-dessus de la tête, tous deux en Neon Bubblegum. Aucun autre objet du jeu n'est rose, donc on le repère au milieu de 100 ennemis (captures Studio).
+- **Capturable** : anneau carré au sol et cage flottante au-dessus de la tête, tous deux en Neon Bubblegum. Aucun autre objet du jeu n'est rose, donc on le repère au milieu de 100 ennemis.
 - **Élite** : anneau et couronne or en Neon (existant).
 - Le joueur se repère à son équipement de classe. Une pastille au sol sous le joueur est recommandée à l'agent UI ou VFX.
 
-## 6. Silhouettes par famille
+## 7. Silhouettes par famille
 
 | Famille | Monde | Peau | Silhouette | Ton | Statut |
 | --- | --- | --- | --- | --- | --- |
-| Gobelins | 1 · Bois Grognon | Lime | T : grosses oreilles horizontales, petites jambes, grosse tête | Bricoleurs ridicules (cocotte, louche, bonnet d'aviateur) | **Livrés** (A01-04) |
+| Gobelins | 1 · Bois Grognon | Lime | T : grosses oreilles horizontales, petites jambes, grosse tête | Bricoleurs ridicules (cocotte, louche, bonnet d'aviateur) | Livrés en v1 voxel (A01-04) ; **à repasser en briques, avec des yeux ronds** |
 | Zombies | 2 · cimetière / marais | Sky.d (bleu-vert mat) | Γ : bras tendus, tête basse en avant ; haillons Plum | Maladroits (zombie en tutu Grape.l, pas en rose) | Ébauches (A01-08) |
 | Fantômes | 3 · Récré Fantôme | Cream | Dôme + bas ondulé, flottent ; objets d'école | Surveillants de cantine | Ébauches (A01-08) |
 
-## 7. Équipement des classes
+## 8. Équipement des classes
 
-L'avatar reste intact : la classe ajoute des **Accessories** voxel sur les attaches R15 standard. Les pièces se **cumulent** : niveau 10 = tête, niveau 20 = épaules ou bras, niveau 30 = grande pièce de dos, celle que voit la caméra placée derrière le joueur. Avant le niveau 10, l'arme de départ suffit à reconnaître la classe. Les pièces de tête laissent le visage visible.
+L'avatar reste intact : la classe ajoute des **Accessories** en briques sur les attaches R15 standard. Les pièces se **cumulent** : niveau 10 = tête, niveau 20 = épaules ou bras, niveau 30 = grande pièce de dos, celle que voit la caméra placée derrière le joueur. Avant le niveau 10, l'arme de départ suffit à reconnaître la classe. Les pièces de tête laissent le visage visible.
+
+Les 9 pièces livrées le 4 nov. sont en v1 voxel. Leurs formes, leurs attaches et leurs gags restent ; seul leur rendu passe en briques.
 
 | Classe | Couleurs | Niveau 10 (tête) | Niveau 20 | Niveau 30 (dos) |
 | --- | --- | --- | --- | --- |
 | Knight | Steel + Royal, rivets Gold | Bassinet ouvert, plumet ridiculement court · `HatAttachment` | Épaulières bleu roi (elles se détachent du casque en acier), la même maille pour les deux (demi-tour à gauche) · `RightShoulderAttachment` + `LeftShoulderAttachment` | Cape bleu roi au canard couronné · `BodyBackAttachment` |
-| Archer | Leaf + Leather | Capuche à pointe, broche en gland · `HatAttachment` | Brassard en cuir, cible rouge et crème sur le dos de l'avant-bras (visible de la caméra) · `LeftGripAttachment` (tourné de −90° sur X) | Carquois droit, une flèche est une carotte de 4 voxels · `BodyBackAttachment` |
-| Mage | Grape + Plum, étoiles Gold | Chapeau pointu à grelot · `HatAttachment` | Orbe de feu dans une cage, 1 stud au-dessus et 1,25 stud à l'extérieur de l'épaule gauche (hors du bord du chapeau), cœur en cube Neon Ember · `LeftShoulderAttachment` | Cape étoilée à haut col, arrêtée au genou (les jambes ne la traversent pas) · `BodyBackAttachment` |
+| Archer | Leaf + Leather | Capuche à pointe, broche en gland · `HatAttachment` | Brassard en cuir, cible rouge et crème sur le dos de l'avant-bras (visible de la caméra) · `LeftGripAttachment` (tourné de −90° sur X) | Carquois droit, une flèche est une carotte · `BodyBackAttachment` |
+| Mage | Grape + Plum, étoiles Gold | Chapeau pointu à grelot · `HatAttachment` | Orbe de feu dans une cage, 1 stud au-dessus et 1,25 stud à l'extérieur de l'épaule gauche, cœur en cube Neon Ember · `LeftShoulderAttachment` | Cape étoilée à haut col, arrêtée au genou (les jambes ne la traversent pas) · `BodyBackAttachment` |
 
 Couleurs réservées pour les 5 autres classes (A01-07) : Guardian Stone + Ember · Rogue Plum + Ink + Tomato · Cleric Cream + Gold + Sky · Barbarian Bark + Tomato + fourrure Cream · Tamer Leather + Leaf + Ember.
 
@@ -149,28 +192,41 @@ Couleurs réservées pour les 5 autres classes (A01-07) : Guardian Stone + Ember
 
 **Chapeaux et cheveux du joueur.** Ils traversent les pièces de tête. Je recommande de masquer les accessoires `Hat` et `Hair` de l'avatar pendant la run, avec le réglage `keepHat` déjà prévu (Contract request).
 
-## 8. Budgets
+## 9. Budgets
 
-Mesurés sur les livrables : maillage glouton, une seule maille, aucune texture.
+Les briques coûtent beaucoup plus de triangles que les cubes lisses. Un tenon en géométrie fait une trentaine de triangles, et le chanfrein multiplie environ par trois les faces d'une brique. La maquette du lobby compte **1,3 million de triangles** avant chanfreins : elle sert à juger le style, pas à jouer. Roblox limite chaque maille à 20 000 triangles.
 
-| Classe | Triangles visés / plafond | Mesuré (mailles étanches) |
+En jeu, on combine donc deux techniques :
+
+| Technique | Comment | Pour quoi |
 | --- | --- | --- |
-| Ennemi d'essaim | 800 / 1 000 | Grunt 656 · Archer 684 · Shaman 716 · Bomber 792 |
-| Ennemi moyen | 1 200 / 2 000 | — |
-| Mini-boss | 3 000 / 6 000 | — |
-| Boss | 8 000 / 15 000 (mailles < 10 000) | — |
-| Pièce d'équipement | 300 / 800 (limite Roblox des accessoires : 4 000) | 80 à 348 |
-| Arme | 300 / 800 | 94 à 232 |
-| Marqueur de capture (anneau + cage) | 300 / 500 | 158 + 130 |
-| Petit prop | 300 / 600 | — |
-| Arbre | 600 / 1 500 | — |
-| Tuile de terrain | 1 500 / 4 000 | — |
+| **A. Briques en géométrie** | Briques chanfreinées et tenons modélisés, comme dans la maquette | Ce qu'on voit de près et en un seul exemplaire : portail, stations du lobby, boss. Chaque maille reste sous 20 000 triangles |
+| **B. Briques en texture** | Maille fusionnée (comme en v1), avec des UV à l'échelle de la cellule et une texture répétée de joints et de tenons (`SurfaceAppearance`, normal map, ou image de tenons en superposition) | Tout ce qui est répété : ennemis de horde, équipement, armes, arbres, sols |
+| **Sol** | Grands Parts ou mailles plates, couleur unie, texture de tenons répétée (comme la plaque de base de Studio) | Plaques à tenons des mondes et du lobby |
 
-Textures : **0 octet** (couleurs par sommet). Une horde de 300 gobelins à 700 triangles en moyenne fait environ 210 000 triangles, sur 4 mailles partagées. Le plafond d'ennemis réel reste à mesurer par A13.
+**La technique B n'est pas encore testée dans Studio** (A01-02 bis). Il faut vérifier trois choses avant de convertir les 23 meshes :
 
-## 8 bis. Armes de départ (A01-05)
+- la couleur par sommet survit-elle sous une `SurfaceAppearance` ?
+- le coût mémoire de la texture sur téléphone ;
+- la lisibilité des tenons à 20 studs.
 
-Planche : [05-armes-depart.png](../../assets/style/05-armes-depart.png). L'origine est le centre de la prise, et l'arme pointe vers +Y dans Roblox. L'attribut `GripOffset` donne la prise depuis le centre de la maille.
+| Classe | Technique | Triangles visés / plafond |
+| --- | --- | --- |
+| Ennemi d'essaim | B | 800 / 1 000 (v1 mesurée : 656 à 792) |
+| Ennemi moyen | B | 1 200 / 2 000 |
+| Mini-boss | A ou B | 6 000 / 12 000 |
+| Boss | A | 15 000 par maille, plusieurs mailles |
+| Pièce d'équipement, arme | B | 300 / 800 (limite Roblox des accessoires : 4 000) |
+| Marqueur de capture | lisse (Neon) | 300 / 500 |
+| Arbre | B | 600 / 1 500 |
+| Station du lobby | A | 20 000 par maille au plus |
+| Portail du lobby | A, en plusieurs mailles | 20 000 par maille |
+
+Le plafond d'ennemis à l'écran reste à mesurer par A13, une fois la technique B en place.
+
+## 9 bis. Armes de départ (A01-05)
+
+Planche : [05-armes-depart.png](../../assets/style/05-armes-depart.png) (v1 voxel, rendu à refaire en briques). L'origine est le centre de la prise, et l'arme pointe vers +Y dans Roblox. L'attribut `GripOffset` donne la prise depuis le centre de la maille.
 
 | Arme | Classe | Gag |
 | --- | --- | --- |
@@ -181,129 +237,139 @@ Planche : [05-armes-depart.png](../../assets/style/05-armes-depart.png). L'origi
 | Throwing Daggers | Rogue | Ruban rouge noué au pommeau (projectile) |
 | Holy Aura | Cleric | Clochette de cantine en porcelaine qui « sonne » l'aura |
 | Spinning Axes | Barbarian | Smiley gravé sur le fer |
-| Beast Whip | Tamer | Fouet enroulé à pompon de cirque (les anneaux carrés sont à revoir s'ils gênent) |
+| Beast Whip | Tamer | Fouet enroulé à pompon de cirque |
 
-## 9. Lumière diorama (proposition pour A02-05)
+## 10. Lumière et ciel (proposition pour A02-05)
 
-Lumière basse et chaude, ombres violettes, flou de profondeur doux (effet maquette), bloom seulement sur le Neon. Valeurs de départ, à régler monde par monde :
+On abandonne l'ambiance de la v1 (soleil bas, ombres violettes, flou de maquette). Le nouveau style demande :
+
+- **plein jour** et un soleil haut et chaud ;
+- des **ombres franches et bleutées** ;
+- un **ciel peint** : bleu franc au zénith, horizon presque blanc, gros cumulus crème ;
+- peu de lumière ambiante, pour que les couleurs restent franches ;
+- un léger reflet plastique sur les chanfreins.
+
+Valeurs de départ, à régler monde par monde :
 
 | Réglage | Valeur |
 | --- | --- |
-| `Lighting.ClockTime` / `GeographicLatitude` | 15,6 / 35 |
-| `Brightness` | 2,6 |
-| `Ambient` / `OutdoorAmbient` | `#60526F` / `#9680A0` |
-| `ColorShift_Top` | `#FFD6A0` |
-| `EnvironmentDiffuseScale` / `SpecularScale` | 0,5 / 0,2 |
-| `Atmosphere` | Density 0,32 · Offset 0,15 · Color `#FFE4C4` · Decay `#96A0E6` · Glare 0,2 · Haze 1,4 |
-| `ColorCorrectionEffect` | Saturation +0,12 · Contrast +0,06 · Tint `#FFF6E8` |
-| `BloomEffect` | Intensity 0,6 · Size 24 · Threshold 0,9 |
-| `DepthOfFieldEffect` | FarIntensity 0,35 · FocusDistance ≈ distance caméra-joueur (30) · InFocusRadius 24 · NearIntensity 0,4 |
+| `Lighting.ClockTime` / `GeographicLatitude` | 13 / 30 |
+| `Brightness` | 3 |
+| `Ambient` / `OutdoorAmbient` | `#4E5A70` / `#7F96B8` |
+| `ColorShift_Top` | `#FFE6C4` |
+| `EnvironmentDiffuseScale` / `SpecularScale` | 0,5 / 0,4 |
+| `Atmosphere` | Density 0,22 · Offset 0,1 · Color `#D6ECFF` · Decay `#5F98E0` · Glare 0 · Haze 0,8 |
+| `Sky` | Skybox peinte maison (6 faces) : dégradé `#1F63D8` → `#7FC2F7` → `#DDF1FF` à l'horizon, cumulus crème. À peindre par A02, sans reprendre de ciel existant |
+| `ColorCorrectionEffect` | Saturation +0,15 · Contrast +0,08 |
+| `BloomEffect` | Intensity 0,5 · Size 24 · Threshold 0,95 (seul le Neon fleurit) |
+| `DepthOfFieldEffect` | Léger : FarIntensity 0,15, au-delà de 120 studs |
 
-La place de test contient un `ColorGradingEffect` réglé sur le tonemapper `Retro`. Il désature la palette : à retirer ou à tester par A02. Les captures MCP de Studio n'affichent pas les effets de post-traitement : la lumière se valide en Play sur téléphone.
+La maquette du lobby (`assets/voxel/lobby.py`, fonction `painted_sky`) utilise ce dégradé. Le ciel y est affiché à pleine force, mais n'éclaire le décor qu'à 45 %. Le `ColorGradingEffect` en mode `Retro` de la place de test désature la palette : il faut l'enlever ou le tester (A02). Les captures MCP de Studio n'affichent pas le post-traitement : la lumière se valide en Play, sur téléphone.
 
-**Signature diorama des mondes** (pour A02) : les tuiles flottent et montrent leur coupe de terrain (herbe, terre Bark, Leather.d, roche Stone.d) au bord de l'arène.
+**Signature des mondes** (pour A02) : chaque tuile flotte et montre sa coupe en strates (herbe, terre Bark, Leather, plaques de pierre Stone / Stone.d) au bord de l'arène.
 
-## 10. Anti-AI-slop, appliqué au modeling
+## 11. Anti-AI-slop
 
-- Aucune sortie Meshy, Cube ou générateur n'est livrée telle quelle. Toute forme organique est revoxelisée et repeinte avec la palette. Crédits Meshy dépensés pour ce lot : 0.
-- Pas de motif bruité : le damier du chapeau du Shaman et le mouchetis de l'herbe ont été retirés. On préfère de grandes bandes ou des plaques.
-- Silhouettes testées en noir à 64 px. Couleurs vérifiées en jeu sur un sol au ton du monde.
-- Chaque modèle a son gag, listé dans `assets/voxel/manifest.json` (champ `gag` pour les ennemis).
+- Aucune sortie de Meshy, Cube ou d'un autre générateur n'est livrée telle quelle. Crédits Meshy dépensés : 0.
+- **Un seul style à l'écran** : pas de rocher réaliste, d'arbre par défaut de Roblox ou de Part grise lisse au milieu des briques. C'est exactement ce que les exemples de Clément montrent comme « avant ».
+- Pas de panneau qui explique : une station se reconnaît à ses objets. Le texte est réservé à l'interface (classements, compte à rebours).
+- Pas de motif bruité : on préfère de grandes surfaces unies, dont le relief vient des tenons.
+- Composition d'abord, détail ensuite : un seul héros par vue, des chemins qui y mènent, de la densité vers les bords (note du vault « World Composition and Set Dressing »).
+- Maquette rendue et relue avant toute construction dans Studio.
+- Silhouettes testées en noir à 64 px ; couleurs vérifiées en jeu sur le sol du monde.
 
-## 10 bis. Relecture quality-score
+## 11 bis. Relectures quality-score (historique v1 voxel)
 
-Trois relecteurs à l'aveugle ont noté les lots le 4 nov. avec la grille modèle du skill, adaptée au voxel (critère V4 = grain unique et arêtes nettes).
+Le 4 nov., trois relecteurs ont noté les lots v1 à l'aveugle (grille modèle adaptée au voxel) :
 
-| Lot | Relecteur 1 | Relecteur 2 | Relecteur 3 | Médiane |
-| --- | --- | --- | --- | --- |
-| Gobelins | 7,0 | 7,0 | 7,7 | **7,0** |
-| Équipement | 7,0 | 8,0 | 6,7 | **7,0** |
+| Lot | Tour 1 (médiane) | Tour 2 (médiane) |
+| --- | --- | --- |
+| Gobelins | 7,0 | 8,7 |
+| Équipement | 7,0 | 7,7 |
 
-Corrections appliquées (tour 1) :
+Les corrections du tour 1 restent acquises dans les formes, quel que soit le rendu :
 
-- **Silhouettes** : Grunt et Bomber faisaient la même tache à 64 px. La louche du Grunt est maintenant brandie hors de la silhouette, et la bombe du Bomber est portée sur le côté.
-- **Peau des gobelins** : Lime moins jaune (`#8FD13F`), et la cocotte remontée d'un voxel pour dégager les yeux.
-- **Intersections de l'équipement** : l'orbe est écartée du chapeau, la queue de capuche raccourcie (elle traversait le carquois), la cape du Mage arrêtée au genou.
-- **Lecture de l'équipement** :
-  - le brassard est d'une seule couleur, avec la cible au dos ;
-  - le carquois est droit, avec une carotte de 4 voxels ;
-  - les épaulières sont bleu roi et posées sur l'épaule ;
-  - la capuche a une vraie pointe.
+- la louche du Grunt brandie hors de la silhouette ;
+- la bombe du Bomber portée sur le côté ;
+- une peau Lime moins jaune ;
+- l'orbe du Mage écartée du chapeau ;
+- la cape du Mage arrêtée au genou.
 
-Un relecteur voyait le casque du Knight tourné d'un quart de tour. La vue de profil dans Studio le contredit : rivets sur le côté, nasal vers −Z, crête d'avant en arrière. Rien n'a été changé sur ce point.
+Il restait trois défauts sur l'équipement :
 
-**Tour 2 (nouvelle note par 3 relecteurs) : pas encore fait.** Il faut d'abord refaire les captures Studio de la horde et des gobelins à 20 studs avec les modèles corrigés. Les captures `studio_horde_*` et `studio_gobelins_*` montrent encore l'ancienne version.
+- les capes rigides descendent sur les jambes ;
+- le carquois touche la capuche ;
+- Mage_Hat dépasse 300 triangles.
 
-## 11. Créatures existantes (`assets/creatures/`)
+Ils seront corrigés au passage en briques. Le lobby en briques n'a pas encore été relu à l'aveugle.
 
-Les 15 mailles existantes ont été générées par IA. Elles sont lisses, avec des textures peintes et des dégradés : elles **ne passent pas ce guide** (règles 1, 2 et 4). La capture `assets/style/captures/studio_grunt_vs_anciennes-creatures.jpg` montre l'écart avec un gobelin voxel. Proposition :
+## 12. Créatures existantes (`assets/creatures/`)
+
+Les 15 mailles existantes ont été générées par IA. Elles sont lisses, avec des textures peintes et des dégradés : elles **ne passent pas ce guide** (règles 1, 3 et 4).
 
 | Modèle | Décision |
 | --- | --- |
-| Grand Chêne Ronchon (boss monde 1) | À refaire en voxel au grain 0,5 (A01-09) en gardant l'idée : souche grognon à sourcils de mousse |
-| Gland Grincheux, Champignon Sauteur, Hibou Plongeur (faune monde 1) | À refaire en voxel (faune d'essaim, peau de famille « forêt » à définir sans Lime ni Bubblegum) |
+| Grand Chêne Ronchon (boss monde 1) | À refaire en briques de 0,5 (A01-09) en gardant l'idée : souche grognon à sourcils de mousse |
+| Gland Grincheux, Champignon Sauteur, Hibou Plongeur (faune monde 1) | À refaire en briques (faune d'essaim, peau de famille « forêt » à définir sans Lime ni Bubblegum) |
 | Souche Géante | Doublon possible du mini-boss : à trancher avec A03 |
 | Bogue Blindée | Hors liste v2 : retirée |
 | Braise, Marée, Ronce (anciens compagnons) | Sortent du jeu (décision v2) |
 
 Les mailles actuelles restent en place tant que les remplaçantes ne sont pas livrées : le jeu continue de tourner.
 
-## 12. Pipeline Blender → Roblox (A01-02)
+## 13. Pipeline Blender → Roblox (A01-02)
 
-Le source de chaque modèle est du code Python (`assets/voxel/models.py`). Cela rend les modèles relisibles, versionnés, réglables et reproductibles.
+Le source de chaque modèle est du code Python, qui modélise sur grille : `assets/voxel/models.py` pour les personnages et les objets, `assets/voxel/lobby.py` pour le lobby. Les modèles restent ainsi relisibles, versionnés, réglables et reproductibles.
 
 ```
-models.py (voxels) → cohue_voxel.py (maillage glouton, tons) → Blender 5.2 en ligne de commande (build.py)
-  → assets/voxel/glb/*.glb + manifest.json → Studio : Import 3D → MeshPart (ids Roblox)
+models.py / lobby.py (grille) → brick.py (briques chanfreinées, tenons) → rendu Blender (maquettes, planches)
+models.py (grille) → cohue_voxel.py (maille fusionnée) → build.py (GLB) → Studio : Import 3D → MeshPart
   → ReplicatedStorage.Assets → ArtLibrary
 ```
 
-### 12.1 Construire et exporter
+### 13.1 Maquettes en briques
+
+```bash
+"C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b --factory-startup --python assets/voxel/lobby.py -- assets/voxel/review/lobby_brick
+```
+
+`brick.to_blender` a la même signature que `cohue_voxel.to_blender`. La scène du lobby la branche à sa place : tous les modèles, avatars compris, passent en briques sans autre changement. La planche 6 se monte avec `python assets/style/compose.py lobby`.
+
+### 13.2 Export pour Roblox (v1, à adapter à la technique B)
 
 ```bash
 "C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b --factory-startup --python assets/voxel/build.py -- export
 ```
 
-- **Échelle** : 1 unité Blender = 1 stud, un voxel = 0,25. Z en haut dans Blender, le modèle regarde vers −Y. L'export glTF +Y up suivi de l'import Roblox donne : avant −Z, main droite en +X, soit la conversion (x, y, z) → (−x, z, y).
-- **Triangles** : maillage glouton, une face par rectangle de même couleur. Les sommets sont séparés par direction de face, d'où un ombrage parfaitement plat.
-- **Mode étanche** : la fusion crée des jonctions en T, sources de fentes topologiques et de pixels qui scintillent. Les coins voisins sont donc insérés dans les arêtes longues. Chaque face est triangulée en éventail depuis un coin libre, sinon depuis un point seul sur son arête, sinon depuis son centre. Résultat : 0 arête de bord, 0 triangle plat, pour environ +35 % de triangles. Il reste quelques arêtes non-manifold, là où deux voxels ne se touchent que par une arête (marches en diagonale) : c'est normal en voxel et sans effet sur le rendu.
-- **UV et couleurs** : couleur par coin de face (`BYTE_COLOR`, sRGB), un jeu d'UV neutre (Roblox en attend un), un seul matériau `COHUE_Voxel`.
-- **Export** : GLB, `export_apply`, normales, `export_vertex_color = ACTIVE`, une maille par fichier. `manifest.json` donne pour chaque modèle : triangles, taille en studs (axes Roblox), décalage de l'attache depuis le centre de la maille, rotation d'attache, couleurs.
-- **Toujours exporter en ligne de commande.** Forcer le contexte d'une autre scène dans un Blender ouvert l'a fait planter pendant ce lot.
-- **Aperçu sans téléversement** : `assets/voxel/luau/*.json` (même maille, axes Roblox), chargé dans Studio par EditableMesh (module `A01_VoxelPreview` de la place COHUE-A01). Un MeshPart créé par EditableMesh garde l'origine des sommets comme centre ; l'aperçu recentre donc la maille sur sa boîte, comme le fait Import 3D.
+- **Échelle** : 1 unité Blender = 1 stud. Z en haut dans Blender, le modèle regarde vers −Y. L'export glTF +Y up suivi de l'import Roblox donne : avant −Z, main droite en +X, soit la conversion (x, y, z) → (−x, z, y).
+- **Maille fusionnée et étanche** : une face par rectangle de même couleur, avec insertion des coins voisins dans les arêtes longues (0 arête de bord, environ +35 % de triangles).
+- **Couleurs** : couleur par coin de face (`BYTE_COLOR`, sRGB), un jeu d'UV neutre, un seul matériau.
+- **À faire pour le style briques (A01-02 bis)** :
+  - UV à l'échelle de la cellule (une cellule = une tuile de tenon) ;
+  - garder un quad par cellule sur les faces qui reçoivent la texture ;
+  - fabriquer la texture de joints et de tenons, puis tester dans Studio (section 9).
+- **Toujours exporter en ligne de commande.** Forcer le contexte d'une autre scène dans un Blender ouvert l'a fait planter.
 
-### 12.2 Importer dans Studio
+### 13.3 Importer dans Studio
 
-`AssetService:CreateAssetAsync` n'est pas encore ouvert (« not available yet », testé le 4 nov.). L'outil MCP `open_cloud_invoke` n'existe que dans une instance de Studio à jour, et apparaît puis disparaît au gré des reconnexions. Le téléversement passe donc par **Import 3D**, ici la file d'importation : un fichier à la fois, l'aperçu s'ouvre seul après l'ajout, puis Importer.
+`AssetService:CreateAssetAsync` n'est pas encore ouvert (« not available yet », testé le 4 nov.). Le téléversement passe par **Import 3D**, un fichier à la fois. Réglages :
+- Scale Unit = **Studs** ;
+- Upload to Roblox activé ;
+- Merge Meshes désactivé ;
+- Use Imported Pivot activé ;
+- Ignore Vertex Colors **désactivé**.
 
-1. Accueil → Import 3D → sélectionner tous les `assets/voxel/glb/*.glb` (import groupé).
-2. Réglages : Scale Unit = **Studs** · Upload to Roblox = **activé** (import final seulement) · Creator = le propriétaire de l'expérience · Merge Meshes désactivé · Use Imported Pivot activé · Ignore Vertex Colors **désactivé**.
-3. Lire le panneau d'avertissements, puis importer.
-4. Lancer `assets/install/A01_finalize.luau` (généré par `python assets/install/make_finalize.py` depuis le manifeste). Le script :
-   - range les MeshParts dans `ReplicatedStorage.Assets` (Creatures, Equipment, Weapons, FX) et règle leurs propriétés : Color blanc, collisions coupées, pas d'ombre, `PivotOffset` nul ;
-   - construit les 10 Accessories : Handle, attache R15 avec sa rotation, attributs `RefPartName` et `RefPartSize`, cœur Neon soudé pour l'orbe ;
-   - affiche la liste `nom;MeshId;taille`.
-5. Reporter cette liste dans `assets/creatures.csv` et `assets/equipment.csv`, puis écrire les `.model.json`.
+Ensuite, `assets/install/A01_finalize.luau` (généré par `python assets/install/make_finalize.py`) range les MeshParts dans `ReplicatedStorage.Assets`, construit les Accessories et affiche la liste `nom;MeshId;taille`. `python assets/install/make_records.py` écrit les fiches CSV et `.model.json`.
 
-**Test à blanc fait le 4 nov.** Des maillages d'aperçu portant les 23 noms ont remplacé les imports. La finalisation a produit 10 Accessories, 8 armes et 2 effets. `ArtLibrary.equipClassTier` a posé 4, 3 et 3 pièces, placées par `AddAccessory` exactement comme prévu, y compris sur un avatar agrandi 1,3 fois (capture `studio_equipClassTier_dos.jpg`). Le vrai import a suivi : voir section 13.
+**Rien n'est construit par script en jeu** (décision de Clément du 4 nov.) : décor, ennemis et lobby existent comme objets posés dans la place COHUE, et les scripts ne font que cloner.
 
-## 13. Livrables et ids Roblox
+## 14. Livrables et ids Roblox (v1 voxel)
 
-**Import fait le 4 nov. (soir)** dans la place `COHUE` (placeId 132257920785923), par la file d'importation de Studio, avec les réglages par défaut : unité studs, facteur 1, couleurs par sommet conservées, téléversement sur le compte de Clément. Une capture en jeu des meshes téléversés est dans `assets/style/captures/studio_COHUE_meshes_televerses.jpg`. Contrôles faits :
+**Import fait le 4 nov. (soir)** dans la place `COHUE` (placeId 132257920785923), par la file d'importation de Studio : unité studs, facteur 1, couleurs par sommet conservées, téléversement sur le compte de Clément. Capture : `assets/style/captures/studio_COHUE_meshes_televerses.jpg`. Les tailles en jeu sont identiques au manifeste, l'avant de chaque mesh est en −Z, et `A01_finalize.luau` a créé `ReplicatedStorage.Assets` : Creatures (4), Equipment (10 Accessories), Weapons (8), FX (2).
 
-- les tailles en jeu sont identiques au manifeste ;
-- l'avant de chaque mesh est bien en −Z ;
-- `A01_finalize.luau` a créé `ReplicatedStorage.Assets` : Creatures (4), Equipment (10 Accessories), Weapons (8), FX (2).
+**Ces 23 meshes sont dans le style v1 voxel.** Ils font tourner le jeu en attendant leurs versions en briques. Les nouvelles versions demanderont un nouveau téléversement, donc l'accord de Clément.
 
-**La place n'est pas sauvegardée** : c'est à la session principale de le faire.
-
-Fiches dans le dépôt :
-
-- `assets/a01-meshes.csv` : les 23 meshes, avec attache, décalage, rotation et partie de référence ;
-- les lignes gobelins dans `assets/creatures.csv` ;
-- les fichiers `.model.json` (format Rojo) dans `assets/creatures/`, `assets/equipment/`, `assets/weapons/` et `assets/fx/`, régénérés par `python assets/install/make_records.py`.
-
-Aucune texture : la colonne texture est vide pour tous les meshes.
+Fiches dans le dépôt : `assets/a01-meshes.csv`, les lignes gobelins de `assets/creatures.csv`, les `.model.json` (format Rojo) de `assets/creatures/`, `assets/equipment/`, `assets/weapons/` et `assets/fx/`.
 
 | Mesh | MeshId | Taille (studs) |
 | --- | --- | --- |
@@ -333,4 +399,4 @@ Aucune texture : la colonne texture est vide pour tous les meshes.
 
 ## Notes du vault utilisées
 
-`Voxel Art - Studs Outlines and Style Kits` · `Meshing Voxels for Roblox - Greedy Meshing and Export` · `Trim Sheets Atlases and Vertex Colors` (les couleurs par sommet se multiplient avec `Color`) · skills `fwjelaa-blender-modeling` (budgets, règle d'export GLB) et `fwjelaa-asset-import` (réglages de l'Import 3D) · `Engine and API Changes 2025-2026` (CreateAssetAsync).
+`Environment Art Styles` (famille « Classic brick / stud ») · `Voxel and Blocky Modeling` et `Voxel Art - Studs Outlines and Style Kits` (kit « toy-box », tenons en texture, paramètres des tenons) · `World Composition and Set Dressing - Designed, Not Scattered` · `Lobby and Hub Design` · `Art-Direction Nitpicks - The Principles Behind Them` · `Meshing Voxels for Roblox - Greedy Meshing and Export` · `Trim Sheets Atlases and Vertex Colors` · skills `fwjelaa-blender-modeling` et `fwjelaa-asset-import` · limite Roblox de 20 000 triangles par maille (docs Roblox, octobre 2026, citées par le vault).

@@ -259,9 +259,42 @@ def board_equipment():
     im.save(os.path.join(HERE, "04-equipement-paliers.png"), optimize=True)
 
 
+def board_lobby_bricks():
+    """Planche 6 : le lobby compact en briques à tenons (rendus de assets/voxel/lobby.py)."""
+    src = os.path.join(ROOT, "assets", "voxel", "review", "lobby_brick")
+    W, H = 2400, 1680
+    im, d = canvas(W, H)
+    header(d, "Briques à tenons : le lobby en maquette",
+           "Style choisi par Clément le 5 nov. 2026. Rendu Blender (EEVEE), mêmes modèles que la version voxel "
+           "refusée ; seul le rendu change (assets/voxel/brick.py).", W)
+    paste_fit(im, os.path.join(src, "lobby_arrival.png"), (60, 200, 1460, 990), align="left")
+    d.text((60, 1000), "Ce que voit le joueur à l'arrivée : la tête de gobelin (le portail) au bout de l'avenue.",
+           font=BODY, fill=INK)
+    paste_fit(im, os.path.join(src, "lobby_overview.png"), (1500, 200, W - 60, 790))
+    d.text((1500, 800), "Vue d'ensemble : île flottante, coupe en strates", font=SMALL, fill=MUTED)
+    paste_fit(im, os.path.join(src, "lobby_portal.png"), (1500, 840, W - 60, 1320))
+    d.text((1500, 1330), "Le portail de près : briques chanfreinées, joints décalés", font=SMALL, fill=MUTED)
+    paste_fit(im, os.path.join(src, "lobby_west.png"), (60, 1050, 740, 1440), align="left")
+    paste_fit(im, os.path.join(src, "lobby_east.png"), (770, 1050, 1450, 1440), align="left")
+    d.text((60, 1450), "Tour du Mage, cour du Knight, enclos · Pas de tir, boutique de Gob, feu de camp",
+           font=SMALL, fill=MUTED)
+    y = 1510
+    d.text((60, y), "Ce qu'on garde des exemples", font=H2, fill=INK)
+    rules = ("Tout est monté en briques chanfreinées, joints décalés · sol = plaque à tenons, une couleur par zone · "
+             "chemins et places en dalles lisses · falaises en strates de plaques · arbres en plaques empilées · "
+             "personnages en briques fines avec de gros yeux ronds · ciel peint bleu franc et cumulus · "
+             "accents Neon seulement sur ce qui compte (portail, capture, butin). À éviter : rochers ou arbres "
+             "réalistes au milieu des briques, arbres par défaut de Roblox, sol gris de Studio.")
+    wrap(d, (60, y + 50), rules, BODY, INK, W - 120)
+    im.save(os.path.join(HERE, "06-lobby-briques.png"), optimize=True)
+
+
 if __name__ == "__main__":
-    board_palette()
-    board_silhouettes()
-    board_diorama()
-    board_equipment()
+    if sys.argv[1:] == ["lobby"]:
+        board_lobby_bricks()
+    else:
+        board_palette()
+        board_silhouettes()
+        board_diorama()
+        board_equipment()
     print("ok")
