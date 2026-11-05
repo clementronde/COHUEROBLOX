@@ -16,7 +16,7 @@ Design source: the design doc (COHUE — Dossier de conception), summarized in `
 - No real asset ids invented. Visuals are built from parts/meshes made in code, or `nil` icon placeholders. Product/pass ids are `0` placeholders with a TODO.
 - Studio without API access: DataStore/MemoryStore calls must fail gracefully (in-memory fallback in Studio, clear warning).
 - Names (classes, weapons, companions, bosses) are original. No Megabonk/Pokémon names.
-- Script Sync naming: `X.luau` ModuleScript, `X.server.luau` Script, `X.client.luau` LocalScript.
+- Script Sync naming: `X.luau` ModuleScript, `X.legacy.luau` Script, `X.local.luau` LocalScript.
 
 ## 2. Ownership
 

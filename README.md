@@ -14,7 +14,7 @@ Survivors-like coop game on Roblox (working title).
 | `ServerScriptService/Server` | `server/` |
 | `StarterPlayer/StarterPlayerScripts/Client` | `client/` |
 
-Naming: `name.luau` = ModuleScript, `name.server.luau` = Script, `name.client.luau` = LocalScript.
+Naming (Studio Script Sync): `name.luau` = ModuleScript, `name.legacy.luau` = Script, `name.local.luau` = LocalScript. Sync each Studio folder (`Shared`, `Server`, `Client`) to the repo root folder, not to the matching folder. Only one person syncs the shared Team Create place.
 
 **First sync:** in Studio, create the three empty `Folder`s above. Right-click each one, choose **Sync to…**, and pick the matching folder on disk. If Studio shows a conflict, keep the disk version.
 
