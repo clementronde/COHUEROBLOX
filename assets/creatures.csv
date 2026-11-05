@@ -14,3 +14,7 @@ Enemy_ChampignonSauteur,rbxassetid://138489448717007,rbxassetid://91628082394670
 Enemy_GlandGrincheux,rbxassetid://92646376570861,rbxassetid://75707012737493,3.000,3.302,2.660
 Enemy_HibouPlongeur,rbxassetid://86592598214232,rbxassetid://78216554065575,2.689,3.000,2.401
 Enemy_SoucheGeante,rbxassetid://83796879264377,rbxassetid://90657091644680,7.737,7.000,6.825
+Enemy_GoblinGrunt,rbxassetid://102615059367724,,4.500,4.000,2.000
+Enemy_GoblinArcher,rbxassetid://132629528679784,,3.500,3.500,2.500
+Enemy_GoblinShaman,rbxassetid://85524445528373,,3.500,4.250,2.000
+Enemy_GoblinBomber,rbxassetid://85411290248554,,4.500,3.500,1.750

@@ -96,7 +96,15 @@ local function activePlayers(): { { player: Player, x: number, z: number, feet: 
 			end
 			if active then
 				local p = root.Position
-				table.insert(out, { player = player, x = p.X, z = p.Z, feet = p.Y - hum.HipHeight - root.Size.Y / 2 })
+				-- S-01 : hauteur des pieds retenue par RunManager (au sol après 1,5 s en l'air)
+				local feet = p.Y - hum.HipHeight - root.Size.Y / 2
+				if run and run.getDamageFeetY then
+					local ok, y = pcall(run.getDamageFeetY, player)
+					if ok and type(y) == "number" then
+						feet = y
+					end
+				end
+				table.insert(out, { player = player, x = p.X, z = p.Z, feet = feet })
 			end
 		end
 	end
@@ -258,6 +266,11 @@ local function resolveTelegraph(b: BossRuntime, t: Telegraph, targets: { { playe
 	local attack = t.attack
 	local run = Registry.find("RunManager")
 	local enemies = Registry.find("EnemyService")
+	if enemies then
+		local dx, dz = t.dirX or (t.x - b.x), t.dirZ or (t.z - b.z)
+		local reach = if t.kind == "Line" then (t.length or 0) * .5 else 0
+		enemies._attackVisual(b.entity, "boss", t.x + dx * reach, t.z + dz * reach, dx, dz, t.radius)
+	end
 	if t.resolve == "Damage" then
 		local dmg = (attack.damage or 10) * damageScale()
 		for _, p in targets do
@@ -390,11 +403,14 @@ local function step()
 	-- Phase
 	local hp = enemies._getHp(b.entity) or 0
 	local frac = hp / b.maxHp
-	local phase = if frac <= Bosses.PhaseAt[2] then 3 elseif frac <= Bosses.PhaseAt[1] then 2 else 1
+	local phase = if not Bosses.PhaseEnabled then 1
+		elseif frac <= Bosses.PhaseAt[2] then 3
+		elseif frac <= Bosses.PhaseAt[1] then 2
+		else 1
 	if phase > b.phase then
 		b.phase = phase
 		b.dirty = true
-		announce("BossPhase", { fr = `{b.name.fr} : phase {phase} !`, en = `{b.name.en}: phase {phase}!` }, 2.5)
+		announce("BossPhase", { en = `{b.name.en}: phase {phase}!`, fr = `{b.name.en}: phase {phase}!` }, 2.5)
 		if b.def.weakness.kind == "Height" and phase == b.def.weakness.minPhase then
 			b.nextRootAt = now + 3
 		end
@@ -481,8 +497,11 @@ function BossService.spawnBoss(bossId: string, centre: Vector3, stage: number, t
 		return false
 	end
 	BossService.despawn()
+	-- `stage` = index du monde dans la run (Run.WorldScaling) ; `tier` n'est plus utilisé (v2).
+	local _ = tier
+	local scaling = Run.WorldScaling[math.clamp(stage, 1, #Run.WorldScaling)]
 	local hp = def.hp
-		* Run.TierHp[math.clamp(tier, 1, 3)]
+		* scaling.bossHp
 		* (1 + Bosses.HpPerExtraPlayer * (math.max(1, nPlayers) - 1))
 		* (if enraged then Bosses.EnragedHpMult else 1)
 	local entity = enemies._spawnBoss(def.kind, centre.X, centre.Z, hp)
@@ -534,6 +553,11 @@ function BossService.despawn()
 		enemies._remove(b.entity)
 	end
 	stateRemote:FireAllClients({ bossId = b.bossId, hpFrac = 0, phase = b.phase, defeated = false, removed = true, telegraphs = {} })
+end
+
+-- Run-domain internal (commandes de test de RunManager) : id d'entité EnemyService du boss.
+function BossService._entityId(): number?
+	return if boss then boss.entity else nil
 end
 
 function BossService.isActive(): boolean
@@ -602,7 +626,7 @@ local function onEnemyKilled(id: number, _kind: number, _x: number, _z: number)
 			end
 		end
 	end
-	announce("BossDefeated", { fr = `{b.name.fr} est vaincu !`, en = `{b.name.en} is defeated!` }, 3)
+	announce("BossDefeated", { en = `{b.name.en} is defeated!`, fr = `{b.name.en} is defeated!` }, 3)
 	Bus.BossDefeated:fire(b.bossId, b.stage)
 end
 

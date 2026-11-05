@@ -1,236 +1,241 @@
 --!strict
--- The 10 launch classes (avatar domain). Design: docs/dossier/50-classes-avatar-mouvement.md section 2.
--- Shape: { [classId]: Types.ClassDef }. Sort by `order` for display.
--- Avatar fields beyond Types.ClassDef:
---   order: number                      display order
---   traits: { TraitPart }              accessories built by TraitService (builder = geometry key)
---   stages: { LocalizedText }          trait description per stage 1..4
---   tints: { Color3 }                  3 free trait tints (index from the data domain profile)
---   movement flags (all optional):
---     slideBoost: number               slide start speed multiplier (default Movement.SlideBoostDefault)
---     airJumps: number                 extra jumps in the air
---     glide: boolean                   hold Jump while falling to glide
---     climbTime: number                seconds of short wall climb
---     gravityMult: number              < 1 = low gravity
---     bhopWindow: number               overrides Movement.BhopWindow
---     bhopNoTurn: boolean              hop gain without camera turn
---     knockbackImmune: boolean         sets the KnockbackImmune player attribute
+-- Les 8 classes v2 (docs/dossier/01-decisions-v2.md section 3, détail : dossier 10 section 8).
+-- Forme : { [classId]: Types.ClassDef }. Trier par `order` pour l'affichage.
+-- La classe ajoute un équipement voxel à l'avatar du joueur (TraitService) ; les stats viennent
+-- de la classe (passif dans Config/Weapons.Passives, même id), jamais de l'apparence.
+--
+-- Champs en plus de Types.ClassDef :
+--   order: number                      ordre d'affichage
+--   role: LocalizedText                une ligne de présentation (écran de choix)
+--   traits: { TraitPart }              pièces d'équipement construites par TraitService
+--   stages: { LocalizedText }          description de l'équipement par palier 1..4 (niveaux 1/10/20/30)
+--   tints: { Color3 }                  3 teintes gratuites (index lu dans le profil du domaine data)
+--   drapeaux de mouvement (lus par le domaine avatar, A06), tous optionnels :
+--     slideBoost: number               multiplicateur de vitesse au début de la glissade
+--     airJumps: number                 sauts en l'air en plus
+--     glide: boolean                   maintenir Saut en tombant pour planer
+--     glideSeconds: number             durée max du plané (Mage : plané court)
+--     heavyLanding: boolean            atterrissage lourd (onde visuelle à chaque réception)
+--     knockbackImmune: boolean         attribut joueur KnockbackImmune
+--
+-- Transition v1 -> v2 : le domaine data (Config/Progression) et l'UI (Config/UI) utilisent encore
+-- les ids v1 (Cornu, Plumeline...). `Classes["Cornu"]` renvoie donc la définition Knight (alias en
+-- lecture seule, via métatable : l'itération ne voit que les 8 classes v2). Toujours utiliser
+-- `def.id` comme id canonique. À retirer quand ARCHITECTURE.md section 3 passe aux ids v2.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Types = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Types"))
 
 export type TraitPart = {
-	attachment: string, -- R15 body attachment name
-	builder: string, -- geometry key in TraitService
-	fromStage: number?, -- first stage where this accessory appears (default 1)
+	attachment: string, -- nom d'attachement R15 du corps
+	builder: string, -- clé de géométrie dans TraitService
+	fromStage: number?, -- premier palier où la pièce apparaît (défaut 1)
 }
 
-local function t(fr: string, en: string): Types.LocalizedText
-	return { fr = fr, en = en }
+-- Texte joueur : anglais seul au lancement (décisions v2 section 1). La forme { fr, en } du contrat
+-- est gardée ; les noms français sont dans le dossier 10 section 8.
+local function t(en: string): Types.LocalizedText
+	return { en = en, fr = en }
 end
 
 local Classes: { [string]: Types.ClassDef } = {
-	Cornu = {
-		id = "Cornu",
+	Knight = {
+		id = "Knight",
 		order = 1,
-		name = t("Cornu", "Horned"),
-		startWeapon = "HacheBoomerang",
-		passive = "Cornu",
+		name = t("Knight"),
+		role = t("Front-line sword swinger. Loves a crowd."),
+		startWeapon = "Broadsword",
+		passive = "Knight",
 		walkSpeed = 16,
 		jumpHeight = 7.2,
 		unlock = "Free",
-		traits = { { attachment = "HatAttachment", builder = "RamHorns" } },
-		stages = {
-			t("Cornes de bélier", "Ram horns"),
-			t("Cornes plus longues", "Longer horns"),
-			t("Gravures lumineuses", "Glowing carvings"),
-			t("Cornes en flammes", "Flaming horns"),
-		},
-		tints = { Color3.fromRGB(222, 205, 170), Color3.fromRGB(120, 90, 70), Color3.fromRGB(70, 70, 80) },
-		slideBoost = 1.4,
-	},
-	Plumeline = {
-		id = "Plumeline",
-		order = 2,
-		name = t("Plumeline", "Featherling"),
-		startWeapon = "PlumesDards",
-		passive = "Plumeline",
-		walkSpeed = 16,
-		jumpHeight = 7.2,
-		unlock = "Free",
-		traits = { { attachment = "BodyBackAttachment", builder = "FeatherWings" } },
-		stages = {
-			t("Ailes de plumes", "Feather wings"),
-			t("Ailes plus grandes", "Bigger wings"),
-			t("Plumes dorées", "Golden feathers"),
-			t("Ailes de lumière", "Wings of light"),
-		},
-		tints = { Color3.fromRGB(245, 245, 250), Color3.fromRGB(110, 170, 230), Color3.fromRGB(60, 60, 70) },
-		airJumps = 1,
-		glide = true,
-	},
-	Mecano = {
-		id = "Mecano",
-		order = 3,
-		name = t("Mécano", "Tinker"),
-		startWeapon = "CleTourelle",
-		passive = "Mecano",
-		walkSpeed = 17.6,
-		jumpHeight = 5.5,
-		unlock = "Free",
-		traits = { { attachment = "RightShoulderAttachment", builder = "MechArm" } },
-		stages = {
-			t("Bras mécanique", "Mechanical arm"),
-			t("Pistons", "Pistons"),
-			t("Deuxième bras", "Second arm"),
-			t("Bras doré à vapeur", "Golden steam arm"),
-		},
-		tints = { Color3.fromRGB(150, 155, 165), Color3.fromRGB(180, 110, 60), Color3.fromRGB(70, 110, 160) },
-	},
-	Felyne = {
-		id = "Felyne",
-		order = 4,
-		name = t("Félyne", "Felyne"),
-		startWeapon = "GriffesEclair",
-		passive = "Felyne",
-		walkSpeed = 16,
-		jumpHeight = 7.2,
-		unlock = "Q_Felyne",
 		traits = {
-			{ attachment = "HatAttachment", builder = "CatEars" },
-			{ attachment = "WaistBackAttachment", builder = "CatTail" },
+			{ attachment = "HatAttachment", builder = "KnightHelm" },
+			{ attachment = "BodyBackAttachment", builder = "KnightCape", fromStage = 2 },
 		},
 		stages = {
-			t("Oreilles et queue de chat", "Cat ears and tail"),
-			t("Rayures", "Stripes"),
-			t("Queue double", "Double tail"),
-			t("Pelage étincelant", "Sparkling fur"),
+			t("Bucket helmet"),
+			t("Red cape"),
+			t("Golden crest"),
+			t("Shining armor"),
 		},
-		tints = { Color3.fromRGB(240, 160, 70), Color3.fromRGB(60, 60, 60), Color3.fromRGB(235, 235, 235) },
-		bhopWindow = 0.25,
-		bhopNoTurn = true,
+		tints = { Color3.fromRGB(200, 205, 215), Color3.fromRGB(70, 110, 200), Color3.fromRGB(205, 60, 60) },
 	},
-	Rocailleux = {
-		id = "Rocailleux",
-		order = 5,
-		name = t("Rocailleux", "Stoneback"),
-		startWeapon = "PoingSeisme",
-		passive = "Rocailleux",
+	Archer = {
+		id = "Archer",
+		order = 2,
+		name = t("Archer"),
+		role = t("Long range sniper. Jumps high, shoots far."),
+		startWeapon = "Longbow",
+		passive = "Archer",
+		walkSpeed = 16,
+		jumpHeight = 10,
+		unlock = "Free",
+		traits = {
+			{ attachment = "HatAttachment", builder = "ArcherHood" },
+			{ attachment = "BodyBackAttachment", builder = "ArcherQuiver" },
+		},
+		stages = {
+			t("Green hood and quiver"),
+			t("Feather on the hood"),
+			t("Full quiver"),
+			t("Golden arrows"),
+		},
+		tints = { Color3.fromRGB(70, 150, 70), Color3.fromRGB(140, 90, 50), Color3.fromRGB(60, 60, 70) },
+	},
+	Mage = {
+		id = "Mage",
+		order = 3,
+		name = t("Mage"),
+		role = t("Fireball thrower. Bigger spells every level."),
+		startWeapon = "FireStaff",
+		passive = "Mage",
+		walkSpeed = 16,
+		jumpHeight = 7.2,
+		unlock = "Free",
+		traits = {
+			{ attachment = "HatAttachment", builder = "MageHat" },
+		},
+		stages = {
+			t("Pointy hat"),
+			t("Star on the hat"),
+			t("Floating rune"),
+			t("Glowing hat"),
+		},
+		tints = { Color3.fromRGB(90, 70, 190), Color3.fromRGB(190, 50, 60), Color3.fromRGB(40, 40, 50) },
+		glide = true,
+		glideSeconds = 1.2,
+	},
+	Guardian = {
+		id = "Guardian",
+		order = 4,
+		name = t("Guardian"),
+		role = t("Walking wall. Slow, heavy, hits back."),
+		startWeapon = "QuakeHammer",
+		passive = "Guardian",
 		walkSpeed = 14,
 		jumpHeight = 6.5,
-		unlock = "Q_Rocailleux",
+		unlock = "Q_Guardian",
 		traits = {
-			{ attachment = "LeftShoulderAttachment", builder = "StonePlate" },
-			{ attachment = "RightShoulderAttachment", builder = "StonePlate" },
+			{ attachment = "LeftShoulderAttachment", builder = "GuardianPauldron" },
+			{ attachment = "RightShoulderAttachment", builder = "GuardianPauldron" },
 		},
 		stages = {
-			t("Plaques de pierre", "Stone plates"),
-			t("Mousse", "Moss"),
-			t("Cristaux", "Crystals"),
-			t("Armure de lave", "Lava armor"),
+			t("Stone pauldrons"),
+			t("Bigger pauldrons"),
+			t("Iron rivets"),
+			t("Molten edges"),
 		},
-		tints = { Color3.fromRGB(120, 120, 125), Color3.fromRGB(150, 120, 90), Color3.fromRGB(80, 90, 110) },
+		tints = { Color3.fromRGB(130, 130, 140), Color3.fromRGB(150, 110, 80), Color3.fromRGB(80, 100, 130) },
+		heavyLanding = true,
 		knockbackImmune = true,
 	},
-	Sporelin = {
-		id = "Sporelin",
+	Rogue = {
+		id = "Rogue",
+		order = 5,
+		name = t("Rogue"),
+		role = t("Slippery dagger thrower. Slides through danger."),
+		startWeapon = "ThrowingDaggers",
+		passive = "Rogue",
+		walkSpeed = 17,
+		jumpHeight = 7.2,
+		unlock = "Q_Rogue",
+		traits = {
+			{ attachment = "HatAttachment", builder = "RogueMask" },
+		},
+		stages = {
+			t("Bandit mask"),
+			t("Hood"),
+			t("Dagger belt"),
+			t("Shadow trail"),
+		},
+		tints = { Color3.fromRGB(50, 50, 60), Color3.fromRGB(120, 40, 60), Color3.fromRGB(40, 90, 90) },
+		airJumps = 1,
+	},
+	Cleric = {
+		id = "Cleric",
 		order = 6,
-		name = t("Sporelin", "Sporeling"),
-		startWeapon = "NuageSpores",
-		passive = "Sporelin",
+		name = t("Cleric"),
+		role = t("Holy aura that hurts foes and heals friends."),
+		startWeapon = "HolyAura",
+		passive = "Cleric",
 		walkSpeed = 16,
 		jumpHeight = 7.2,
-		unlock = "Q_Sporelin",
-		traits = { { attachment = "HatAttachment", builder = "MushroomCap" } },
-		stages = {
-			t("Chapeau-champignon", "Mushroom cap"),
-			t("Taches", "Spots"),
-			t("Spores flottantes", "Floating spores"),
-			t("Chapeau géant lumineux", "Giant glowing cap"),
+		unlock = "Q_Cleric",
+		traits = {
+			{ attachment = "HatAttachment", builder = "ClericHalo" },
 		},
-		tints = { Color3.fromRGB(200, 60, 60), Color3.fromRGB(150, 90, 200), Color3.fromRGB(230, 180, 60) },
+		stages = {
+			t("Little halo"),
+			t("Brighter halo"),
+			t("Double halo"),
+			t("Radiant halo"),
+		},
+		tints = { Color3.fromRGB(255, 225, 120), Color3.fromRGB(180, 230, 255), Color3.fromRGB(255, 180, 210) },
 	},
-	Ecaille = {
-		id = "Ecaille",
+	Barbarian = {
+		id = "Barbarian",
 		order = 7,
-		name = t("Écaille", "Scaleling"),
-		startWeapon = "SouffleBraise",
-		passive = "Ecaille",
+		name = t("Barbarian"),
+		role = t("Spinning axes. Hits harder when hurt."),
+		startWeapon = "SpinningAxes",
+		passive = "Barbarian",
 		walkSpeed = 16,
-		jumpHeight = 9.5,
-		unlock = "Q_Ecaille",
+		jumpHeight = 7.2,
+		unlock = "Q_Barbarian",
 		traits = {
-			{ attachment = "HatAttachment", builder = "SmallHorns" },
-			{ attachment = "WaistBackAttachment", builder = "ScalyTail" },
-			{ attachment = "BodyBackAttachment", builder = "DragonWings", fromStage = 4 },
+			{ attachment = "HatAttachment", builder = "BarbarianHelm" },
 		},
 		stages = {
-			t("Petites cornes et queue écailleuse", "Small horns and scaly tail"),
-			t("Écailles", "Scales"),
-			t("Crête", "Crest"),
-			t("Mini-ailes de dragon", "Mini dragon wings"),
+			t("Horned helmet"),
+			t("Longer horns"),
+			t("War paint"),
+			t("Flaming horns"),
 		},
-		tints = { Color3.fromRGB(70, 160, 90), Color3.fromRGB(200, 70, 50), Color3.fromRGB(60, 90, 170) },
+		tints = { Color3.fromRGB(150, 100, 60), Color3.fromRGB(110, 110, 120), Color3.fromRGB(200, 170, 120) },
+		slideBoost = 1.6,
 	},
-	Astrel = {
-		id = "Astrel",
+	Tamer = {
+		id = "Tamer",
 		order = 8,
-		name = t("Astrel", "Starling"),
-		startWeapon = "Meteorite",
-		passive = "Astrel",
+		name = t("Tamer"),
+		role = t("Beast whip and two companions at once."),
+		startWeapon = "BeastWhip",
+		passive = "Tamer",
 		walkSpeed = 16,
 		jumpHeight = 7.2,
-		unlock = "Q_Astrel",
-		traits = { { attachment = "HatAttachment", builder = "StarCrown" } },
-		stages = {
-			t("Antennes et étoile", "Antennae and a star"),
-			t("Deux étoiles", "Two stars"),
-			t("Quatre étoiles", "Four stars"),
-			t("Anneau galactique", "Galactic ring"),
-		},
-		tints = { Color3.fromRGB(255, 220, 90), Color3.fromRGB(150, 200, 255), Color3.fromRGB(255, 150, 220) },
-		gravityMult = 0.6,
-	},
-	Cristallin = {
-		id = "Cristallin",
-		order = 9,
-		name = t("Cristallin", "Crystalline"),
-		startWeapon = "EclatsPrisme",
-		passive = "Cristallin",
-		walkSpeed = 16,
-		jumpHeight = 7.2,
-		unlock = "Q_Cristallin",
+		unlock = "Q_Tamer",
 		traits = {
-			{ attachment = "LeftShoulderAttachment", builder = "Crystals" },
-			{ attachment = "RightShoulderAttachment", builder = "Crystals" },
+			{ attachment = "HatAttachment", builder = "TamerHat" },
 		},
 		stages = {
-			t("Cristaux d'épaule", "Shoulder crystals"),
-			t("Les cristaux poussent", "Crystals grow"),
-			t("Grappe de cristaux", "Crystal cluster"),
-			t("Couronne de cristaux", "Crystal crown"),
+			t("Ringmaster hat"),
+			t("Paw badge"),
+			t("Fur collar"),
+			t("Golden whistle"),
 		},
-		tints = { Color3.fromRGB(140, 220, 255), Color3.fromRGB(220, 140, 255), Color3.fromRGB(150, 255, 180) },
-	},
-	Tentaculos = {
-		id = "Tentaculos",
-		order = 10,
-		name = t("Tentaculos", "Tentaclos"),
-		startWeapon = "FouetTentacule",
-		passive = "Tentaculos",
-		walkSpeed = 16,
-		jumpHeight = 7.2,
-		unlock = "Q_Tentaculos",
-		traits = { { attachment = "BodyBackAttachment", builder = "Tentacles" } },
-		stages = {
-			t("4 tentacules", "4 tentacles"),
-			t("6 tentacules", "6 tentacles"),
-			t("Ventouses lumineuses", "Glowing suckers"),
-			t("8 tentacules", "8 tentacles"),
-		},
-		tints = { Color3.fromRGB(160, 80, 170), Color3.fromRGB(230, 110, 120), Color3.fromRGB(70, 150, 150) },
-		climbTime = 1.2,
+		tints = { Color3.fromRGB(180, 40, 50), Color3.fromRGB(40, 40, 50), Color3.fromRGB(230, 150, 40) },
 	},
 }
+
+-- Ids v1 encore envoyés par Config/Progression et Config/UI (voir l'en-tête). Astrel et Cristallin
+-- n'ont pas d'équivalent v2 : ils restent inconnus.
+local LEGACY: { [string]: string } = {
+	Cornu = "Knight",
+	Plumeline = "Archer",
+	Mecano = "Mage",
+	Rocailleux = "Guardian",
+	Felyne = "Rogue",
+	Sporelin = "Cleric",
+	Ecaille = "Barbarian",
+	Tentaculos = "Tamer",
+}
+
+setmetatable(Classes :: any, {
+	__index = function(self: any, key: any): any
+		local id = if type(key) == "string" then LEGACY[key] else nil
+		return if id then rawget(self, id) else nil
+	end,
+})
 
 return Classes

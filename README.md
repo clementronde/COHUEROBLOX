@@ -18,6 +18,9 @@ Naming: `name.luau` = ModuleScript, `name.server.luau` = Script, `name.client.lu
 
 **First sync:** in Studio, create the three empty `Folder`s above. Right-click each one, choose **Sync to…**, and pick the matching folder on disk. If Studio shows a conflict, keep the disk version.
 
+
+**Single game (since 4 Nov 2026):** the only place is the published `COHUE` place. Agents never create their own place copies. After each merge into `main`, the lead reloads all scripts into `COHUE`: `bash tools/studio-serve.sh 8787`, then run `tools/studio-load.luau` with the Studio MCP `execute_luau` (Edit). It backs up the old scripts in `ServerStorage` first.
+
 ## Team rules (design doc 12.6)
 
 - Synced folders hold only scripts and folders. No attributes or tags on scripts (Script Sync drops them).

@@ -1,0 +1,75 @@
+{
+ "className": "Accessory",
+ "children": [
+  {
+   "className": "MeshPart",
+   "properties": {
+    "MeshId": "rbxassetid://75942870774271",
+    "Size": [
+     2.25,
+     2.75,
+     2.5
+    ],
+    "InitialSize": [
+     2.25,
+     2.75,
+     2.5
+    ],
+    "Color": [
+     1,
+     1,
+     1
+    ],
+    "Anchored": false,
+    "CanCollide": false,
+    "CanQuery": false,
+    "CanTouch": false,
+    "CastShadow": false,
+    "Massless": true
+   },
+   "name": "Handle",
+   "attributes": {
+    "RefPartName": "Head",
+    "RefPartSize": {
+     "Vector3": [
+      1.159,
+      1.182,
+      1.161
+     ]
+    }
+   },
+   "children": [
+    {
+     "name": "HatAttachment",
+     "className": "Attachment",
+     "properties": {
+      "CFrame": {
+       "position": [
+        0.125,
+        -0.125,
+        -0.25
+       ],
+       "orientation": [
+        [
+         1.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.0,
+         1.0,
+         0.0
+        ],
+        [
+         0.0,
+         0.0,
+         1.0
+        ]
+       ]
+      }
+     }
+    }
+   ]
+  }
+ ]
+}

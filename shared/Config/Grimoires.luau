@@ -1,128 +1,66 @@
 --!strict
--- Grimoires (tomes), base stats and caps (dossier 10, sections 1 and 6).
--- `perLevel` stats are linear (value * level); `table` stats give the cumulative value per level.
+-- Les 14 Runes (les « grimoires » de la v1, renommés : docs/dossier/01-decisions-v2.md section 4),
+-- les stats de base et leurs plafonds (dossier 10, sections 1 et 6).
+-- Le module garde son nom interne `Config/Grimoires` (et les champs `grimoires` du Build) pour ne
+-- pas casser les autres domaines ; « Rune » est le nom affiché au joueur.
+-- 4 emplacements de Rune par run (jusqu'à 6 avec la méta, lue chez ProgressionService).
+-- `perLevel` : valeur linéaire (valeur x niveau) ; `byLevel` : valeur cumulée par niveau.
 
 export type GrimoireDef = {
 	id: string,
 	name: { fr: string, en: string },
+	desc: { fr: string, en: string }?,
 	maxLevel: number,
 	perLevel: { [string]: number },
 	byLevel: { [string]: { number } }?,
-	unlockGated: boolean?, -- needs ProgressionService.isUnlocked; locked when ProgressionService is missing
+	unlockGated: boolean?, -- true : demande ProgressionService.isUnlocked (bloquée sans lui)
 }
 
 local Grimoires = {}
 
 Grimoires.Order = {
-	"Degats",
-	"VitesseAttaque",
-	"Quantite",
-	"Taille",
-	"Duree",
+	"Damage",
+	"AttackSpeed",
+	"Projectiles",
+	"Area",
+	"Duration",
 	"Cooldown",
-	"Critique",
-	"Chance",
-	"Savoir",
-	"Aimant",
-	"Vitalite",
-	"Rempart",
-	"Agilite",
-	"Interdit",
+	"Crit",
+	"Luck",
+	"Wisdom",
+	"Magnet",
+	"Vitality",
+	"Armor",
+	"Agility",
+	"Cursed",
 } :: { string }
 
+-- Texte joueur : anglais seul (décisions v2 section 1) ; noms français dans le dossier 10 section 6.
+local function rune(id: string, name: string, desc: string, maxLevel: number, perLevel: { [string]: number }, byLevel: { [string]: { number } }?): GrimoireDef
+	return { id = id, name = { en = name, fr = name }, desc = { en = desc, fr = desc }, maxLevel = maxLevel, perLevel = perLevel, byLevel = byLevel }
+end
+
 Grimoires.Defs = {
-	Degats = {
-		id = "Degats",
-		name = { fr = "Grimoire des Dégâts", en = "Tome of Damage" },
-		maxLevel = 8,
-		perLevel = { Damage = 0.08 },
-	},
-	VitesseAttaque = {
-		id = "VitesseAttaque",
-		name = { fr = "Grimoire de Vitesse d'attaque", en = "Tome of Attack Speed" },
-		maxLevel = 8,
-		perLevel = { AttackSpeed = 0.07 },
-	},
-	Quantite = {
-		id = "Quantite",
-		name = { fr = "Grimoire de Quantité", en = "Tome of Amount" },
-		maxLevel = 8,
-		perLevel = {},
-		byLevel = {
-			Amount = { 1, 1, 2, 2, 3, 3, 4, 4 },
-			Damage = { 0, 0.04, 0.04, 0.08, 0.08, 0.12, 0.12, 0.16 },
-		},
-	},
-	Taille = {
-		id = "Taille",
-		name = { fr = "Grimoire de Taille", en = "Tome of Size" },
-		maxLevel = 8,
-		perLevel = { Size = 0.08 },
-	},
-	Duree = {
-		id = "Duree",
-		name = { fr = "Grimoire de Durée", en = "Tome of Duration" },
-		maxLevel = 8,
-		perLevel = { Duration = 0.10 },
-	},
-	Cooldown = {
-		id = "Cooldown",
-		name = { fr = "Grimoire de Recharge", en = "Tome of Cooldown" },
-		maxLevel = 8,
-		perLevel = { Cooldown = 0.04 },
-	},
-	Critique = {
-		id = "Critique",
-		name = { fr = "Grimoire Critique", en = "Tome of Criticals" },
-		maxLevel = 8,
-		perLevel = { CritChance = 0.04, CritDamage = 0.10 },
-	},
-	Chance = {
-		id = "Chance",
-		name = { fr = "Grimoire de Chance", en = "Tome of Luck" },
-		maxLevel = 8,
-		perLevel = { Luck = 3 },
-	},
-	Savoir = {
-		id = "Savoir",
-		name = { fr = "Grimoire du Savoir", en = "Tome of Knowledge" },
-		maxLevel = 8,
-		perLevel = { XpGain = 0.10 },
-	},
-	Aimant = {
-		id = "Aimant",
-		name = { fr = "Grimoire Aimant", en = "Tome of Magnet" },
-		maxLevel = 8,
-		perLevel = { Magnet = 3 },
-	},
-	Vitalite = {
-		id = "Vitalite",
-		name = { fr = "Grimoire de Vitalité", en = "Tome of Vitality" },
-		maxLevel = 8,
-		perLevel = { MaxHp = 15, Regen = 0.1 },
-	},
-	Rempart = {
-		id = "Rempart",
-		name = { fr = "Grimoire Rempart", en = "Tome of Bulwark" },
-		maxLevel = 8,
-		perLevel = { Armor = 3 },
-	},
-	Agilite = {
-		id = "Agilite",
-		name = { fr = "Grimoire d'Agilité", en = "Tome of Agility" },
-		maxLevel = 8,
-		perLevel = { MoveSpeed = 0.04, Dodge = 0.02 },
-	},
-	Interdit = {
-		id = "Interdit",
-		name = { fr = "Grimoire Interdit", en = "Forbidden Tome" },
-		maxLevel = 5,
-		perLevel = { Difficulty = 0.10, LootBonus = 0.12, XpGain = 0.05, Damage = 0.05 },
-		unlockGated = true,
-	},
+	Damage = rune("Damage", "Damage Rune", "+8% damage per level", 8, { Damage = 0.08 }),
+	AttackSpeed = rune("AttackSpeed", "Attack Speed Rune", "+7% attack speed per level", 8, { AttackSpeed = 0.07 }),
+	Projectiles = rune("Projectiles", "Projectile Rune", "More projectiles, a bit more damage", 8, {}, {
+		Amount = { 1, 1, 2, 2, 3, 3, 4, 4 },
+		Damage = { 0, 0.04, 0.04, 0.08, 0.08, 0.12, 0.12, 0.16 },
+	}),
+	Area = rune("Area", "Area Rune", "+8% area per level", 8, { Size = 0.08 }),
+	Duration = rune("Duration", "Duration Rune", "+10% duration per level", 8, { Duration = 0.10 }),
+	Cooldown = rune("Cooldown", "Cooldown Rune", "-4% cooldown per level", 8, { Cooldown = 0.04 }),
+	Crit = rune("Crit", "Crit Rune", "+4% crit chance and +10% crit damage per level", 8, { CritChance = 0.04, CritDamage = 0.10 }),
+	Luck = rune("Luck", "Luck Rune", "+3 luck per level: rarer cards and loot", 8, { Luck = 3 }),
+	Wisdom = rune("Wisdom", "Wisdom Rune", "+10% XP per level", 8, { XpGain = 0.10 }),
+	Magnet = rune("Magnet", "Magnet Rune", "+3 studs pickup range per level", 8, { Magnet = 3 }),
+	Vitality = rune("Vitality", "Vitality Rune", "+15 max HP and +0.1 HP/s per level", 8, { MaxHp = 15, Regen = 0.1 }),
+	Armor = rune("Armor", "Armor Rune", "+3 armor per level", 8, { Armor = 3 }),
+	Agility = rune("Agility", "Agility Rune", "+4% move speed and +2% dodge per level", 8, { MoveSpeed = 0.04, Dodge = 0.02 }),
+	Cursed = rune("Cursed", "Cursed Rune", "Tougher, more numerous enemies, but more loot, XP and damage", 5, { Difficulty = 0.10, LootBonus = 0.12, XpGain = 0.05, Damage = 0.05 }),
 } :: { [string]: GrimoireDef }
 
--- Final StatBlock starts here (Types.StatName). Every stat must have an entry.
+-- Le StatBlock final part d'ici (Types.StatName). Chaque stat doit avoir une entrée.
 Grimoires.BaseStats = {
 	Damage = 0,
 	AttackSpeed = 0,
@@ -146,7 +84,7 @@ Grimoires.BaseStats = {
 	LootBonus = 0,
 } :: { [string]: number }
 
--- Upper caps applied last (lower bounds: none, except MaxHp >= 1).
+-- Plafonds appliqués en dernier (pas de plancher, sauf PV max >= 1).
 Grimoires.StatCaps = {
 	AttackSpeed = 3,
 	Amount = 10,
@@ -161,31 +99,31 @@ Grimoires.StatCaps = {
 	Bounces = 10,
 } :: { [string]: number }
 
--- Short labels used to write card descriptions.
+-- Libellés courts pour écrire les descriptions des cartes (anglais = texte joueur).
 Grimoires.StatLabel = {
-	Damage = { fr = "dégâts", en = "damage", pct = true },
-	AttackSpeed = { fr = "vitesse d'attaque", en = "attack speed", pct = true },
-	Amount = { fr = "quantité", en = "amount", pct = false },
-	Size = { fr = "taille", en = "size", pct = true },
-	Duration = { fr = "durée", en = "duration", pct = true },
-	Cooldown = { fr = "recharge", en = "cooldown", pct = true },
-	CritChance = { fr = "chance de critique", en = "crit chance", pct = true },
-	CritDamage = { fr = "dégâts critiques", en = "crit damage", pct = true },
-	Luck = { fr = "chance", en = "luck", pct = false },
-	XpGain = { fr = "XP", en = "XP", pct = true },
-	Magnet = { fr = "aimant", en = "magnet", pct = false },
-	MaxHp = { fr = "PV max", en = "max HP", pct = false },
-	Armor = { fr = "armure", en = "armor", pct = false },
-	Regen = { fr = "PV/s", en = "HP/s", pct = false },
-	MoveSpeed = { fr = "vitesse", en = "move speed", pct = true },
-	Dodge = { fr = "esquive", en = "dodge", pct = true },
-	Thorns = { fr = "épines", en = "thorns", pct = true },
-	Bounces = { fr = "rebonds", en = "bounces", pct = false },
-	Difficulty = { fr = "difficulté", en = "difficulty", pct = true },
-	LootBonus = { fr = "butin", en = "loot", pct = true },
+	Damage = { en = "damage", fr = "damage", pct = true },
+	AttackSpeed = { en = "attack speed", fr = "attack speed", pct = true },
+	Amount = { en = "amount", fr = "amount", pct = false },
+	Size = { en = "size", fr = "size", pct = true },
+	Duration = { en = "duration", fr = "duration", pct = true },
+	Cooldown = { en = "cooldown", fr = "cooldown", pct = true },
+	CritChance = { en = "crit chance", fr = "crit chance", pct = true },
+	CritDamage = { en = "crit damage", fr = "crit damage", pct = true },
+	Luck = { en = "luck", fr = "luck", pct = false },
+	XpGain = { en = "XP", fr = "XP", pct = true },
+	Magnet = { en = "magnet", fr = "magnet", pct = false },
+	MaxHp = { en = "max HP", fr = "max HP", pct = false },
+	Armor = { en = "armor", fr = "armor", pct = false },
+	Regen = { en = "HP/s", fr = "HP/s", pct = false },
+	MoveSpeed = { en = "move speed", fr = "move speed", pct = true },
+	Dodge = { en = "dodge", fr = "dodge", pct = true },
+	Thorns = { en = "thorns", fr = "thorns", pct = true },
+	Bounces = { en = "bounces", fr = "bounces", pct = false },
+	Difficulty = { en = "difficulty", fr = "difficulty", pct = true },
+	LootBonus = { en = "loot", fr = "loot", pct = true },
 } :: { [string]: { fr: string, en: string, pct: boolean } }
 
--- Cumulative value of one stat for a grimoire at a level (0 if level < 1).
+-- Valeur cumulée d'une stat pour une Rune à un niveau (0 si niveau < 1).
 function Grimoires.valueAt(def: GrimoireDef, stat: string, level: number): number
 	if level < 1 then
 		return 0

@@ -1,0 +1,24 @@
+name,kind,folder,mesh,sx,sy,sz,tris,attach,attach_offset,attach_rot,ref_part
+Enemy_GoblinGrunt,enemy,creatures,rbxassetid://102615059367724,4.5,4.0,2.0,656,,0.0 -2.0 -0.0,0 0 0,
+Enemy_GoblinArcher,enemy,creatures,rbxassetid://132629528679784,3.5,3.5,2.5,684,,0.0 -1.75 -0.0,0 0 0,
+Enemy_GoblinShaman,enemy,creatures,rbxassetid://85524445528373,3.5,4.25,2.0,716,,0.0 -2.125 -0.0,0 0 0,
+Enemy_GoblinBomber,enemy,creatures,rbxassetid://85411290248554,4.5,3.5,1.75,792,,0.0 -1.75 -0.0,0 0 0,
+FX_CaptureRing,fx,fx,rbxassetid://127618518100828,3.5,0.5,3.5,158,,0.0 -0.25 -0.0,0 0 0,
+FX_CaptureIcon,fx,fx,rbxassetid://120961194899196,1.0,2.0,1.0,130,,0.0 -1.0 -0.0,0 0 0,
+Knight_Helm,accessory,equipment,rbxassetid://132240907256271,2.0,2.0,2.25,242,HatAttachment,0.0 -0.0 0.125,0 0 0,Head
+Knight_Pauldron,accessory,equipment,rbxassetid://72447148865331,1.75,1.5,1.5,80,RightShoulderAttachment,-0.375 -0.0 -0.0,0 0 0,RightUpperArm
+Knight_Cape,accessory,equipment,rbxassetid://99009188505054,2.5,3.5,1.0,318,BodyBackAttachment,0.0 0.5 -0.5,0 0 0,UpperTorso
+Archer_Hood,accessory,equipment,rbxassetid://75942870774271,2.25,2.75,2.5,274,HatAttachment,0.125 -0.125 -0.25,0 0 0,Head
+Archer_Bracer,accessory,equipment,rbxassetid://120950419069141,1.75,1.25,1.75,148,LeftGripAttachment,-0.125 -0.875 -0.125,-90 0 0,LeftLowerArm
+Archer_Quiver,accessory,equipment,rbxassetid://75868637250392,2.0,3.5,0.75,202,BodyBackAttachment,0.0 -0.5 -0.625,0 0 0,UpperTorso
+Mage_Hat,accessory,equipment,rbxassetid://92427299567407,3.0,2.75,3.0,348,HatAttachment,0.0 -0.875 -0.0,0 0 0,Head
+Mage_Orb,accessory,equipment,rbxassetid://121605107426611,2.0,2.5,2.0,296,LeftShoulderAttachment,1.25 -1.25 -0.0,0 0 0,LeftUpperArm
+Mage_Cape,accessory,equipment,rbxassetid://96432733334599,3.0,4.25,1.0,256,BodyBackAttachment,0.0 0.125 -0.5,0 0 0,UpperTorso
+Weapon_Broadsword,weapon,weapons,rbxassetid://135800784718280,2.0,5.0,1.0,158,,0.0 -1.5 0.25,0 0 0,
+Weapon_Longbow,weapon,weapons,rbxassetid://125338053789307,0.5,5.25,1.0,94,,0.0 -0.375 -0.25,0 0 0,
+Weapon_FireStaff,weapon,weapons,rbxassetid://135835703924289,1.25,5.75,1.0,162,,0.125 -0.875 -0.0,0 0 0,
+Weapon_QuakeHammer,weapon,weapons,rbxassetid://125437062108252,2.5,5.25,1.25,130,,0.0 -0.625 0.125,0 0 0,
+Weapon_ThrowingDagger,weapon,weapons,rbxassetid://91444651706594,1.0,2.5,0.75,98,,0.0 -0.5 -0.125,0 0 0,
+Weapon_HolyBell,weapon,weapons,rbxassetid://83647104694033,2.0,3.5,2.0,152,,0.0 0.25 -0.0,0 0 0,
+Weapon_SpinningAxe,weapon,weapons,rbxassetid://102028773090465,2.25,3.25,0.75,116,,0.375 -0.375 0.125,0 0 0,
+Weapon_BeastWhip,weapon,weapons,rbxassetid://98868436713221,2.0,4.75,2.0,232,,0.25 -1.125 0.25,0 0 0,

@@ -1,6 +1,8 @@
-# 10 — Combat : armes, grimoires, objets, cartes, passifs
+# 10 — Combat : armes, Runes, objets, cartes, passifs
 
-Domaine **combat**. Source : `00-vision.md` §5.2, §6.2, §8.1–8.3, §12.3. Contrat : `docs/ARCHITECTURE.md`.
+Domaine **combat**. Source : `01-decisions-v2.md` sections 3 et 4 (prioritaire), puis `00-vision.md` §5.2, §8.1–8.3, §12.3. Contrat : `docs/ARCHITECTURE.md`.
+
+**v2 (A04, 4 nov. 2026)** : les « grimoires » s'appellent **Runes** pour le joueur ; le module garde son nom interne `Config/Grimoires` et les champs `grimoires` du Build pour ne pas casser les autres domaines. Les 10 classes v1 sont remplacées par les **8 classes classiques** (section 8), les 16 armes par les armes v2 (section 5). Tout texte joueur est en **anglais** (le champ `fr` des tables porte aussi l'anglais) ; les noms français ci-dessous servent au dossier.
 Tous les nombres ci-dessous vivent dans `shared/Config/{Weapons,Grimoires,Items,Cards,Rarities}.luau` : ce document décrit, la config fait foi en cas d'écart.
 
 Fichiers : `server/Services/{StatsService,CardService,WeaponService,PassiveService}.luau`, `shared/WeaponFxCodec.luau`, `client/Controllers/WeaponFX.luau`, configs `shared/Config/{Weapons,Grimoires,Items,Cards,Rarities}.luau` (les nombres des passifs de classe sont dans `Weapons.Passives`).
@@ -29,12 +31,12 @@ Sémantique (Types.StatName) : stats « pourcent » = bonus additifs, multiplica
 | Regen | 0 | — | RunManager (PV/s) |
 | MoveSpeed | 0 | 1 | domaine avatar |
 | Dodge | 0 | 0,6 | RunManager |
-| Thorns | 0 | 1 | PassiveService (renvoi) |
-| Bounces | 0 | 10 | WeaponService (Éclats de prisme) |
-| Difficulty | 0 | — | domaine run |
+| Thorns | 0 | 1 | PassiveService (renvoi des coups de mêlée) |
+| Bounces | 0 | 10 | WeaponService (Lightning Chain) |
+| Difficulty | 0 | — | RunManager (moyenne de l'équipe → PV et densité de la horde) |
 | LootBonus | 0 | — | domaine loot |
 
-Ordre de calcul de `StatsService.get` : base → + grimoires → + objets (× nombre) → + passif de classe (plat + par niveau) → + boosts `addStat` (autels, permanents pour la run) → + boosts temporaires (objets) → multiplicateurs d'objets (ex. Pile usée PV ×0,9) → plafonds. Valeur mise en cache, recalculée seulement si quelque chose change.
+Ordre de calcul de `StatsService.get` : base → + Runes → + objets (× nombre) → + passif de classe (plat + par niveau) → + boosts `addStat` (autels, permanents pour la run) → + boosts temporaires (objets) → multiplicateurs d'objets (ex. Pile usée PV ×0,9) → plafonds. Valeur mise en cache, recalculée seulement si quelque chose change.
 
 ## 2. Formule de dégâts (une fonction pure, serveur)
 
@@ -43,14 +45,14 @@ Ordre canonique tiré de la note vault *Damage Formula Pipeline* :
 ```
 coup = base(arme, niveau)
      × (1 + Damage + bonus_rareté_arme + bonus_contexte)      -- un seul seau additif
-     × facteurs « more » (fusion, Tentaculos ×0,9, Poing : +1 %/Armure)
+     × facteurs « more » (fusion, Quake Hammer : +1 %/Armure)
      × crit ? (2 + CritDamage) : 1                              -- crit tiré côté serveur
      × objet Ciseaux (8 %/pile : ×2)
 -> arrondi une seule fois, minimum 1
 ```
 
-- `bonus_contexte` : Plumeline en l'air (+25 %), charges du Bélier (Cornu, +0,5 %/ennemi percuté), Petite voiture (en mouvement), Oreiller (immobile), Lunettes de chasseur (élites/boss, si `EnemyService.isElite` existe).
-- Chance de crit = `CritChance + critChance de l'arme`, plafonnée à 1. Le crit est tiré par coup, jamais par le client.
+- `bonus_contexte` : Valor du Knight (+1 %/ennemi à ≤ 10 studs, max +30 %), Rage du Barbarian (jusqu'à +50 %), Petite voiture (en mouvement), Oreiller (immobile), Lunettes de chasseur (élites/boss, si `EnemyService.isElite` existe).
+- Chance de crit = `CritChance + critChance de l'arme` (+ 25 % au-delà de 20 studs pour l'Archer), plafonnée à 1 avant le bonus de distance. Le crit est tiré par coup, jamais par le client.
 - **Armure ennemie : N/A.** Les ennemis n'ont pas d'armure au lancement ; la seule mitigation est côté joueur (RunManager).
 - Les dégâts sur la durée (Brûlure, Poison) sont appliqués par EnemyService via `applyStatus` ; leurs paramètres `dps` sont déjà multipliés par `(1 + Damage)` au moment de l'application.
 
@@ -67,12 +69,12 @@ Paramètres envoyés à `EnemyService.applyStatus` (le domaine run les interprè
 
 - **3 cartes**, **8 s**, sans pause : `RunManager.setInvulnerable(player, 8)` + `setSlow(player, 0.5, 8)`. À l'expiration : choix auto de la carte **la plus rare** (égalité : la première).
 - File : si plusieurs niveaux sont gagnés, les offres s'enchaînent (nouvelle fenêtre de 8 s chacune). Pas d'offre tant que le joueur est à terre ; elle s'ouvre quand il est relevé.
-- **Pool** (poids de tirage) : amélioration d'arme possédée 1,2 · nouvelle arme 1,0 · amélioration de grimoire 1,0 · nouveau grimoire 0,9 · **fusion disponible 3,0**. Tirage pondéré sans remise, ids distincts.
+- **Pool** (poids de tirage) : amélioration d'arme possédée 1,2 · nouvelle arme 1,0 · amélioration de Rune 1,0 · nouvelle Rune 0,9 · **fusion disponible 3,0**. Tirage pondéré sans remise, ids distincts.
 - **Compagnon** : chaque emplacement de carte a 25 % de chance d'être tiré dans `CompanionService.getCardOptions` (≈ 1 carte sur 4). Appliqué via `CompanionService.applyCard`.
-- **Emplacements pleins** : plus de « nouvelle arme » quand les emplacements d'armes sont pleins, idem grimoires. Une arme niveau 8 sans fusion possible, une arme fusionnée, un grimoire au max sortent du pool. Les ids **bannis** sortent du pool pour la run.
+- **Emplacements pleins** : plus de « nouvelle arme » quand les emplacements d'armes sont pleins, idem Runes. Une arme niveau 8 sans fusion possible, une arme fusionnée, une Rune au max sortent du pool. Les ids **bannis** sortent du pool pour la run.
 - **Pool vide** : cartes de secours *Goûter* (soin 30 % PV max) et *Tirelire* (+20 pièces × (1 + LootBonus)).
-- **Débloquage** : armes/grimoires filtrés par `ProgressionService.isUnlocked` (sans ProgressionService : tout est ouvert sauf le Grimoire Interdit).
-- **Bannir** (sur une carte arme/grimoire) : l'id sort du pool, la carte est remplacée. **Passer** : ferme l'offre sans rien prendre. **Relancer** : 3 nouvelles cartes. Chaque action change l'`offerId` ; le temps restant continue. Charges : `ProgressionService.getMetaBonuses` (repli 3/3/3).
+- **Déblocage** : v2, toutes les armes et Runes sont dans le tirage (`unlock` absent ou `"Free"`). Une arme ou Rune verrouillée (`unlock` ≠ `"Free"`, `unlockGated`) demanderait `ProgressionService.isUnlocked`. Les règles du domaine data portent encore les ids v1 : contract request A04.
+- **Bannir** (sur une carte arme / Rune) : l'id sort du pool, la carte est remplacée. **Passer** : ferme l'offre sans rien prendre. **Relancer** : 3 nouvelles cartes. Chaque action change l'`offerId` ; le temps restant continue. Charges : `ProgressionService.getMetaBonuses` (repli 3/3/3).
 - **Validation `CardChoice`** (C→S, 5/s) : `offerId` entier égal à l'offre ouverte, `action ∈ {pick, ban, skip, reroll}`, `index` entier 1..#cartes pour pick/ban, charge disponible. Tout le reste est ignoré sans log.
 
 ### 4.1 Raretés
@@ -92,103 +94,71 @@ Effet de la rareté d'une carte :
 | --- | --- | --- | --- | --- |
 | Niveaux d'arme gagnés | 1 | 1 | 2 | 2 |
 | Bonus de dégâts de l'arme (cumulatif) | 0 | +10 % | +10 % | +25 % |
-| Niveaux de grimoire gagnés | 1 | 2 | 3 | 4 |
+| Niveaux de Rune gagnés | 1 | 2 | 3 | 4 |
 
-La carte de fusion est toujours Legendary. Astrel : toutes les 5 offres, au moins une carte est Rare ou mieux.
+La carte de fusion est toujours Legendary (fusions désactivées en vague 1 : `Weapons.FusionEnabled = false`, A04-09 attend Clément). Mage : toutes les 5 offres, au moins une carte est Rare ou mieux.
+
+Textes des cartes (anglais, `Cards.Locale = "en"`) : `New weapon: Longbow`, `Longbow Lv 3` + deltas (`+2 pierce`, `+15% area`, mots dans `Cards.WeaponStatWords`), `New Rune: Damage Rune`, `Damage Rune Lv 2` + `+8% damage`.
 
 ### 4.2 Emplacements
 
-4 armes / 4 grimoires (méta : `getMetaBonuses`, plafond 6). Tentaculos +1 arme.
+4 armes / 4 Runes (méta : `getMetaBonuses`, plafond 6).
 
-## 5. Les 16 armes
+## 5. Les 16 armes (v2, A04-05 et A04-07)
 
-Toutes tirent seules côté serveur à 15 Hz (`Balance.SimHz`). Projectiles = données (aucune Part serveur), collisions via `EnemyService.queryRadius`. Cadence finale = `cooldown × (1 − Cooldown) / (1 + AttackSpeed)`, minimum 0,15 s. Rayon/portée × `(1 + Size)`, durées × `(1 + Duration)`, quantité + `Amount`.
+Toutes tirent seules côté serveur à 15 Hz (`Balance.SimHz`). Projectiles = données (aucune Part serveur), collisions via `EnemyService.queryRadius`. Cadence finale = `cooldown × (1 − Cooldown) / (1 + AttackSpeed)`, minimum 0,15 s. Rayon / portée × `(1 + Size)`, durées × `(1 + Duration)`, quantité + `Amount`. Toutes équipables par toutes les classes. Les numéros sont l'index réseau de `WeaponFx` (1..16).
 
-Notation des niveaux : `+N dég` (plat), `+N qté`, `+15 % zone`, `−10 % cd`, etc. Niveau 9 = fusion.
-
-| # | Id | Nom FR / EN | Comportement | Base niv. 1 | Stats clés |
+| # | Id | EN / FR | Comportement (`kind`) | Base niv. 1 | Brille avec |
 | --- | --- | --- | --- | --- | --- |
-| 1 | HacheBoomerang | Hache-boomerang / Boomerang Axe | Part vers l'ennemi le plus proche 0,55 s, revient au joueur, transperce tout (chaque passage touche une fois) | 14 dég, cd 1,5 s, rayon 1,8, 1 hache, 34 studs/s | Taille, Quantité |
-| 2 | PlumesDards | Plumes-dards / Feather Darts | Rafale (éventail 8°) vers l'ennemi le plus proche, perce 1 | 8 dég, cd 1,1, 2 dards, 70 studs/s, 0,8 s | Quantité, Vit. d'attaque |
-| 3 | CleTourelle | Clé-tourelle / Wrench Turret | Pose une tourelle fixe 8 s qui tire un dard toutes les 0,8 s (portée 35) | 7 dég/dard, cd 6, 1 tourelle | Durée, Quantité |
-| 4 | GriffesEclair | Griffes éclair / Lightning Claws | Coup en cône 100° devant soi (vers l'ennemi le plus proche), portée 7 ; Quantité = coups supplémentaires alternés | 18 dég, cd 1,0, +10 % crit | Critique |
-| 5 | PoingSeisme | Poing-séisme / Quake Fist | Onde circulaire rayon 9, recul 8 ; +1 % dégâts par point d'Armure ; Quantité = ondes en plus (+0,3 s) | 20 dég, cd 2,5 | Taille, Armure |
-| 6 | NuageSpores | Nuage de spores / Spore Cloud | Nappe qui suit le joueur 3,5 s, rayon 6, frappe toutes les 0,5 s + Poison (3 dps, 3 s) | 4 dég/tic, cd 5 | Durée, Taille |
-| 7 | SouffleBraise | Souffle de braise / Ember Breath | Cône de feu 50°, portée 9, + Brûlure (4 dps, 3 s) | 6 dég, cd 0,45 | Vit. d'attaque |
-| 8 | Meteorite | Météorite / Meteorite | Chute 0,7 s après le marquage sur un ennemi à ≤ 35 studs, zone rayon 7 ; chaque point de Chance = +1 % de chance d'une météorite en plus | 40 dég, cd 3,0, 1 météore | Chance, Taille |
-| 9 | EclatsPrisme | Éclats de prisme / Prism Shards | Frappe l'ennemi le plus proche (≤ 30) puis rebondit (≤ 12 studs) ; + Rebonds | 11 dég, cd 1,3, 2 rebonds, +5 % crit | Rebonds, Critique |
-| 10 | FouetTentacule | Fouet-tentacule / Tentacle Whip | Balayage 360° rayon 8, recul 6 ; Quantité = balayages en plus (+0,25 s) | 15 dég, cd 1,8 | Taille |
-| 11 | ToupieScie | Toupie à scie / Saw Top | 2 scies en orbite (rayon 5, 4 rad/s × (1+Vit. d'attaque)) pendant 4 s ; un même ennemi touché toutes les 0,5 s | 8 dég, cd 5 | Quantité, Vitesse |
-| 12 | BouleBowling | Boule de bowling / Bowling Ball | Roule tout droit vers l'ennemi le plus proche 2,5 s, transperce tout, recul 10 | 25 dég, cd 2,2, rayon 2,2, 26 studs/s | Taille, Dégâts |
-| 13 | CerfVolantLaser | Cerf-volant laser / Laser Kite | Un cerf-volant au-dessus du joueur tire un rayon vers l'ennemi le plus proche (portée 28) : tic toutes les 0,25 s, touche tout le segment (largeur 1,5), 3 s actif | 5 dég/tic, cd 5 | Durée |
-| 14 | ParapluieBouclier | Parapluie-bouclier / Umbrella Shield | Une charge : le prochain coup reçu est annulé (PV rendus + 0,5 s d'invulnérabilité) et renvoie une onde rayon 10, recul 12 ; recharge 12 s | 30 dég (onde), 1 charge | Cooldown |
-| 15 | BombePaillettes | Bombe à paillettes / Glitter Bomb | Lancée sur un ennemi à ≤ 25, explose après 0,8 s, rayon 6, Étourdit 0,8 s (« aveugle ») | 22 dég, cd 2,6 | Taille, Quantité |
-| 16 | PistoletBulles | Pistolet à bulles / Bubble Blaster | Bulle vers l'ennemi le plus proche (éventail 15°), Gel 1 s (« emprisonne »), perce 1 | 9 dég, cd 1,2, 30 studs/s | Quantité |
+| 1 | `Broadsword` | Broadsword / Épée large | Cône 140° devant soi (vers l'ennemi le plus proche), rayon 8, recul 4 ; un coup sur deux part derrière (`swingBack`) | 16 dég, cd 1,1 s | Taille, Dégâts |
+| 2 | `Longbow` | Longbow / Arc long | Flèches auto vers l'ennemi le plus proche (portée 55), perce 3 | 12 dég, cd 1,0, 80 studs/s | Quantité, Vit. d'attaque |
+| 3 | `FireStaff` | Fire Staff / Bâton de feu | Boule de feu qui explose au premier ennemi (rayon 5 × Taille) ou en fin de course, + brûlure 4 dps 2 s | 14 dég, cd 1,4, 42 studs/s | Taille, Dégâts |
+| 4 | `QuakeHammer` | Quake Hammer / Marteau séisme | Onde circulaire rayon 9, recul 8, +1 % dégâts par point d'armure ; étourdit 0,3 s au niv. 8 | 22 dég, cd 2,4 | Taille, Armure |
+| 5 | `ThrowingDaggers` | Throwing Daggers / Dagues de lancer | Éventail de 3 dagues (14°), perce 1 | 7 dég, cd 0,9 | Quantité, Vit. d'attaque |
+| 6 | `HolyAura` | Holy Aura / Aura sacrée | Anneau permanent rayon 6 autour du joueur, tic toutes les 0,5 s ; soigne les alliés si porté par un Cleric | 5 dég/tic | Taille, Dégâts |
+| 7 | `SpinningAxes` | Spinning Axes / Haches tournoyantes | 2 grosses haches en orbite (rayon 6) pendant 3,5 s, recul 5 | 10 dég, cd 5 | Quantité, Durée |
+| 8 | `BeastWhip` | Beast Whip / Fouet de dompteur | Balayage 360° rayon 8,5, recul 6 | 15 dég, cd 1,7 | Taille |
+| 9 | `LightningChain` | Lightning Chain / Chaîne d'éclairs | Frappe l'ennemi le plus proche (≤ 30) puis rebondit 2 fois (≤ 12 studs) | 11 dég, cd 1,3 | Rebonds, Critique |
+| 10 | `FrostNova` | Frost Nova / Nova de givre | Onde rayon 10 qui ralentit de 50 % 1 s ; gel 0,4 puis 0,8 s aux niv. 4 et 8 | 10 dég, cd 3,0 | Taille, Durée |
+| 11 | `Boomerang` | Boomerang / Boomerang | Part 0,55 s vers l'ennemi le plus proche, revient, transperce tout | 13 dég, cd 1,5 | Taille, Quantité |
+| 12 | `BombBag` | Bomb Bag / Sac de bombes | Bombe sur un ennemi à ≤ 25, explose après 0,8 s (cercle rouge au sol), rayon 6 | 24 dég, cd 2,6 | Taille, Quantité |
+| 13 | `SpearThrow` | Spear Throw / Lancer de lance | Lance rapide qui traverse tout (perce infini), portée 50 | 20 dég, cd 1,8, 75 studs/s | Dégâts, Quantité |
+| 14 | `MeteorRain` | Meteor Rain / Pluie de météores | 2 météores sur des ennemis au hasard (≤ 35), 0,9 s de télégraphe, rayon 7, brûlure ; +1 % de météore en plus par point de Chance | 40 dég, cd 3,2 | Chance, Taille |
+| 15 | `OrbitingBlades` | Orbiting Blades / Lames en orbite | 3 petites lames permanentes en orbite serrée (rayon 3,5) | 6 dég, toutes les 0,35 s par ennemi | Quantité, Vit. d'attaque |
+| 16 | `CrossbowTurret` | Crossbow Turret / Tourelle arbalète | Pose une arbalète fixe 8 s qui tire toutes les 0,8 s (portée 38, perce 2) | 8 dég/carreau, cd 6 | Durée, Quantité |
 
-### 5.1 Niveaux 2 → 8
+Les niveaux 2 → 8 de chaque arme sont dans `Config/Weapons` (`levels`), 7 deltas par arme : environ deux paliers de dégâts, un de zone ou de portée, un de quantité, un de recharge, un spécifique (perce, rebonds, gel…).
 
-| Arme | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| HacheBoomerang | +1 qté | +6 dég | +15 % zone | +1 qté | +6 dég | −10 % cd | +1 qté, +8 dég |
-| PlumesDards | +1 qté | +3 dég | +1 perce | +1 qté | −10 % cd | +3 dég | +2 qté |
-| CleTourelle | +3 dég | +2 s durée | −15 % intervalle | +1 tourelle | +3 dég | +1 dard/tir | +1 tourelle, +3 dég |
-| GriffesEclair | +5 dég | +15 % zone | +5 % crit | +1 qté | +6 dég | −10 % cd | +50 % dég. crit, +6 dég |
-| PoingSeisme | +6 dég | +15 % zone | −10 % cd | +1 onde | +8 dég | +15 % zone | +10 dég, Étourdit 0,3 s |
-| NuageSpores | +2 dég | +1 s durée | +15 % zone | +3 dps poison | +1 nuage | +1 s durée | +3 dég, +20 % zone |
-| SouffleBraise | +2 dég | +15 % portée | +3 dps brûlure | −10 % cd | +3 dég | +20° d'angle | +4 dps brûlure, +15 % portée |
-| Meteorite | +12 dég | +1 qté | +15 % zone | +15 dég | −10 % cd | +1 qté | +20 dég, +20 % zone |
-| EclatsPrisme | +1 rebond | +4 dég | +1 qté | +1 rebond | +5 dég | −10 % cd | +2 rebonds, +5 dég |
-| FouetTentacule | +5 dég | +15 % zone | +1 qté | +6 dég | +15 % zone | −10 % cd | +8 dég, +20 % zone |
-| ToupieScie | +1 scie | +3 dég | +1 s durée | +1 scie | +15 % zone | +3 dég, +25 % vitesse | +1 scie, +1 s durée |
-| BouleBowling | +8 dég | +15 % zone | +1 qté | +10 dég | +0,5 s durée | +1 qté | +12 dég, +20 % zone |
-| CerfVolantLaser | +2 dég | +1 s durée | +15 % portée | +1 rayon | +2 dég | +1 s durée | +3 dég, −15 % cd |
-| ParapluieBouclier | +10 dég | −10 % cd | +15 % zone | +1 charge | +12 dég | −10 % cd | +15 dég, +1 charge |
-| BombePaillettes | +7 dég | +15 % zone | +1 qté | +0,4 s étourdi | +8 dég | +1 qté | +10 dég, +20 % zone |
-| PistoletBulles | +1 qté | +3 dég | +0,3 s gel | +1 qté | +4 dég | −10 % cd | +2 qté |
+**Visuels provisoires** (vague 1) : chaque arme décrit son style dans `Weapons.Defs[id].fx` (forme, couleur, taille, rotation, orbite, aura au sol). `WeaponFX` ne contient plus aucun index d'arme en dur : la vague 2 (A07) remplace les pièces sans toucher au serveur. Lisibilité : flèches et lances longues et claires, boule de feu orange pleine, haches marron en orbite, aura dorée au sol, ondes au sol de la couleur de l'arme, télégraphes rouges des bombes et météores toujours dessinés.
 
-### 5.2 Fusions (arme niv. 8 + grimoire précis niv. ≥ 5 → carte Legendary, niveau 9)
+**Moteur** (`WeaponService`) : aucun id d'arme ni de classe n'y est écrit. Comportements par `kind` (Shot, Boomerang, Cone, Nova, Cloud, Turret, Strike, Chain, Orbit, Beam, Shield) et drapeaux de stats (`popRadius`, `endBlast`, `permanent`, `swingBack`…). Les kinds Beam et Shield n'ont plus d'arme en v2 mais restent disponibles.
 
-| Arme | Grimoire | Fusion FR / EN | Effet |
+### 5.2 Fusions (A04-09, en attente)
+
+Proposition des décisions v2 : une arme au niveau 8 + une Rune précise au niveau 5 → version ultime (exemple : Longbow + Attack Speed Rune → Storm Bow). Le moteur existe (niveau 9 = base + niveaux + `fusion.delta`, carte Legendary) ; `Weapons.FusionEnabled = false` et aucune arme v2 n'a encore de `fusion` tant que Clément n'a pas confirmé.
+
+## 6. Les 14 Runes (max niveau 8, Cursed 5) (A04-06)
+
+Valeurs **par niveau** (cumul linéaire), sauf Projectiles. Id = nom anglais ; nom affiché « X Rune ».
+
+| Id | EN / FR | Par niveau | Au max |
 | --- | --- | --- | --- |
-| HacheBoomerang | Taille | Hache Tempête / Storm Axe | ×1,5 dég, +2 haches, +30 % zone |
-| PlumesDards | VitesseAttaque | Rafale d'Aigle / Eagle Volley | 2 salves (0,2 s d'écart), +2 perce, ×1,3 dég |
-| CleTourelle | Quantite | Atelier Volant / Flying Workshop | les tourelles suivent le joueur, +1 dard/tir, ×1,3 dég |
-| GriffesEclair | Critique | Griffe Foudroyante / Thunder Claw | chaque crit fait sauter un éclair sur 3 ennemis proches, ×1,3 dég |
-| PoingSeisme | Rempart | Faille Tellurique / Tectonic Rift | +2 % dég par Armure (au lieu de 1 %), Étourdit 0,6 s, ×1,3 dég |
-| NuageSpores | Aimant | Marée de Spores / Spore Tide | +40 % zone, ralentit de 50 %, ×1,4 dég |
-| SouffleBraise | Degats | Souffle du Dragon / Dragon Breath | +60 % portée, angle 90°, brûlure ×2, ×1,3 dég |
-| Meteorite | Chance | Pluie d'Étoiles / Star Shower | +3 météores, +1 % crit par point de Chance |
-| EclatsPrisme | Savoir | Prisme du Savant / Scholar Prism | +3 rebonds, chaque ennemi tué donne +1 XP |
-| FouetTentacule | Vitalite | Kraken Tourbillon / Kraken Swirl | +1 balayage, soigne 2 % des dégâts infligés (max 5 PV/s) |
-| ToupieScie | Agilite | Tornade d'Acier / Steel Tornado | scies permanentes, +2 scies, vitesse ×1,5 |
-| BouleBowling | Taille | Boule Titanesque / Titan Ball | rayon ×2, se divise en 3 petites boules en fin de course |
-| CerfVolantLaser | Duree | Comète de Papier / Paper Comet | rayon permanent, +1 rayon, ×1,3 dég |
-| ParapluieBouclier | Cooldown | Grand Chapiteau / Big Top | l'onde part aussi seule à chaque recharge, zone ×2 |
-| BombePaillettes | Quantite | Feu d'Artifice Géant / Grand Fireworks | chaque bombe éclate en 4 mini-bombes (40 % dég.) |
-| PistoletBulles | Interdit | Bulles Cosmiques / Cosmic Bubbles | les bulles explosent (rayon 6) en éclatant, ×1,3 dég |
+| `Damage` | Damage Rune / Rune de dégâts | +8 % Damage | +64 % |
+| `AttackSpeed` | Attack Speed Rune / Rune de vitesse d'attaque | +7 % AttackSpeed | +56 % |
+| `Projectiles` | Projectile Rune / Rune de projectiles | Amount 1,1,2,2,3,3,4,4 ; niveaux pairs +4 % Damage | +4 projectiles, +16 % |
+| `Area` | Area Rune / Rune de zone | +8 % Size | +64 % |
+| `Duration` | Duration Rune / Rune de durée | +10 % Duration | +80 % |
+| `Cooldown` | Cooldown Rune / Rune de recharge | +4 % Cooldown | −32 % |
+| `Crit` | Crit Rune / Rune critique | +4 % CritChance, +10 % CritDamage | +32 %, +80 % |
+| `Luck` | Luck Rune / Rune de chance | +3 Luck | +24 |
+| `Wisdom` | Wisdom Rune / Rune de sagesse | +10 % XpGain | +80 % |
+| `Magnet` | Magnet Rune / Rune aimant | +3 Magnet | +24 studs |
+| `Vitality` | Vitality Rune / Rune de vitalité | +15 MaxHp, +0,1 Regen | +120 PV, +0,8/s |
+| `Armor` | Armor Rune / Rune d'armure | +3 Armor | +24 |
+| `Agility` | Agility Rune / Rune d'agilité | +4 % MoveSpeed, +2 % Dodge | +32 %, +16 % |
+| `Cursed` | Cursed Rune / Rune maudite | +10 % Difficulty, +12 % LootBonus, +5 % XpGain, +5 % Damage | ×5 |
 
-Le Grimoire Interdit étant un déblocage tardif, Bulles Cosmiques est la fusion « de fin de jeu ».
-
-## 6. Les 14 grimoires (max niveau 8, Interdit 5)
-
-Valeurs **par niveau** (cumul linéaire), sauf Quantité.
-
-| Id | FR / EN | Par niveau | Au max |
-| --- | --- | --- | --- |
-| Degats | Dégâts / Damage | +8 % Damage | +64 % |
-| VitesseAttaque | Vitesse d'attaque / Attack Speed | +7 % AttackSpeed | +56 % |
-| Quantite | Quantité / Amount | Amount 1,1,2,2,3,3,4,4 ; niveaux pairs +4 % Damage | +4 qté, +16 % |
-| Taille | Taille / Size | +8 % Size | +64 % |
-| Duree | Durée / Duration | +10 % Duration | +80 % |
-| Cooldown | Recharge / Cooldown | +4 % Cooldown | −32 % |
-| Critique | Critique / Critical | +4 % CritChance, +10 % CritDamage | +32 %, +80 % |
-| Chance | Chance / Luck | +3 Luck | +24 |
-| Savoir | Savoir / Knowledge | +10 % XpGain | +80 % |
-| Aimant | Aimant / Magnet | +3 Magnet | +24 studs |
-| Vitalite | Vitalité / Vitality | +15 MaxHp, +0,1 Regen | +120 PV, +0,8/s |
-| Rempart | Rempart / Bulwark | +3 Armor | +24 |
-| Agilite | Agilité / Agility | +4 % MoveSpeed, +2 % Dodge | +32 %, +16 % |
-| Interdit | Grimoire Interdit / Forbidden Tome | +10 % Difficulty, +12 % LootBonus, +5 % XpGain, +5 % Damage | ×5 |
+**Difficulty** (Rune Cursed, tirelire gourmande des autels) agit enfin sur la horde : RunManager prend la moyenne des joueurs de la run, PV ennemis ×(1 + moyenne), densité ×(1 + 0,5 × moyenne) (`Run.DifficultyDensityShare`).
 
 ## 7. Les 40 objets (coffres, `grantItem`)
 
@@ -239,22 +209,26 @@ Tous se cumulent (nombre de piles). Le domaine loot choisit l'objet ; il peut ti
 
 Répartition : 16 Common, 16 Rare, 5 Epic, 3 Legendary.
 
-## 8. Passifs des 10 classes (§6.2)
+## 8. Les 8 classes et leurs passifs (A04-04, A04-10)
 
-| Classe | Passif | Règle exacte |
-| --- | --- | --- |
-| Cornu | Bélier / Ram | Quand la vitesse au sol dépasse 21 studs/s (glissade), les ennemis à ≤ 3,5 studs prennent 10 dég. × (1 + Damage) + recul 10 (une fois par seconde par ennemi). Chaque ennemi percuté : +0,5 % dégâts pour la run (max +75 %). Les arcs de recul font partie de la classe (domaine avatar). |
-| Plumeline | Vent arrière / Tailwind | +25 % dégâts (seau additif) quand les pieds ne touchent rien (`FloorMaterial == Air`). |
-| Mecano | Bricoleur / Tinkerer | Autels chargés 35 % plus vite (lu par ShrineService : classe Mecano) ; les tourelles reçoivent `Amount` en tourelles supplémentaires (au lieu de dards). |
-| Felyne | Élan / Momentum | 5 atterrissages d'affilée sans subir de dégâts → griffure éclair rayon 10, 30 dég. × (1 + Damage). Le compteur revient à 0 si le joueur est touché. |
-| Rocailleux | Bouclier vivant / Living Shield | +3 Armure par niveau ; Épines +30 % (les coups reçus renvoient 30 % aux 3 ennemis les plus proches à ≤ 6 studs). |
-| Sporelin | Contagion | Un ennemi empoisonné par un Sporelin qui meurt applique Poison (4 dps × (1 + Damage), 3 s) à 6 voisins max à ≤ 8 studs. Peut se propager en chaîne. |
-| Ecaille | Combustion | Les brûlures du joueur se cumulent sans limite (`maxStacks = 999`) mais durent 2 s. |
-| Astrel | Bonne étoile / Lucky Star | +1 Chance par niveau ; toutes les 5 offres de cartes, au moins une carte Rare+. |
-| Cristallin | Croissance / Growth | +2 % Taille par niveau. |
-| Tentaculos | Multitâche / Multitask | +1 emplacement d'arme ; toutes ses armes font ×0,9. |
+Décisions v2 section 3. L'avatar Roblox reste intact ; la classe ajoute un **équipement voxel** (TraitService, pièces provisoires en blocs en attendant les Accessories de A01) qui grandit aux niveaux 10, 20 et 30. Les stats viennent de la classe, jamais de l'apparence. Classes jamais vendues.
 
-Les Épines (stat Thorns) de tous les joueurs suivent la même règle que Rocailleux. Les valeurs sont dans `Config.Weapons.Passives`.
+| Id | EN / FR | Arme de départ | Passif (id = classe) | Règle exacte (`Weapons.Passives`) | Mouvement (`Config/Classes`, lu par A06) | Déblocage |
+| --- | --- | --- | --- | --- | --- | --- |
+| `Knight` | Knight / Chevalier | Broadsword | Valor | +1 % dégâts par ennemi à ≤ 10 studs (max +30 %, seau additif, compté à 15 Hz) ; pare un coup toutes les 8 s (`PassiveService.tryBlock`, avant esquive et armure) | normal | Gratuit |
+| `Archer` | Archer / Archère | Longbow | Eagle Eye | +25 % de chance de critique sur les ennemis à ≥ 20 studs du joueur | saut haut (`jumpHeight` 10) | Gratuit |
+| `Mage` | Mage / Mage | Fire Staff | Arcane Surge | +2 % Taille par niveau ; toutes les 5 offres, au moins une carte Rare ou mieux | plané court (`glide`, `glideSeconds` 1,2) | Gratuit |
+| `Guardian` | Guardian / Gardien | Quake Hammer | Bulwark | +3 armure par niveau ; renvoie 30 % des dégâts de **mêlée** aux 3 ennemis les plus proches (≤ 6 studs) ; immunisé au recul (`knockbackImmune`) | lent (14), atterrissage lourd (`heavyLanding`) | Quête |
+| `Rogue` | Rogue / Voleuse | Throwing Daggers | Shadowstep | Le début d'une glissade validée par MovementGuard (attribut `Sliding`) donne 0,5 s d'invulnérabilité (une fois toutes les 2 s) ; +10 % esquive | double saut (`airJumps` 1), 17 de vitesse | Quête |
+| `Cleric` | Cleric / Clerc | Holy Aura | Blessing | L'aura (Holy Aura) soigne de 1,5 PV par tic les joueurs actifs dedans, le Cleric compris ; relève 2× plus vite | normal | Quête |
+| `Barbarian` | Barbarian / Barbare | Spinning Axes | Rage | +50 % × (1 − PV / PV max) de dégâts (0 % à PV pleins, +50 % à 0) | charge en glissade (`slideBoost` 1,6) | Quête |
+| `Tamer` | Tamer / Dompteuse | Beast Whip | Pack Leader | 2 compagnons, capture 50 % plus rapide, compagnons +20 % dégâts : données pour le domaine compagnons (vague 2), sans effet en vague 1 | normal | Quête |
+
+Équipement provisoire (paliers 1 → 4) : Knight casque ouvert, cape rouge au niveau 10, crête dorée, armure dorée ; Archer capuche et carquois, plume, carquois plein, flèches dorées ; Mage chapeau pointu en blocs, étoile, rune flottante, chapeau lumineux ; Guardian épaulières de pierre, rivets, bords en fusion ; Rogue masque, capuche, nœud, fumée ; Cleric auréole carrée, plus brillante, double ; Barbarian casque à cornes, cornes plus longues, fourrure, cornes en flammes ; Tamer chapeau de dompteuse, badge patte, plume, bande dorée.
+
+**Transition des ids** : le domaine data (`Config/Progression`) et l'UI (`Config/UI`) envoient encore les ids v1. `Config/Classes` résout en lecture `Cornu → Knight`, `Plumeline → Archer`, `Mecano → Mage`, `Rocailleux → Guardian`, `Felyne → Rogue`, `Sporelin → Cleric`, `Ecaille → Barbarian`, `Tentaculos → Tamer` (métatable, l'itération ne voit que les 8 classes v2). Le code utilise toujours `def.id`. À retirer quand le contrat v2 est fusionné.
+
+Épines : la stat Thorns de tous les joueurs ne répond qu'aux coups de mêlée (`Bus.PlayerDamaged` source `"Contact"`).
 
 ## 9. Coop (§5.2)
 
@@ -267,8 +241,8 @@ Les Épines (stat Thorns) de tous les joueurs suivent la même règle que Rocail
 ## 10. Réseau et budgets mobile
 
 - **WeaponFx** (UnreliableRemoteEvent) : `WeaponFxCodec`, en-tête 6 octets (version u8, tick u32, nombre u8), enregistrement fixe 14 octets, ≤ 900 octets par paquet (63 évènements). Les évènements sont cosmétiques : en perdre un ne change rien au jeu (note vault *RemoteEvents RemoteFunctions and Unreliable Remotes*).
-- Types d'évènement : Projectile (le client le simule), Fin de projectile, Zone (onde, cône, explosion avec délai), Segment (rayon, rebond), Attaché (scies, nuage, cerf-volant qui suivent un joueur, identifié par l'attribut `FxSlot` du Player ; tourelles fixes avec le bit 128 du champ nombre).
-- Les textes des cartes (`Card.title`/`desc`) sont des chaînes simples (type du contrat) : langue choisie par `Cards.Locale` (fr par défaut).
+- Types d'évènement : Projectile (le client le simule), Fin de projectile, Zone (onde, cône, explosion avec délai), Segment (éclair, rebond), Attaché (haches et lames en orbite, aura qui suivent un joueur, identifié par l'attribut `FxSlot` du Player ; tourelles fixes avec le bit 128 du champ nombre). Visuels spéciaux : `Parry`, `Shadowstep`, `Thorns`, `Ghost`, `Whistle`, `Megaphone`, `ChainBolt`, `MiniBomb`.
+- Les textes des cartes (`Card.title`/`desc`) sont des chaînes simples (type du contrat) : anglais (`Cards.Locale = "en"`).
 - Intérêt : chaque joueur reçoit les évènements à ≤ 160 studs ; max 126 évènements par joueur et par tick (2 paquets), le surplus est jeté.
 - **Serveur** : ≤ 400 projectiles vivants, ≤ 96 zones ; enregistrements réutilisés (pool), aucune table créée par ennemi dans les boucles, cibles par grille (`queryRadius`).
 - **Client** : pools de Parts par style, un `BulkMoveTo` par image, qualité auto : téléphone → *Bas* (60 projectiles, 12 zones, 16 segments, SmoothPlastic, sans fondu), tablette/PC moyen → *Moyen* (150/28/40), PC → *Haut* (300/56/80, Neon). Les zones de gameplay lisibles (télégraphes de météore) ne sont jamais coupées, seulement simplifiées.

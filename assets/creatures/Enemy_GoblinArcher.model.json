@@ -1,0 +1,35 @@
+{
+ "className": "MeshPart",
+ "properties": {
+  "MeshId": "rbxassetid://132629528679784",
+  "Size": [
+   3.5,
+   3.5,
+   2.5
+  ],
+  "InitialSize": [
+   3.5,
+   3.5,
+   2.5
+  ],
+  "Color": [
+   1,
+   1,
+   1
+  ],
+  "Anchored": true,
+  "CanCollide": false,
+  "CanQuery": false,
+  "CanTouch": false,
+  "CastShadow": false
+ },
+ "attributes": {
+  "GripOffset": {
+   "Vector3": [
+    0.0,
+    -1.75,
+    -0.0
+   ]
+  }
+ }
+}

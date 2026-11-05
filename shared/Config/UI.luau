@@ -1,16 +1,20 @@
 --!strict
--- UI tuning, palettes and player-facing strings (ui domain). Design: docs/dossier/60-ui-ux.md.
--- Sizes are logical pixels at UIScale 1 (reference phone 844 x 390).
+-- UI tuning, palettes and player-facing strings (ui domain). Design: docs/dossier/60-ui-ux.md
+-- section 0 (v2 "Toy-block gloss", Figma file 0Yq5m1skq5dzgOQXZ9bG6D, validated by Clément on
+-- 4 Nov 2026). Sizes are logical pixels at UIScale 1 (reference phone 844 x 390).
 
 type L = { fr: string, en: string }
 
 local UI = {}
 
+-- Decision v2: English only at launch. The French strings stay for later; nil = follow the locale.
+UI.ForceLanguage = "en" :: string?
+
 UI.Scale = {
 	PhoneShortSide = 520, -- TouchEnabled and short side < this = phone (vault: Responsive UI)
 	ReferenceShortSide = 420, -- scale = clamp(shortSide / ref, Min, Max)
 	Min = 1,
-	Max = 1.4,
+	Max = 1.6, -- v2: 1.4 was too small on a 1080p screen (design review)
 }
 
 UI.TextScales = { 1, 1.15, 1.3 }
@@ -18,82 +22,174 @@ UI.TextScales = { 1, 1.15, 1.3 }
 UI.Margin = 8
 UI.MinTap = 44
 
+-- Three fonts shipped with Roblox AND available in Figma (same render on both sides).
 UI.Fonts = {
-	Body = "rbxasset://fonts/families/BuilderSans.json",
-	Display = "FredokaOne", -- Font.fromName
+	Number = "rbxasset://fonts/families/LuckiestGuy.json", -- big numbers, banners
+	Label = "rbxasset://fonts/families/FredokaOne.json", -- buttons, titles, pills
+	Body = "rbxasset://fonts/families/Nunito.json", -- descriptions (Bold / ExtraBold)
 }
 
+-- Text styles of the Figma file. Old role names are kept as aliases for the other UI modules.
 UI.TextSize = {
-	Tiny = 12,
-	Small = 13,
+	Hero = 56,
+	NumberXL = 40,
+	NumberL = 30,
+	NumberM = 22,
+	TitleL = 22,
+	TitleM = 16,
+	LabelM = 15,
+	LabelS = 14,
+	BodyM = 14,
+	BodyS = 14,
+	-- aliases (v1 role names)
+	Tiny = 14,
+	Small = 14,
 	Body = 14,
-	Title = 18,
+	Title = 16,
 	Big = 22,
-	Timer = 28,
-	TimerUrgent = 40,
-	Huge = 34,
+	Timer = 30,
+	TimerUrgent = 30,
+	Huge = 40,
 }
 
--- Semantic colour tokens. "Colorblind" overrides only what changes (Okabe-Ito based).
+-- Ink outline on text: at most 8 % of the size (above that it eats the next glyph).
+UI.TextStrokeRatio = 0.08
+
+-- Semantic colour tokens (Figma collection "Color"). Triplets: <Role> = face, <Role>Light = gloss
+-- band, <Role>Lip = darker lip. "Colorblind" overrides only what changes (Okabe-Ito).
+local hex = Color3.fromHex
 UI.Palettes = {
 	Default = {
-		Panel = Color3.fromRGB(28, 34, 48),
-		PanelLight = Color3.fromRGB(44, 52, 72),
-		Text = Color3.fromRGB(255, 255, 255),
-		TextDim = Color3.fromRGB(180, 188, 204),
-		Outline = Color3.fromRGB(10, 12, 18),
-		Primary = Color3.fromRGB(90, 200, 120),
-		Danger = Color3.fromRGB(255, 74, 61),
-		Warning = Color3.fromRGB(255, 160, 40),
-		Hp = Color3.fromRGB(240, 86, 74),
-		Shield = Color3.fromRGB(90, 210, 255),
-		Xp = Color3.fromRGB(182, 140, 255),
-		Coin = Color3.fromRGB(255, 212, 71),
-		Revive = Color3.fromRGB(80, 200, 220),
-		Boss = Color3.fromRGB(200, 50, 60),
-		Ultimate = Color3.fromRGB(255, 190, 60),
-		MapSelf = Color3.fromRGB(255, 255, 255),
-		MapAlly = Color3.fromRGB(76, 217, 100),
-		MapShrine = Color3.fromRGB(60, 140, 255),
-		MapChest = Color3.fromRGB(255, 212, 71),
-		MapBoss = Color3.fromRGB(255, 59, 48),
-		Common = Color3.fromRGB(170, 176, 186),
-		Rare = Color3.fromRGB(60, 150, 255),
-		Epic = Color3.fromRGB(180, 90, 255),
-		Legendary = Color3.fromRGB(255, 190, 40),
-		PingBoss = Color3.fromRGB(255, 59, 48),
-		PingShrine = Color3.fromRGB(60, 140, 255),
-		PingHelp = Color3.fromRGB(255, 150, 40),
-		PingChest = Color3.fromRGB(255, 212, 71),
-		PingRegroup = Color3.fromRGB(76, 217, 100),
-		PingThanks = Color3.fromRGB(255, 130, 190),
+		-- surfaces and text
+		Panel = hex("#1F2B49"),
+		PanelLight = hex("#2B3A60"),
+		PanelSunken = hex("#0E1424"),
+		Highlight = hex("#3C4E7C"),
+		Outline = hex("#0E1424"), -- navy ink, never pure black
+		Shine = hex("#FFFFFF"),
+		Text = hex("#FFFFFF"),
+		TextDim = hex("#DCE3F5"),
+		TextMuted = hex("#B8C4E3"),
+		OnLight = hex("#0E1424"),
+		-- actions
+		Primary = hex("#62D93D"),
+		PrimaryLight = hex("#C2FF85"),
+		PrimaryLip = hex("#2D8A1E"),
+		Neutral = hex("#3C4E7C"),
+		NeutralLight = hex("#6E80AE"),
+		NeutralLip = hex("#161F36"),
+		Danger = hex("#FF4757"),
+		DangerLight = hex("#FF9A9A"),
+		DangerLip = hex("#B81E3A"),
+		Premium = hex("#FFC22E"),
+		PremiumLight = hex("#FFE58A"),
+		PremiumLip = hex("#B8820A"),
+		Info = hex("#3B87FF"),
+		InfoLight = hex("#93C5FF"),
+		InfoLip = hex("#1D4FBF"),
+		Slide = hex("#22D39B"),
+		SlideLight = hex("#95F7D5"),
+		SlideLip = hex("#128A68"),
+		Capture = hex("#FF5CB0"),
+		CaptureLight = hex("#FFB0DC"),
+		CaptureLip = hex("#B82A78"),
+		-- stats
+		Hp = hex("#FF4757"),
+		HpLight = hex("#FF9A9A"),
+		HpLip = hex("#B81E3A"),
+		Shield = hex("#DDEBFA"),
+		ShieldLight = hex("#FFFFFF"),
+		ShieldLip = hex("#7D96B8"),
+		Xp = hex("#2EDDF5"), -- same cyan as the XP gem in the world
+		XpLight = hex("#A5F6FF"),
+		XpLip = hex("#0B8FAD"),
+		Coin = hex("#FFC22E"),
+		CoinLight = hex("#FFE58A"),
+		CoinLip = hex("#B8820A"),
+		Ko = hex("#FF8A1F"),
+		KoLight = hex("#FFC27A"),
+		KoLip = hex("#B8540A"),
+		Warning = hex("#FFC22E"), -- timer under 1:00
+		Overtime = hex("#FF4757"),
+		Boss = hex("#B81E3A"),
+		Ultimate = hex("#FFC22E"),
+		Revive = hex("#22D39B"),
+		ReviveLight = hex("#95F7D5"),
+		ReviveLip = hex("#128A68"),
+		Downed = hex("#FF8A1F"),
+		Ghost = hex("#B8C4E3"),
+		-- minimap
+		MapSelf = hex("#FFFFFF"),
+		MapAlly = hex("#22D39B"),
+		MapShrine = hex("#3B87FF"),
+		MapChest = hex("#FFC22E"),
+		MapBoss = hex("#FF4757"),
+		MapCapture = hex("#FF5CB0"),
+		-- rarity
+		Common = hex("#BCC5D6"),
+		CommonLight = hex("#F2F5FA"),
+		CommonLip = hex("#77829A"),
+		Rare = hex("#3B87FF"),
+		RareLight = hex("#93C5FF"),
+		RareLip = hex("#1D4FBF"),
+		Epic = hex("#A75CFF"),
+		EpicLight = hex("#DBADFF"),
+		EpicLip = hex("#6A2DBF"),
+		Legendary = hex("#FFC22E"),
+		LegendaryLight = hex("#FFE58A"),
+		LegendaryLip = hex("#B8820A"),
+		-- pings
+		PingBoss = hex("#FF4757"),
+		PingShrine = hex("#3B87FF"),
+		PingHelp = hex("#FF8A1F"),
+		PingChest = hex("#FFC22E"),
+		PingRegroup = hex("#22D39B"),
+		PingThanks = hex("#FF5CB0"),
 	},
 	Colorblind = {
-		MapAlly = Color3.fromRGB(0, 158, 115),
-		MapShrine = Color3.fromRGB(0, 114, 178),
-		MapChest = Color3.fromRGB(240, 228, 66),
-		MapBoss = Color3.fromRGB(213, 94, 0),
-		Common = Color3.fromRGB(230, 230, 230),
-		Rare = Color3.fromRGB(86, 180, 233),
-		Epic = Color3.fromRGB(213, 94, 0),
-		Legendary = Color3.fromRGB(240, 228, 66),
-		Hp = Color3.fromRGB(213, 94, 0),
-		Primary = Color3.fromRGB(0, 158, 115),
-		PingBoss = Color3.fromRGB(213, 94, 0),
-		PingShrine = Color3.fromRGB(0, 114, 178),
-		PingHelp = Color3.fromRGB(230, 159, 0),
-		PingChest = Color3.fromRGB(240, 228, 66),
-		PingRegroup = Color3.fromRGB(0, 158, 115),
-		PingThanks = Color3.fromRGB(204, 121, 167),
+		Overtime = hex("#D55E00"),
+		Slide = hex("#009E73"),
+		SlideLight = hex("#5FD1B0"),
+		SlideLip = hex("#006249"),
+		Capture = hex("#CC79A7"),
+		CaptureLight = hex("#E8B5D2"),
+		CaptureLip = hex("#8C4A70"),
+		Revive = hex("#009E73"),
+		ReviveLight = hex("#5FD1B0"),
+		ReviveLip = hex("#006249"),
+		Downed = hex("#E69F00"),
+		MapAlly = hex("#009E73"),
+		MapShrine = hex("#0072B2"),
+		MapChest = hex("#F0E442"),
+		MapBoss = hex("#D55E00"),
+		MapCapture = hex("#CC79A7"),
+		Common = hex("#E6E6E6"),
+		CommonLight = hex("#FFFFFF"),
+		CommonLip = hex("#8E8E8E"),
+		Rare = hex("#56B4E9"),
+		RareLight = hex("#A9DAF5"),
+		RareLip = hex("#2A7DB0"),
+		Epic = hex("#D55E00"),
+		EpicLight = hex("#FF9A5C"),
+		EpicLip = hex("#8F3F00"),
+		Legendary = hex("#F0E442"),
+		LegendaryLight = hex("#FFF8A8"),
+		LegendaryLip = hex("#A89C10"),
+		PingBoss = hex("#D55E00"),
+		PingShrine = hex("#0072B2"),
+		PingHelp = hex("#E69F00"),
+		PingChest = hex("#F0E442"),
+		PingRegroup = hex("#009E73"),
+		PingThanks = hex("#CC79A7"),
 	},
 }
 
--- Second channel for rarity: diamond count and border thickness (never changes between palettes).
+-- Second channel for rarity: word, diamond count and frame thickness (never change with the palette).
 UI.Rarity = {
-	Common = { gems = 1, stroke = 2, name = { fr = "Commun", en = "Common" } :: L },
-	Rare = { gems = 2, stroke = 3, name = { fr = "Rare", en = "Rare" } :: L },
-	Epic = { gems = 3, stroke = 4, name = { fr = "Épique", en = "Epic" } :: L },
-	Legendary = { gems = 4, stroke = 4, name = { fr = "Légendaire", en = "Legendary" } :: L },
+	Common = { gems = 1, stroke = 3, name = { fr = "Commun", en = "Common" } :: L },
+	Rare = { gems = 2, stroke = 4, name = { fr = "Rare", en = "Rare" } :: L },
+	Epic = { gems = 3, stroke = 5, name = { fr = "Épique", en = "Epic" } :: L },
+	Legendary = { gems = 4, stroke = 6, name = { fr = "Légendaire", en = "Legendary" } :: L },
 }
 
 UI.Hud = {
@@ -104,19 +200,47 @@ UI.Hud = {
 	AnnounceMax = 6,
 	TeamMax = 3,
 	FeedMax = 3,
-	FeedSeconds = 5,
+	FeedSeconds = 6,
+	OvertimeStepSeconds = 30, -- fallback when RunState has no overtimeStep (Run.Overtime.StepSeconds)
 }
 
 UI.Cards = {
-	Width = 132,
-	Height = 112,
-	Gap = 8,
-	RingSize = 40,
+	Width = 150,
+	Height = 188,
+	RowWidth = 366, -- portrait phone: cards become rows
+	RowHeight = 98,
+	Gap = 12,
+	ButtonWidth = 100,
+	ButtonHeight = 48,
+	RingSize = 48,
 	WarnSeconds = 3,
+	ArmSeconds = 0.4, -- cards ignore taps this long after they appear (no accidental pick)
+	-- v3 level-up window (StarterGui.COHUE_LevelUp). Width/Height above are still read by ShrineUI.
+	Rarity = { Common = "Cream", Rare = "Royal", Epic = "Grape", Legendary = "Gold" }, -- brick colour
+	-- Stats panel, in this order. A stat the selected offer changes but that is not listed takes
+	-- the place of the last rows. Portrait phone: the first PortraitRows only, then "+N more".
+	StatRows = { "MaxHp", "Regen", "Armor", "Damage", "AttackSpeed", "Amount", "Size", "Cooldown", "CritChance", "Luck", "Magnet", "MoveSpeed" },
+	PortraitRows = 6,
+	ItemsShown = 8, -- 4 when weapons or Runes need a second row
+	FlySeconds = 0.35, -- picked icon flies into its inventory cell
+	-- Optional remote (A04, contract request): LevelUpPause { active, choosers = { userId }, endsIn }.
+	PauseRemote = "LevelUpPause",
 }
 
+-- Short stat names for the level-up stats panel (180 px). Missing = UI.Stats name.
+UI.StatShort = {
+	AttackSpeed = { fr = "Vit. d'attaque", en = "Attack Speed" },
+	Amount = { fr = "Projectiles", en = "Projectiles" },
+	Size = { fr = "Zone", en = "Area" },
+	CritChance = { fr = "Critique", en = "Crit" },
+	CritDamage = { fr = "Dégâts crit.", en = "Crit Damage" },
+	XpGain = { fr = "Gain d'XP", en = "XP Gain" },
+	MoveSpeed = { fr = "Vitesse", en = "Move Speed" },
+	MaxHp = { fr = "PV max", en = "Max HP" },
+} :: { [string]: L }
+
 UI.Minimap = {
-	Size = { phone = 112, tablet = 140, desktop = 160 },
+	Size = { phone = 120, tablet = 120, desktop = 120 }, -- logical px, x UIScale
 	RangeStuds = 120,
 	Hz = 10,
 	LongPress = 0.5,
@@ -150,16 +274,26 @@ UI.Shrine = {
 
 UI.Mobile = {
 	Jump = 84,
-	Small = 64,
-	Ping = 48,
+	Action = 68, -- Slide, Capture
+	Ping = 52,
 	Gap = 12,
-	EdgeX = 20,
-	EdgeY = 24,
+	EdgeX = 8, -- from the safe-area edge
+	EdgeY = 8,
+	LabelHeight = 18,
 	ShowJump = true, -- TODO(avatar): hide the default Roblox jump button if we keep ours
-	KeyHints = {
-		KeyboardAndMouse = { Ultimate = "E" },
-		Gamepad = { Ultimate = "Y" },
-	},
+}
+
+UI.Victory = {
+	BannerSeconds = 0, -- 0 = stays until the player picks
+	CashOutKey = Enum.KeyCode.C,
+	KeepGoingKey = Enum.KeyCode.K,
+}
+
+UI.Capture = {
+	-- Optional remote (companion domain, contract request): CaptureState { state, progress, seconds, name }.
+	RemoteName = "CaptureState",
+	HoldSeconds = 2,
+	ResultSeconds = 2.5,
 }
 
 UI.Settings = {
@@ -199,33 +333,84 @@ UI.Stats = {
 
 -- Every UI string. Placeholders are named: {name}, {n}, {s}...
 UI.Strings = {
-	Level = { fr = "Nv", en = "Lv" },
-	LevelN = { fr = "Nv {n}", en = "Lv {n}" },
+	Level = { fr = "NV", en = "LV" },
+	LevelN = { fr = "NV {n}", en = "LV {n}" },
 	New = { fr = "NOUVEAU", en = "NEW" },
 	Companion = { fr = "Compagnon", en = "Companion" },
+	CompanionTag = { fr = "PET", en = "PET" }, -- short: fits next to LEGENDARY in a 150 px card header
 	Stunned = { fr = "sonné", en = "stunned" },
 	Tier = { fr = "Tier {n}", en = "Tier {n}" },
 	Stage = { fr = "Stage {n}", en = "Stage {n}" },
+	World = { fr = "MONDE {n} / {m}", en = "WORLD {n} / {m}" },
+	Overtime = { fr = "OVERTIME", en = "OVERTIME" },
+	Danger = { fr = "DANGER {n}", en = "DANGER {n}" },
 	FinalWave = { fr = "VAGUE FINALE {t}", en = "FINAL WAVE {t}" },
+	Ko = { fr = "KO", en = "KO" },
+	Best = { fr = "RECORD {n}", en = "BEST {n}" },
+	BestUnknown = { fr = "RECORD —", en = "BEST —" },
+	NewBest = { fr = "NOUVEAU RECORD !", en = "NEW BEST!" },
 	Downed = { fr = "À TERRE", en = "DOWNED" },
+	DownedTitle = { fr = "À TERRE !", en = "DOWNED!" },
 	DownedTimer = { fr = "À TERRE — {s} s", en = "DOWNED — {s} s" },
-	DownedHint = { fr = "Un coéquipier doit rester 3 s près de toi", en = "A teammate must stay near you for 3 s" },
+	DownedSeconds = { fr = "s pour être relevé", en = "s to be revived" },
+	DownedHint = { fr = "Un coéquipier doit rester 3 s près de toi.", en = "A teammate must stay 3 s next to you." },
+	ReviveBy = { fr = "Relève en cours · {p} %", en = "Being revived · {p}%" },
 	Ghost = { fr = "FANTÔME", en = "GHOST" },
-	GhostHint = { fr = "Tu peux encore charger les autels (25 %)", en = "You can still charge shrines (25%)" },
+	GhostTitle = { fr = "MODE FANTÔME", en = "GHOST MODE" },
+	GhostHint = { fr = "Tu peux encore aider : charge les autels (25 %) et pingue.", en = "You can still help: charge shrines (25% speed) and ping." },
+	GhostBack = { fr = "RETOUR AU MONDE SUIVANT", en = "BACK AT THE NEXT WORLD" },
 	TeammateDowned = { fr = "{name} est à terre !", en = "{name} is down!" },
 	PingFeed = { fr = "{name} : {ping}", en = "{name}: {ping}" },
-	Reroll = { fr = "Relancer ({n})", en = "Reroll ({n})" },
-	Skip = { fr = "Passer ({n})", en = "Skip ({n})" },
-	Ban = { fr = "Bannir ({n})", en = "Banish ({n})" },
+	LevelUp = { fr = "NIVEAU !", en = "LEVEL UP!" },
+	Reroll = { fr = "Relancer", en = "Reroll" },
+	Skip = { fr = "Passer", en = "Skip" },
+	Ban = { fr = "Bannir", en = "Banish" },
 	BanHint = { fr = "Touche une carte à bannir", en = "Tap a card to banish" },
+	BanTag = { fr = "BANNIR", en = "TAP TO BANISH" },
 	Cancel = { fr = "Annuler", en = "Cancel" },
+	-- Level-up window v3
+	LevelTitle = { fr = "NIVEAU {n} !", en = "LEVEL {n}!" },
+	Inventory = { fr = "INVENTAIRE", en = "INVENTORY" },
+	StatsTitle = { fr = "STATS", en = "STATS" },
+	WeaponsTitle = { fr = "ARMES", en = "WEAPONS" },
+	RunesTitle = { fr = "RUNES", en = "RUNES" },
+	ItemsTitle = { fr = "OBJETS", en = "ITEMS" },
+	NewTag = { fr = "NOUVEAU !", en = "NEW!" },
+	LevelFromTo = { fr = "Nv {a} → {b}", en = "Lv {a} → {b}" },
+	TapAgain = { fr = "TOUCHE ENCORE", en = "TAP AGAIN" },
+	Seconds = { fr = "{n} s", en = "{n}s" },
+	FrozenChoose = { fr = "Tout le monde est figé pendant ton choix", en = "Everyone is frozen while you choose" },
+	MateLeveled = { fr = "{name} MONTE DE NIVEAU !", en = "{name} LEVELED UP!" },
+	MatePicking = { fr = "{name} choisit une amélioration.", en = "{name} is picking an upgrade." },
+	FrozenBack = { fr = "Tout le monde est figé. Retour dans {n} s", en = "Everyone is frozen. Back in {n}s" },
+	MoreStats = { fr = "+{n} de plus", en = "+{n} more" },
 	ShrineCharge = { fr = "Autel {p} % · {n} joueur(s)", en = "Shrine {p}% · {n} player(s)" },
 	ShrineTitle = { fr = "Choisis un bonus d'autel", en = "Pick a shrine bonus" },
 	Ultimate = { fr = "Ultime", en = "Ultimate" },
-	Jump = { fr = "Saut", en = "Jump" },
-	Slide = { fr = "Glisser", en = "Slide" },
-	Ping = { fr = "Ping", en = "Ping" },
+	Jump = { fr = "SAUT", en = "JUMP" },
+	Slide = { fr = "GLISSER", en = "SLIDE" },
+	Ping = { fr = "PING", en = "PING" },
+	Capture = { fr = "CAPTURE", en = "CAPTURE" },
 	Distance = { fr = "{n} m", en = "{n} m" },
+	BossDistance = { fr = "BOSS {n} m", en = "BOSS {n} m" },
+	-- Capture
+	Capturing = { fr = "CAPTURE...", en = "CAPTURING..." },
+	CaptureHint = { fr = "Reste dans la cage. Ne te fais pas toucher !", en = "Stay in the cage. Don't get hit!" },
+	CaptureReset = { fr = "AÏE ! CAPTURE RATÉE", en = "OUCH! CAPTURE RESET" },
+	CaptureRetry = { fr = "Touché. Retourne dans la cage.", en = "You got hit. Step back in to retry." },
+	Captured = { fr = "CAPTURÉ !", en = "CAPTURED!" },
+	CaptureJoins = { fr = "{name} rejoint ta collection", en = "{name} joins your collection" },
+	CaptureSeconds = { fr = "{s} / {t} s", en = "{s} / {t} s" },
+	-- Victory
+	Victory = { fr = "VICTOIRE !", en = "VICTORY!" },
+	VictorySub = { fr = "Le dernier boss est tombé ! Tous les mondes sont finis.", en = "The last boss is down! All worlds cleared." },
+	CashOut = { fr = "Encaisser", en = "Cash out" },
+	KeepGoing = { fr = "Continuer", en = "Keep going" },
+	CashOutCaption = { fr = "Fin de la run, tu gardes tout.", en = "End the run, keep all your loot." },
+	KeepGoingCaption = { fr = "Overtime sans fin. Bats ton record de KO.", en = "Endless Overtime. Chase the KO record." },
+	CashOutPortal = { fr = "PORTAIL {n} m", en = "CASH OUT PORTAL {n} m" },
+	CashOutHold = { fr = "Restez 2 s dans le portail doré, toute l'équipe", en = "Whole team: stand 2 s in the gold portal" },
+	KoRun = { fr = "{n} KO", en = "{n} KO" },
 	-- Loadout
 	TabClass = { fr = "Classe", en = "Class" },
 	TabCompanion = { fr = "Compagnon", en = "Companion" },
@@ -239,19 +424,25 @@ UI.Strings = {
 	StartWeapon = { fr = "Arme : {w}", en = "Weapon: {w}" },
 	ChooseLoadout = { fr = "Choisis ta classe et ton compagnon", en = "Choose your class and companion" },
 	-- End screen
-	Victory = { fr = "VICTOIRE !", en = "VICTORY!" },
 	Defeat = { fr = "FIN DE LA RUN", en = "RUN OVER" },
+	EndSub = { fr = "Monde {w} · Overtime +{t} · Nv {l}", en = "World {w} · Overtime +{t} · Lv {l}" },
+	EndSubNoOvertime = { fr = "Monde {w} · Nv {l}", en = "World {w} · Lv {l}" },
 	Kills = { fr = "Ennemis vaincus", en = "Enemies defeated" },
 	Coins = { fr = "Pièces", en = "Coins" },
 	Shrines = { fr = "Autels", en = "Shrines" },
 	Chests = { fr = "Coffres", en = "Chests" },
 	Revives = { fr = "Relèves", en = "Revives" },
 	FinalWaveSec = { fr = "Vague Finale (s)", en = "Final Wave (s)" },
-	DamageByWeapon = { fr = "Dégâts par arme", en = "Damage per weapon" },
+	DamageByWeapon = { fr = "DÉGÂTS PAR ARME", en = "DAMAGE BY WEAPON" },
+	Rewards = { fr = "GAINS", en = "REWARDS" },
 	Quests = { fr = "Quêtes avancées", en = "Quest progress" },
 	QuestDone = { fr = "TERMINÉE", en = "DONE" },
-	Silver = { fr = "Étoiles d'argent : +{n}", en = "Silver stars: +{n}" },
-	Replay = { fr = "REJOUER", en = "PLAY AGAIN" },
+	QuestSteps = { fr = "+{n} étape(s) de quête", en = "+{n} quest step(s)" },
+	Silver = { fr = "+{n} Silver", en = "+{n} Silver" },
+	RankWeek = { fr = "cette semaine", en = "this week" },
+	RankReset = { fr = "reset le lundi", en = "resets Monday" },
+	Replay = { fr = "Rejouer", en = "Play again" },
+	Lobby = { fr = "Lobby", en = "Lobby" },
 	-- Settings
 	Settings = { fr = "Réglages", en = "Settings" },
 	Colorblind = { fr = "Mode daltonien", en = "Colorblind mode" },
@@ -265,8 +456,8 @@ UI.Strings = {
 	Close = { fr = "Fermer", en = "Close" },
 	Legend = { fr = "Légende de la carte", en = "Map legend" },
 	LegendText = {
-		fr = "Flèche blanche : toi · Chevron vert : coéquipier (+ = à terre) · Losange bleu : autel · Carré jaune : coffre · Rond rouge ! : boss",
-		en = "White arrow: you · Green chevron: teammate (+ = down) · Blue diamond: shrine · Yellow square: chest · Red circle !: boss",
+		fr = "Flèche blanche : toi · Chevron turquoise : coéquipier (+ = à terre) · Losange bleu : autel · Carré jaune : coffre · Étoile rose : capturable · Rond rouge ! : boss",
+		en = "White arrow: you · Teal chevron: teammate (+ = down) · Blue diamond: shrine · Yellow square: chest · Pink star: capturable · Red circle !: boss",
 	},
 }
 

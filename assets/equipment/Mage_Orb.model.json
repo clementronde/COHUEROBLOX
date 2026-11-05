@@ -1,0 +1,130 @@
+{
+ "className": "Accessory",
+ "children": [
+  {
+   "className": "MeshPart",
+   "properties": {
+    "MeshId": "rbxassetid://121605107426611",
+    "Size": [
+     2.0,
+     2.5,
+     2.0
+    ],
+    "InitialSize": [
+     2.0,
+     2.5,
+     2.0
+    ],
+    "Color": [
+     1,
+     1,
+     1
+    ],
+    "Anchored": false,
+    "CanCollide": false,
+    "CanQuery": false,
+    "CanTouch": false,
+    "CastShadow": false,
+    "Massless": true
+   },
+   "name": "Handle",
+   "attributes": {
+    "RefPartName": "LeftUpperArm",
+    "RefPartSize": {
+     "Vector3": [
+      1.001,
+      1.242,
+      1.002
+     ]
+    }
+   },
+   "children": [
+    {
+     "name": "LeftShoulderAttachment",
+     "className": "Attachment",
+     "properties": {
+      "CFrame": {
+       "position": [
+        1.25,
+        -1.25,
+        -0.0
+       ],
+       "orientation": [
+        [
+         1.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.0,
+         1.0,
+         0.0
+        ],
+        [
+         0.0,
+         0.0,
+         1.0
+        ]
+       ]
+      }
+     }
+    },
+    {
+     "name": "NeonCore",
+     "className": "Part",
+     "properties": {
+      "Size": [
+       0.5,
+       0.5,
+       0.5
+      ],
+      "Material": "Neon",
+      "Color": [
+       1.0,
+       0.47843137254901963,
+       0.10196078431372549
+      ],
+      "Anchored": false,
+      "CanCollide": false,
+      "CanQuery": false,
+      "CanTouch": false,
+      "Massless": true,
+      "CastShadow": false
+     },
+     "children": [
+      {
+       "name": "Weld",
+       "className": "Weld",
+       "properties": {
+        "C0": {
+         "position": [
+          0.0,
+          -0.25,
+          -0.0
+         ],
+         "orientation": [
+          [
+           1.0,
+           0.0,
+           0.0
+          ],
+          [
+           0.0,
+           1.0,
+           0.0
+          ],
+          [
+           0.0,
+           0.0,
+           1.0
+          ]
+         ]
+        }
+       }
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

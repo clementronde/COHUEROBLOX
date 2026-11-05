@@ -43,6 +43,8 @@ type Session = {
 	state: SessionState,
 	saving: boolean,
 	releasing: boolean,
+	-- Sauvegarde finale (départ ou fermeture) lancée : plus aucune mutation, jamais remis à false.
+	closing: boolean,
 	accountedAt: number,
 }
 
@@ -61,7 +63,7 @@ local releaseHooks: { (Player) -> () } = {}
 -- still mutable, so buffered changes (batched kill counters...) land in the snapshot.
 local function runReleaseHooks(player: Player)
 	local session = sessions[player]
-	if not session or session.state ~= "active" or session.releasing then
+	if not session or session.state ~= "active" or session.releasing or session.closing then
 		return
 	end
 	for _, hook in releaseHooks do
@@ -98,7 +100,7 @@ local function realBackend(store: GlobalDataStore): Backend
 		name = "DataStore",
 		update = function(key: string, transform: Transform): any
 			-- lihfolk-ignore: datastore-no-pcall -- every caller (tryClaim, save, releaseUnsaved) wraps backend.update in pcall
-			return store:UpdateAsync(key, transform)
+			return store:UpdateAsync(key, transform) -- fwjelaa-ignore: datastore-no-pcall (même raison : appelants sous pcall)
 		end,
 	}
 end
@@ -355,16 +357,28 @@ local function accountPlayTime(session: Session)
 	session.data.playSeconds = (tonumber(session.data.playSeconds) or 0) + math.floor(elapsed)
 end
 
--- Writes data (and optionally clears the lease). Fenced by the token. "saved" | "lost" | "error".
+-- Résultat d'une sauvegarde demandée sur une session qui n'est plus active.
+-- Audit S-04 : une session libérée a été écrite depuis un instantané pris AVANT les changements de
+-- cet appelant. Seul un appelant qui libérait lui aussi peut tenir son travail pour fait ; pour les
+-- autres (saveNow d'un reçu...) c'est "released", jamais "saved", sinon on acquitte un achat perdu.
+local function inactiveResult(session: Session, release: boolean): string
+	if session.state == "released" then
+		return if release then "saved" else "released"
+	end
+	return "lost"
+end
+
+-- Writes data (and optionally clears the lease). Fenced by the token.
+-- "saved" | "released" (déjà libérée, rien écrit pour cet appelant) | "lost" | "error".
 local function save(session: Session, release: boolean): string
 	if session.state ~= "active" then
-		return "lost"
+		return inactiveResult(session, release)
 	end
 	while session.saving do -- one write per profile at a time, in order
 		task.wait(0.1)
 	end
 	if session.state ~= "active" then
-		return if session.state == "released" then "saved" else "lost"
+		return inactiveResult(session, release)
 	end
 	session.saving = true
 	accountPlayTime(session)
@@ -461,7 +475,7 @@ local function startAutosave(player: Player)
 			if not session or session.state ~= "active" then
 				break
 			end
-			if not session.releasing then
+			if not session.releasing and not session.closing then
 				saveWithRetries(player, false, 1) -- a failed autosave waits for the next cycle
 			end
 			task.wait(CFG.AutosaveSeconds + math.random() * CFG.AutosaveJitter)
@@ -512,6 +526,7 @@ local function loadSession(player: Player): (LoadStatus, Session?)
 				state = "active",
 				saving = false,
 				releasing = false,
+				closing = false,
 				accountedAt = os.clock(),
 			}
 			return "ready", session
@@ -598,10 +613,21 @@ local function onPlayerAdded(player: Player)
 	activate(player, session)
 end
 
+-- Sauvegarde finale : les hooks d'abord (profil encore modifiable), puis plus aucune mutation avant
+-- l'instantané (audit S-04). Un reçu qui arrive ensuite reçoit NotProcessedYet et revient au
+-- prochain serveur, au lieu d'être accordé dans un profil qui ne sera plus jamais écrit.
+local function beginFinalSave(player: Player)
+	runReleaseHooks(player)
+	local session = sessions[player]
+	if session and session.state == "active" then
+		session.closing = true
+	end
+end
+
 local function onPlayerRemoving(player: Player)
 	saveQueued[player] = nil
 	autosaveEpoch[player] = (autosaveEpoch[player] or 0) + 1
-	runReleaseHooks(player)
+	beginFinalSave(player)
 	local session = sessions[player]
 	if session and session.state == "active" then
 		saveWithRetries(player, true, CFG.FinalSaveAttempts) -- final write + release the lease
@@ -679,7 +705,7 @@ end
 -- True when the profile can be changed and saved right now.
 function DataService.canMutate(player: Player): boolean
 	local session = sessions[player]
-	return session ~= nil and session.state == "active" and not session.releasing
+	return session ~= nil and session.state == "active" and not session.releasing and not session.closing
 end
 
 -- Live table, READ-ONLY, for the data domain's hot paths. Nil when no session.
@@ -705,7 +731,7 @@ end
 -- SaveNowAsync equivalent: yields, returns true only when the current state is durably written.
 function DataService.saveNow(player: Player): boolean
 	local session = sessions[player]
-	if not session or session.state ~= "active" or session.releasing then
+	if not session or session.state ~= "active" or session.releasing or session.closing then
 		return false
 	end
 	return saveWithRetries(player, false, 2)
@@ -783,14 +809,14 @@ function DataService.init()
 		if IS_STUDIO then
 			-- Studio: save but do not hold the window open. Leftover Studio leases are taken over.
 			for _, p in Players:GetPlayers() do
-				runReleaseHooks(p)
+				beginFinalSave(p)
 				task.spawn(saveWithRetries, p, true, 1)
 			end
 			task.wait(1)
 			return
 		end
 		for _, p in Players:GetPlayers() do -- parallel: sequential saves do not fit in 30 s
-			runReleaseHooks(p)
+			beginFinalSave(p)
 			task.spawn(saveWithRetries, p, true, 3)
 		end
 		local started = os.clock()
