@@ -385,9 +385,9 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 | ID | Tâche | Livrable | Dépend de | Priorité | Statut |
 | --- | --- | --- | --- | --- | --- |
 | A05-01 | Règles de la capture : cage, 2 s, interruption, sauvegarde | Note : `docs/dossier/40-compagnons.md` (APIs pour A03 §6.1 et A12 §3.2) |  | P0 — bloquant | À valider |
-| A05-02 | Refaire CompanionService : capture, collection, équipement, suivi et attaque | CompanionService | A05-01, A03-03 | P0 — bloquant | En cours |
+| A05-02 | Refaire CompanionService : capture, collection, équipement, suivi et attaque | CompanionService | A05-01, A03-03 | P0 — bloquant | À valider |
 | A05-03 | Une attaque et 2 à 3 cartes de technique par espèce | Config/Companions | A05-02 | P1 — lancement | À faire |
-| A05-04 | Tamer : 2 compagnons, capture plus rapide | CompanionService | A04-10 | P1 — lancement | À faire |
+| A05-04 | Tamer : 2 compagnons, capture plus rapide | CompanionService | A04-10 | P1 — lancement | À valider |
 | A05-05 | Emplacements de personnalisation : chapeaux, couleurs, auras | CompanionRenderer | A12-04 | P1 — lancement | À faire |
 
 ### A07 — VFX (vague 2)

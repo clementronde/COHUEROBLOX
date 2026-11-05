@@ -187,7 +187,7 @@ Règle « rien n'est construit par script » (`01-decisions-v2.md` §12) : `Comp
 | --- | --- | --- | --- |
 | `Companion_<espèce>` | `Assets.Creatures` | Le compagnon (maille unique, mise à la hauteur de l'ennemi × 0,8) | Repli sur `Enemy_<espèce>` (la maille de l'ennemi) |
 | `Enemy_<espèce>` | `Assets.Creatures` (déjà fourni par A01/A03) | Repli du compagnon | Compagnon invisible + avertissement |
-| `FX_CaptureCage` | `Assets.FX` | La cage au sol (modèle, mis à l'échelle du rayon 6) | Cage invisible ; la barre de CaptureUI reste |
+| `FX_CaptureCage` | `Assets.FX` | La cage au sol (modèle posé tel quel : à construire à 12 studs de large, rayon 6) | Cage invisible ; la barre de CaptureUI reste |
 | `FX_CaptureSuccess` | `Assets.FX` | Éclat de réussite, 1,5 s | Rien |
 | `FX_CompanionStun` | `Assets.FX` | Étoiles au-dessus d'un compagnon sonné | Rien |
 | `FX_CompanionHit` | `Assets.FX` | Impact d'une attaque (petite pièce, pool de 24) | Rien |
@@ -223,3 +223,8 @@ La cage clignote (transparence) pendant ses 3 dernières secondes. Le compagnon 
 - `docs/security/regles-v2.md` §0 et §3 (cage serveur, touché même bloqué, idempotence, plafond, aucun remote).
 - `docs/dossier/13-ennemis-boss.md` (roster v2, noms de mailles `Enemy_<nom>`, marqueur de capture d'A01).
 - Vault : *Pet Hatching and Following End to End* (suivi client, parts ancrées sans requête), *Snapshot Interpolation for Custom Replication*, *Paid Random Items and Odds Disclosure in Practice* (capture sans hasard ni paiement : hors du champ des objets aléatoires payants).
+
+## 13. Tests en Studio (`Companions.Debug`, jamais en jeu publié)
+
+- `TestSpecies` : un joueur sans compagnon valide reçoit cette espèce, pour voir le suivi.
+- `CageEveryNthKill = 15` : tant qu'A03 n'appelle pas `onCapturableDefeated`, un ennemi non boss sur 15 laisse une cage. Coupé dès le premier appel d'A03.
