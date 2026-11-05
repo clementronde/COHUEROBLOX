@@ -114,6 +114,15 @@ local Run = {
 	EliteHpMult = 6,
 	EliteSizeMult = 1.3,
 	MiniBossAt = { 180, 420 },
+	-- Variantes capturables (A03-03, dossier 40 §0-2). Marquées au spawn par EnemyService si
+	-- CompanionService.isSpecies(kind) ; Enemies[].captureChance remplace Chance espèce par espèce.
+	Capturable = {
+		Chance = 0.004, -- par apparition ordinaire (≈ 5 à 8 par monde de 10 min)
+		MiniBossChance = 0.25,
+		HpMult = 2.5, -- « plus résistante »
+		MaxAlive = 2, -- jamais plus de 2 à la fois : elles doivent rester rares et lisibles
+		FirstAt = 60, -- secondes après le début du monde
+	},
 
 	-- Ancien mode Survie v1 : remplacé par l'Overtime infini après le dernier boss (Keep going).
 	-- Les sélections de monde et de tier v1 (TierUnlock, SelectStage) n'ont plus d'effet sur la run.

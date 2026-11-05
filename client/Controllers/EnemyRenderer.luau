@@ -64,7 +64,11 @@ type Entry = {
 	tinted: boolean,
 	faceX: number,
 	faceZ: number,
+	marker: Marker?,
 }
+
+-- Aura + icône d'une variante capturable (A03-03) : gabarits FX_CaptureRing / FX_CaptureIcon.
+type Marker = { parts: { BasePart }, offsets: { CFrame } }
 
 type Projectile = {
 	id: number,
@@ -88,6 +92,11 @@ local projectilePool: { BasePart } = {}
 local latestTick = 0
 local visibleCount = 0
 local container: Folder
+
+-- Variantes capturables (remote EnemyCapturable, A03-03 ; hors EnemyCodec pour garder 7 octets)
+local capturableIds: { [number]: boolean } = {}
+local markerPools: { [number]: { Marker } } = {}
+local markerMissing = false
 
 local moveParts: { BasePart } = {}
 local moveCFrames: { CFrame } = {}
@@ -241,7 +250,50 @@ local function acquire(kind: number, lod: number, elite: boolean): Model
 	return m or buildModel(kind, lod, elite)
 end
 
+local function acquireMarker(kind: number, elite: boolean): Marker?
+	if markerMissing then
+		return nil
+	end
+	local pool = markerPools[poolKey(kind, 1, elite)]
+	local reused = pool and table.remove(pool)
+	if reused then
+		return reused
+	end
+	local def = Enemies[kind]
+	local s = if elite then Run.EliteSizeMult else 1
+	local parts, offsets = ArtLibrary.cloneCaptureMarker(def.height * ART_SCALE * s, def.radius * s * 1.6)
+	if not parts or not offsets then
+		markerMissing = true
+		warn("[EnemyRenderer] gabarits FX_CaptureRing / FX_CaptureIcon manquants : variantes capturables sans aura")
+		return nil
+	end
+	for _, part in parts do
+		part.CFrame = HIDDEN
+		part.Parent = container
+	end
+	return { parts = parts, offsets = offsets }
+end
+
+local function releaseMarker(e: Entry)
+	local mk = e.marker
+	if not mk then
+		return
+	end
+	e.marker = nil
+	for _, part in mk.parts do
+		part.CFrame = HIDDEN
+	end
+	local key = poolKey(e.kind, 1, e.elite)
+	local pool = markerPools[key]
+	if not pool then
+		pool = {}
+		markerPools[key] = pool
+	end
+	table.insert(pool, mk)
+end
+
 local function release(e: Entry)
+	releaseMarker(e)
 	local m = e.model
 	for k, part in m.parts do
 		part.CFrame = HIDDEN -- moving is cheaper than reparenting
@@ -540,6 +592,20 @@ local function render(dt: number)
 			moveParts[n] = part
 			moveCFrames[n] = if hidden then HIDDEN else (if k == m.groundIndex then base else modelBase) * m.offsets[k]
 		end
+		local wantsMarker = capturableIds[id] == true and e.lod <= 2
+		if wantsMarker and not e.marker then
+			e.marker = acquireMarker(e.kind, e.elite)
+		elseif not wantsMarker and e.marker then
+			releaseMarker(e)
+		end
+		local mk = e.marker
+		if mk then
+			for k, part in mk.parts do
+				n += 1
+				moveParts[n] = part
+				moveCFrames[n] = if hidden then HIDDEN else base * mk.offsets[k]
+			end
+		end
 		if not hidden then
 			drawn += 1
 		end
@@ -585,6 +651,11 @@ function EnemyRenderer.start()
 	Net.unreliable("EnemySnapshot").OnClientEvent:Connect(onSnapshot)
 	Net.unreliable("EnemyAttackVisual").OnClientEvent:Connect(onAttackVisual)
 	Net.event("EnemyProjectiles").OnClientEvent:Connect(onProjectiles)
+	Net.event("EnemyCapturable").OnClientEvent:Connect(function(id: unknown, on: unknown)
+		if type(id) == "number" then
+			capturableIds[id] = if on == true then true else nil
+		end
+	end)
 	RunService.PreRender:Connect(render)
 end
 

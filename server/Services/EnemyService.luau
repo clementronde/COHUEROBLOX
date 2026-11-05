@@ -91,13 +91,15 @@ local kbUntil: { number } = {}
 local maxHps: { number } = {}
 local hasteMult: { number } = {}
 local hasteUntil: { number } = {}
+-- Variante capturable (A03-03), marquée à l'apparition, jamais lue chez le client (remote à part)
+local capturable: { boolean } = {}
 
 local columns: { { any } } = {
 	ids, xs, zs, hps, kinds, states, targetOf :: any, dmgMult, sizeMult, external, lootElite,
 	actPhase, actT, actX, actZ, actOX, actOZ,
 	burnDps, burnUntil, burnSrc :: any, poisonDps, poisonUntil, poisonSrc :: any, dotNext,
 	slowMult, slowUntil, stopUntil, kbVX, kbVZ, kbUntil,
-	maxHps, hasteMult, hasteUntil,
+	maxHps, hasteMult, hasteUntil, capturable,
 }
 
 local indexOf: { [number]: number } = {} -- id -> index
@@ -110,6 +112,8 @@ local grid: { [number]: { number } } = {}
 local snapshot: UnreliableRemoteEvent
 local projectileRemote: RemoteEvent
 local attackVisualRemote: UnreliableRemoteEvent
+local capturableRemote: RemoteEvent
+local capturableAlive = 0
 
 -- Run director (set by RunManager) ---------------------------------------------------------
 local director = {
@@ -264,6 +268,7 @@ local function insertEnemy(kind: number, x: number, z: number, hp: number, dmg: 
 	actT[i] = os.clock() + math.random() * 2
 	maxHps[i] = hp
 	hasteMult[i], hasteUntil[i] = 1, 0
+	capturable[i] = false
 	actX[i], actZ[i], actOX[i], actOZ[i] = 0, 0, 0, 0
 	burnDps[i], burnUntil[i], burnSrc[i] = 0, 0, nil
 	poisonDps[i], poisonUntil[i], poisonSrc[i] = 0, 0, nil
@@ -277,6 +282,10 @@ end
 local function removeAt(i: number)
 	if countsTowardEliteCap(i) then
 		lootEliteAlive -= 1
+	end
+	if capturable[i] then
+		capturableAlive -= 1
+		capturableRemote:FireAllClients(ids[i], false)
 	end
 	indexOf[ids[i]] = nil
 	coinTimes[ids[i]] = nil
@@ -420,6 +429,29 @@ local function pickKind(elapsed: number): number
 	return withVariant(world, optionFamilies[k], optionKinds[k])
 end
 
+-- Variante capturable (A03-03, dossier 40 §6.1) : tirage au sort, puis CompanionService.isSpecies
+-- (pcall : sans CompanionService ou sans cette fonction, rien n'est capturable).
+local function rollCapturable(kind: number, def: Enemies.Def): boolean
+	local C = Run.Capturable
+	if def.isBoss or def.family == "Boss" or capturableAlive >= C.MaxAlive then
+		return false
+	end
+	if os.clock() - director.stageStart < C.FirstAt then
+		return false
+	end
+	local chance = def.captureChance or (if def.family == "MiniBoss" then C.MiniBossChance else C.Chance)
+	if chance <= 0 or math.random() >= chance then
+		return false
+	end
+	local companions = Registry.find("CompanionService")
+	local isSpecies = companions and (companions :: any).isSpecies
+	if type(isSpecies) ~= "function" then
+		return false
+	end
+	local ok, yes = pcall(isSpecies, kind)
+	return ok and yes == true
+end
+
 local function spawnScaled(kind: number, x: number, z: number, elite: boolean, hpMult: number, noLoot: boolean?): number?
 	local def = Enemies[kind]
 	if not def then
@@ -429,12 +461,22 @@ local function spawnScaled(kind: number, x: number, z: number, elite: boolean, h
 	if elite and def.family ~= "MiniBoss" then
 		hp *= Run.EliteHpMult
 	end
+	local catchable = rollCapturable(kind, def)
+	if catchable then
+		hp *= Run.Capturable.HpMult
+	end
 	local dmg = scaledDamage() * (if elite then Run.Player.EliteDamageMult else 1)
 	-- Règles anti-triche §5.2 : jamais inf ni NaN, même après des heures d'Overtime.
 	local cap = Run.Overtime.ValueCap
 	hp = if hp == hp then math.min(hp, cap) else cap
 	dmg = if dmg == dmg then math.min(dmg, cap) else cap
-	return insertEnemy(kind, x, z, hp, dmg, elite, false, noLoot)
+	local id = insertEnemy(kind, x, z, hp, dmg, elite, false, noLoot)
+	if id and catchable then
+		capturable[indexOf[id]] = true
+		capturableAlive += 1
+		capturableRemote:FireAllClients(id, true)
+	end
+	return id
 end
 
 -- Sends only cosmetic cues. Direction is flattened so effects stay aligned to the ground.
@@ -1047,7 +1089,8 @@ local function step(targets: { Target }, now: number)
 					removeN += 1
 					pendingRemove[removeN] = ids[i]
 				end
-			elseif now >= actT[i] and d <= (def.fuseRange or 6) + radiusOf(i) then
+			elseif now >= actT[i] and d <= (def.fuseRange or 6) + radiusOf(i) and not capturable[i] then
+				-- (une variante capturable n'explose pas : elle doit pouvoir finir en cage)
 				actPhase[i] = 1
 				actT[i] = now + (def.fuseTime or 1)
 				st = bit32.bor(st, BIT_ACTION)
@@ -1147,8 +1190,17 @@ function EnemyService.damage(id: number, amount: number, source: Player?): boole
 		if def.puddleRadius and not external[i] then
 			addPuddle(def, x, z, dmgMult[i]) -- Bloater : nappe laissée à sa mort
 		end
+		local wasCapturable = capturable[i]
 		removeAt(i)
 		Bus.EnemyKilled:fire(id, kind, x, z, source, isElite, hordeElite)
+		if wasCapturable then
+			-- Battue sous les coups : la cage (A05, dossier 40 §6.1). Jamais sur clearAll, dépop, explosion.
+			local companions = Registry.find("CompanionService")
+			local onDefeated = companions and (companions :: any).onCapturableDefeated
+			if type(onDefeated) == "function" then
+				pcall(onDefeated, kind, x, z, source)
+			end
+		end
 		return true
 	end
 	return false
@@ -1475,6 +1527,13 @@ function EnemyService.init()
 	snapshot = Net.unreliable("EnemySnapshot")
 	projectileRemote = Net.event("EnemyProjectiles")
 	attackVisualRemote = Net.unreliable("EnemyAttackVisual")
+	capturableRemote = Net.event("EnemyCapturable")
+end
+
+-- Vrai pour une variante capturable vivante (A03-03). Lecture serveur, pour CompanionService.
+function EnemyService.isCapturable(id: number): boolean
+	local i = indexOf[id]
+	return i ~= nil and capturable[i] == true
 end
 
 function EnemyService.start()
@@ -1482,6 +1541,13 @@ function EnemyService.start()
 	if not Registry.find("RunManager") then
 		EnemyService.beginStage(Run.DefaultWorld, 1, 1)
 	end
+	Players.PlayerAdded:Connect(function(player)
+		for i = 1, count do
+			if capturable[i] then
+				capturableRemote:FireClient(player, ids[i], true)
+			end
+		end
+	end)
 	local acc = 0
 	RunService.Heartbeat:Connect(function(dt)
 		acc += dt

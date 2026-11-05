@@ -91,6 +91,8 @@ export type Def = {
 	puddleTime: number?,
 	puddleDps: number?,
 	puddleSlow: number?,
+	-- Variante capturable (A03-03) : remplace Run.Capturable.Chance pour cette espèce (0 = jamais)
+	captureChance: number?,
 	-- Mini-boss
 	coinsPerHit: boolean?,
 	isBoss: boolean?,
