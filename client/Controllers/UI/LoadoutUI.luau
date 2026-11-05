@@ -312,7 +312,35 @@ local function refresh()
 	setSpin(open)
 end
 
+-- Lobby v3 (A09, 65-lobby.md §2) : quand ses gabarits sont posés dans la place, le hub (PLAY, barre
+-- des menus, menu Classes) remplace cet écran. LobbyController n'est pas encore dans l'ordre de
+-- client/Main.client.luau (demande au lead) : on le lance d'ici. Sans gabarits, l'ancien écran reste.
+local function startLobby(): boolean
+	local StarterGui = game:GetService("StarterGui")
+	local template = StarterGui:FindFirstChild("COHUE_Lobby") or LOCAL:WaitForChild("PlayerGui"):WaitForChild("COHUE_Lobby", 3)
+	if not template then
+		return false
+	end
+	local folder = script.Parent.Parent:FindFirstChild("Lobby")
+	local module = folder and folder:FindFirstChild("LobbyController")
+	if not module or not module:IsA("ModuleScript") then
+		warn("[LoadoutUI] COHUE_Lobby est posé mais Controllers.Lobby.LobbyController manque : ancien écran de choix")
+		return false
+	end
+	local ok, controller = pcall(require, module)
+	if not ok or type(controller) ~= "table" or type(controller.start) ~= "function" then
+		warn(`[LoadoutUI] LobbyController : {controller}`)
+		return false
+	end
+	Registry.register("LobbyController", controller)
+	task.spawn(controller.start)
+	return true
+end
+
 function LoadoutUI.start()
+	if startLobby() then
+		return
+	end
 	bgGui = UITheme.screen("COHUE_LoadoutBg", 39, Enum.ScreenInsets.None)
 	local bg = UITheme.new("Frame", { Size = UDim2.fromScale(1, 1), BorderSizePixel = 0 }, bgGui)
 	UITheme.paint(bg, "BackgroundColor3", "Panel")
