@@ -154,7 +154,7 @@ local function visualOf(kind: number): Visual
 	end
 	local def = Enemies[kind]
 	local name = def.asset or ("Enemy_" .. def.name)
-	local template = ArtLibrary.find(name)
+	local template = ArtLibrary.find(name) or (def.legacyAsset and ArtLibrary.find(def.legacyAsset))
 	if not template then
 		warnOnce(name, `[EnemyRenderer] modèle manquant : Assets.Creatures.{name} (dossier 13 §9.1) ; Enemy_Placeholder à la place s'il existe`)
 		template = ArtLibrary.find("Enemy_Placeholder")

@@ -36,6 +36,7 @@ export type Def = {
 	contactDamage: number,
 	xp: number,
 	asset: string?, -- gabarit visuel (voir l'en-tête)
+	legacyAsset: string?, -- ancien modèle de la place, utilisé tant que `asset` manque
 	armor: number?, -- damage reduction 0..1 (Armored)
 	weight: number?, -- separation weight (Armored push others)
 	knockbackMult: number?,
