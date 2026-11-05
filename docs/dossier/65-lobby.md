@@ -59,7 +59,22 @@ Maquette de structure : écran 0 du [Figma](https://www.figma.com/design/cdIWE7A
 | Réglages | haut droite | 44 × 44 | Bouton engrenage de A08 |
 | Joystick, Saut | bas gauche, bas droite | Roblox | Rien de notre UI dessous |
 
-**Couleurs** : un bouton de la barre, l'en-tête de son menu et son bâtiment partagent la même couleur (variables `zone/*` de A08). Les couleurs de la barre v3 de A08 diffèrent encore des `zone/*` (par exemple Class violet contre `zone/classes` turquoise) : à aligner par A08.
+**Couleurs** : un bouton de la barre, l'en-tête de son menu et son bâtiment partagent la même couleur (variables `zone/*` de A08 ; barre v3 alignée par A08 le 5 nov., commit 621e34f de sa branche).
+
+| Menu | Couleur | Variable |
+| --- | --- | --- |
+| Classes | turquoise | `zone/classes` |
+| Critters | vert lime | `zone/critters` |
+| Upgrades | violet | à créer : `zone/upgrades` |
+| Inventory | acier | à créer : `zone/inventory` |
+| Quests | bleu | `zone/quests` |
+| Ranks | or | `zone/ranks` |
+| Pass | ciel | à créer : `zone/pass` |
+| Shop | mandarine | `zone/shop` |
+| Queue & Party, portail | violet | `zone/play` |
+| Settings | gris | `zone/settings` |
+
+Le bouton PLAY reste **vert** : c'est l'action principale (rôle Go), pas une zone. Les fenêtres v3 de A08 n'ont que 5 couleurs (Gold, Sky, Leaf, Tomato, Plum) : il faut que l'en-tête de `Window` suive la zone de son menu (demande à A08).
 
 **Pastilles de nombre** (rouges, sur l'icône) : seulement pour une chose à voir qui ne coûte rien. Quêtes terminées, nouveau compagnon capturé, amélioration abordable avec l'argent gagné. **Jamais sur Shop ni Pass.**
 
