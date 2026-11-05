@@ -27,19 +27,27 @@ local Balance = {
 	HpPerExtraPlayer = 0.6, -- doc 5.2
 	SwarmShare = 0.8, -- share of spawns that are the basic swarm kind (doc 9.1)
 
-	-- Network (doc 12.2)
-	InterestRadiusNear = 80, -- sent every tick
-	InterestRadiusFar = 160, -- sent every FarSendEveryNTicks; must cover the farthest LOD band
-	FarSendEveryNTicks = 3,
+	-- Network (doc 12.2 ; PERF-01, A03-v3) : chaque client reçoit à chaque tick ses SnapshotNearCount
+	-- ennemis les plus proches (et ceux qui agissent : préparation, saut, état qui change, boss), le
+	-- reste à moins de InterestRadiusNear un tick sur NearRestEveryNTicks, et jusqu'à
+	-- InterestRadiusFar un tick sur FarSendEveryNTicks (étalés par id).
+	InterestRadiusNear = 80,
+	InterestRadiusFar = 160, -- must cover the farthest LOD band
+	SnapshotNearCount = 48,
+	NearRestEveryNTicks = 4,
+	FarSendEveryNTicks = 8,
 	ChunkMaxBytes = 900, -- UnreliableRemoteEvent drops payloads over 1,000 bytes
 	PositionScale = 4, -- quantization: 1/4 stud, i16 range = +/- 8191 studs
+	AttackVisualRadius = 90, -- EnemyAttackVisual : seulement aux joueurs à moins de ce rayon (boss : x1,6)
 
 	-- Client
-	ClientStaleTicks = 7, -- drop an enemy not seen for this many ticks (> FarSendEveryNTicks * 2)
+	-- Drop an enemy not seen for this many ticks (> FarSendEveryNTicks * 2). Les morts partent tout de
+	-- suite (liste removed d'EnemyCodec) : ce délai ne sert qu'aux ennemis qui sortent du rayon.
+	ClientStaleTicks = 18,
 
 	-- Debug / perf gate (doc 14, phase 0: 150 enemies at 60 fps on a mid-range phone)
 	Debug = {
-		ForceAlive = nil :: number?, -- set to e.g. 150 to hold a fixed count for the perf test
+		ForceAlive = nil :: number?, -- set to e.g. 150 to hold a fixed count for the perf test (borné par MaxEnemies, avertissement sinon : QA-01)
 		ShowStats = game:GetService("RunService"):IsStudio(), -- never on live servers
 	},
 }

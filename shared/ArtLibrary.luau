@@ -2,8 +2,9 @@
 -- Art templates (lead). ReplicatedStorage.Assets holds ready-made meshes:
 --   Assets/Creatures  enemies, bosses, companions generated in Studio (ids in assets/creatures.csv)
 --   Assets/Pack       models imported from the LihFolk Asset Pack (assets/pack-manifest.csv)
--- Renderers ask for a template by name and fall back to their procedural parts when it is
--- missing, so the game always runs (Studio test place, live place, or no assets at all).
+--   Assets/FX         effect objects (ArtLibrary.fx)
+-- Renderers ask for a template by name and clone it. Nothing visible is built by script (décisions
+-- v2 §12) : a missing template is reported once by the caller, which then draws nothing.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -81,6 +82,64 @@ function ArtLibrary.clonePart(name: string, height: number?): (BasePart?, Vector
 		part.Size = part.Size * (height / part.Size.Y)
 	end
 	return part, part.Size
+end
+
+-- Objet d'effet sous ReplicatedStorage.Assets.FX, par chemin pointé ("Enemies.Telegraphs.Circle").
+-- Mis en cache (y compris l'absence) : à appeler librement.
+local fxCache: { [string]: Instance | false } = {}
+
+function ArtLibrary.fx(path: string): Instance?
+	local hit = fxCache[path]
+	if hit ~= nil then
+		return if hit then hit else nil
+	end
+	local node: Instance? = root()
+	node = node and node:FindFirstChild("FX")
+	for _, name in string.split(path, ".") do
+		node = node and node:FindFirstChild(name)
+	end
+	fxCache[path] = node or false
+	return node
+end
+
+-- Clone d'un modèle posé à sa taille finale (étape 4, dossier 13 §9.1) : chaque BasePart avec son
+-- décalage depuis le pivot du modèle (pieds au sol, avant vers -Z), prêts pour BulkMoveTo. La
+-- PrimaryPart invisible (Root) n'est pas rendue. `scale` (élites x1,3) passe par Model:ScaleTo sur la
+-- copie, une fois, à la création du pool. Les enfants (SurfaceAppearance, ParticleEmitter...) restent.
+-- Un template BasePart seul donne une pièce avec un décalage nul (son centre est le pivot).
+function ArtLibrary.clonePivoted(template: Instance, scale: number?): ({ BasePart }, { CFrame })
+	local parts: { BasePart } = {}
+	local offsets: { CFrame } = {}
+	if template:IsA("BasePart") then
+		local p = template:Clone()
+		prep(p)
+		if scale and scale ~= 1 then
+			p.Size *= scale
+		end
+		parts[1], offsets[1] = p, CFrame.identity
+		return parts, offsets
+	end
+	if not template:IsA("Model") then
+		return parts, offsets
+	end
+	local model = template:Clone()
+	if scale and scale ~= 1 then
+		model:ScaleTo(model:GetScale() * scale)
+	end
+	local pivot = model:GetPivot()
+	local primary = model.PrimaryPart
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") and d ~= primary then
+			prep(d)
+			table.insert(parts, d)
+			table.insert(offsets, pivot:ToObjectSpace(d.CFrame))
+		end
+	end
+	for _, p in parts do
+		p.Parent = nil
+	end
+	model:Destroy()
+	return parts, offsets
 end
 
 -- Multi-part model clone (pack imports), scaled so its height equals `height`.
