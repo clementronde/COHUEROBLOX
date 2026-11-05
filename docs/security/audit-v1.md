@@ -11,6 +11,32 @@ Agent A11 (anti-triche et sécurité), 4 nov. 2026. Code audité : commit `ef662
 | Moyenne | 4 | 1 (S-06) | 0 (prévue en vague 2, voir `regles-v2.md`) |
 | Basse | 7 | 3 (S-11, S-13, S-15) | 0 |
 
+## Statut dans main au 5 nov. 2026
+
+Revérifié par A11 dans le code de main (`851322e`, après les fusions A04 `a1e45bb` et A06 `f09a58f`), puis sur la branche `claude/a11-failles`.
+
+| ID | Statut | Preuve dans le code |
+| --- | --- | --- |
+| S-01 | **Corrigé** (A06 + A04) | `Movement.luau` `Guard.HoverEnforce = true`, `FlyHeight = 12` / `FlyTime = 2`, `RiseMargin`, `MaxAirTime = 4` ; dégâts subis avec la hauteur du sol après 1,5 s en l'air (`RunManager.getDamageFeetY`, `Run.Player.AirHeight` / `AirGroundAfter`) |
+| S-02 | **Corrigé** (A06 + A04) | Pas borné pendant une exemption (`ExemptBoundFactor`, `ExemptLaunchStuds`), grâce d'apparition ancrée (`graceAnchor`), tremplin une fois par atterrissage ; reset ou chute en run = mise à terre serveur (`RunManager.onCharacterDied`) |
+| S-03 | **Corrigé** (A06) | `Guard.Margin = 1.06`, `LeakPerSecond = 1.5` ; bonus de hop ou de glissade seulement s'il est validé par le serveur (`hopBonusAllowed`, `slideSpeed`) |
+| S-04 | **Corrigé** (A11, dans main depuis `dd65a9c`) | `DataService.save` renvoie `"released"` à un appelant qui ne libère pas |
+| S-05 | **Corrigé** (A04) | Invulnérabilité par source (`RunManager.setInvulnerable` / `clearInvulnerable`), retirée par `CardService.closeOffer`, plafonnée à 30 % du temps de run + 10 s (`Run.Player.InvulnCapShare`, `InvulnCapGrace`). Reste : le ralentissement de 8 s n'est pas retiré au choix (gêne de jeu, pas une faille) |
+| S-06 | En cours (A12) | Classement v2 « KO en une run » en cours de réécriture dans `ProgressionService` par A12. Non relu tant que la branche n'est pas poussée |
+| S-07 | **Corrigé** (A04) | `WeaponService.gather` : vitesse = déplacement mesuré par le serveur ; en l'air = attribut `Airborne` posé par MovementGuard. Plus aucun `FloorMaterial` lu côté serveur |
+| S-08 | **Corrigé** (A06) | `SlideStart` validé au sol avec vitesse mesurée (`SlideValidateInterval = 1.5`), `Hop` crédité seulement après un sol vu (`HopLandWindow`) |
+| S-09 | **Fermé par la v2** (A04) | `RunManager.startRun` ignore `selectedWorld` / `selectedTier` : en mode une place la run part toujours du monde 1, tier 1. `SelectStage` ne change plus qu'un état inutilisé. En mode lobby, `MatchService.startRun` exige que **chaque** membre ait débloqué le tier (`MatchService.luau:269`). Le « carry » de tier n'existe donc plus. Aucun code changé par A11 |
+| S-10 | En cours (A12) | Domaine data |
+| S-11 | **Corrigé** (A11, `claude/a11-failles`) | `Net.publish` branche un écouteur puits sur chaque remote sans handler et compte les appels (`Net.getStrayCalls`, avertissement à 20) |
+| S-12 | **Corrigé** (A04) | `RunManager.lobbyConfig` : en mode lobby, tier et membres viennent de `MatchService.getRunConfig()`, `SelectStage` est ignoré |
+| S-13 | **Corrigé** par S-01 à S-03 | Rien à changer dans LootService et ShrineService |
+| S-14 | **Corrigé** (A06) | `MovementGuard` multiplie la vitesse permise par `SlowMult` tant que `SlowUntil` n'est pas passé |
+| S-15 | En cours (A12) | Le correctif DataService (`lastSaveAt` écrit seulement si `sessions[player] == session`) est dans le worktree d'A12, identique à celui prévu ici ; la partie `ProgressionService.writeBoards` (`lastWritten`) tombe avec la réécriture des classements (S-06). A11 n'y touche pas pour éviter un conflit ; à vérifier à la revue de la branche A12 |
+
+| S-16 | **Corrigé** (A11, `claude/a11-failles`) | Nouvelle, Moyenne. `RunManager.onCharacterDied` (correctif S-02 d'A04) faisait réapparaître le joueur à `root.Position`, valeur du client : se téléporter puis se tuer (Reset) = réapparaître n'importe où (cage, autel, arène), sans strike puisque le téléport de réapparition est imposé par le serveur. Il prend maintenant `MovementGuard.getLastValidPosition` (dernière position au sol validée), `root.Position` seulement en secours |
+
+Hard gate « serveur autoritaire » : **réussi** depuis S-01 (le Y du client ne protège plus des dégâts après 1,5 s en l'air). À confirmer en Play avec les scripts de `docs/security/tests-exploits.md` (A11-06).
+
 ## Méthode
 
 1. Checker fwjelaa (`fwjelaa-check.sh --scan`) sur `shared/`, `server/`, `client/` : 75 fichiers, 1 erreur, 1 alerte, 6 infos. Les 8 sont des faux positifs (liste en fin de document).
