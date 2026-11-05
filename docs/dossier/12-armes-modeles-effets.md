@@ -543,7 +543,7 @@ Commités :
 
 **Import dans COHUE** (téléversement sur le compte de Clément, avec son accord ; passage dans Studio annoncé au coordinateur) :
 1. Régénérer si besoin : `blender -b --factory-startup --python assets/a14/export.py -- glb,pack assets/a14/out`, puis `python assets/a14/make_install.py`.
-2. Dans Studio, place COHUE, faire **un seul Import 3D** de `assets/a14/out/A14_Weapons.glb` (64 mailles : 35 corps et 29 parties Neon). Réglages :
+2. Dans Studio, place COHUE, faire **un seul Import 3D** de `assets/a14/out/A14_Weapons.glb` (86 mailles : 35 corps, 29 parties Neon et 22 formes d effets). Réglages :
    - Scale Unit = Studs ;
    - Upload to Roblox activé ;
    - Merge Meshes désactivé ;
