@@ -1408,8 +1408,8 @@ function CompanionService.init()
 			o.stateDirty = true
 		end
 	end)
-	-- « Touché » : Bus.PlayerHit (tout coup reçu, même bloqué) quand le lead et A04 l'ajoutent ;
-	-- en attendant, Bus.PlayerDamaged (seulement les coups qui font des dégâts).
+	-- « Touché » : Bus.PlayerHit (A04-v3 : tout coup reçu, même bloqué, tiré au début de
+	-- RunManager.damagePlayer). Repli sans lui : Bus.PlayerDamaged (seulement les coups qui font des dégâts).
 	local busAny = Bus :: any
 	if busAny.PlayerHit and type(busAny.PlayerHit.connect) == "function" then
 		busAny.PlayerHit:connect(onHit)
@@ -1417,6 +1417,26 @@ function CompanionService.init()
 		warnOnce("hit", "Bus.PlayerHit missing: blocked hits do not interrupt captures yet")
 	end
 	Bus.PlayerDamaged:connect(onHit)
+	-- Gel du passage de niveau (A04-v3, RunManager.isFrozen lu à chaque tic) : à la reprise,
+	-- Bus.RunFrozen(false, pausedSeconds) décale les minuteries en temps réel (sonné, blocage après un coup).
+	if busAny.RunFrozen and type(busAny.RunFrozen.connect) == "function" then
+		busAny.RunFrozen:connect(function(frozen: any, pausedSeconds: any)
+			if frozen ~= false or type(pausedSeconds) ~= "number" or pausedSeconds <= 0 or pausedSeconds ~= pausedSeconds then
+				return
+			end
+			local now = os.clock()
+			for _, o in owners do
+				if o.stunnedUntil > now - pausedSeconds then
+					o.stunnedUntil += pausedSeconds
+				end
+			end
+			for _, a in attempts do
+				if a.lockUntil > now - pausedSeconds then
+					a.lockUntil += pausedSeconds
+				end
+			end
+		end)
+	end
 	Bus.PlayerDowned:connect(function(player: Player)
 		local o = owners[player]
 		if o then

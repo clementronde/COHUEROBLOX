@@ -26,7 +26,7 @@ Fichiers du domaine : `server/Services/CompanionService.luau`, `shared/Config/Co
 | Règle | Valeur (`Companions.Capture`) |
 | --- | --- |
 | Création | **Uniquement côté serveur**, quand `EnemyService` appelle `CompanionService.onCapturableDefeated` pour un ennemi marqué capturable **à son apparition** (jamais sur un `clearAll`, un changement de monde, une fin de run ou un dépop) |
-| Durée de vie | `CageSeconds = 10` s après la mort. Le compte à rebours s'arrête pendant un gel coop (`RunManager.isFrozen`, si A04 l'expose) |
+| Durée de vie | `CageSeconds = 10` s après la mort. Le compte à rebours s'arrête pendant le gel du passage de niveau (`RunManager.isFrozen`, A04-v3) ; les compagnons et la barre de capture aussi, et `Bus.RunFrozen(false, s)` décale les minuteries « sonné » et « blocage après un coup » |
 | Rayon « dedans » | `Radius = 6` studs, test 2D, plus une tolérance verticale de `VerticalTolerance = 6` studs entre les pieds du joueur et le sol de la cage |
 | Durée de capture | `HoldSeconds = 2` s ; Tamer : `HoldSeconds ÷ Passives.Tamer.captureSpeed` (1,5) |
 | Coop | **Une cage commune, une capture par joueur** : chaque joueur de la run peut capturer la créature dans la même cage, chacun avec sa propre barre. Personne ne vole la créature d'un coéquipier (recommandation A11 §3.3, à confirmer par Clément). La cage disparaît à 10 s, ou plus tôt si tous les joueurs de la run l'ont capturée |
@@ -56,7 +56,7 @@ La barre **retombe à 0** si :
 Touché = **tout coup reçu** : contact, projectile, attaque de boss, **même bloqué** par l'invulnérabilité, l'esquive, le bouclier ou la parade (`regles-v2.md` §3.1.4). L'invulnérabilité ne doit pas aider à capturer.
 
 - Source voulue : un événement `Bus.PlayerHit(player, source)` tiré par `RunManager.damagePlayer` **avant** les tests d'invulnérabilité, de parade et d'esquive (contract request, section 10).
-- Repli tant qu'il n'existe pas : `Bus.PlayerDamaged` (ne voit que les coups qui font des dégâts : un coup bloqué n'interrompt pas encore la capture, trou connu).
+- Repli tant qu'il n'est pas dans main : `Bus.PlayerDamaged` (ne voit que les coups qui font des dégâts : un coup bloqué n'interrompt pas encore la capture, trou connu).
 
 ### 2.3 Rien côté client
 
@@ -246,8 +246,8 @@ Hors run, `CompanionRenderer` affiche la collection du joueur local, sans rien d
 
 | Pour | Demande |
 | --- | --- |
-| Lead (`server/Bus.luau`) + A04 (`RunManager.damagePlayer`) | `Bus.PlayerHit(player, source: string)`, tiré au début de `damagePlayer` pour tout coup reçu par un joueur actif, **avant** invulnérabilité, parade, esquive et bouclier |
-| A04 (`RunManager`) | `RunManager.isFrozen() -> boolean` pendant le gel coop du choix de carte (les cages et les compagnons se mettent en pause) |
+| Lead + A04 | ~~`Bus.PlayerHit`~~ : fait sur `claude/a04-v3` (6d7f564), à fusionner |
+| A04 | ~~`RunManager.isFrozen()`~~ et `Bus.RunFrozen` : faits sur `claude/a04-v3` (6d7f564), à fusionner |
 | A03 (`EnemyService`) | Appeler `isSpecies` au spawn et `onCapturableDefeated` à la mort d'un capturable (6.1) |
 | A12 (`ProgressionService`) | `grantCapture`, `getCompanionLoadout`, `hasCompanion`, `profile.companions`, `SelectLoadout` à 2 compagnons, payload `Profile`, clés de quêtes (sections 3 et 9) |
 | A08 (`CaptureUI`) | Gérer l'état `Refused` (`reason = "Cap"` : « Collection full for this run », `"Unavailable"` : « Can't save right now ») et `isNew` (« NEW! ») ; le bouton Capture mobile n'envoie rien |
