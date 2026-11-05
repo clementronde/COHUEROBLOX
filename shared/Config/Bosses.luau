@@ -1,5 +1,5 @@
 --!strict
--- Bosses (docs/dossier/20-run-mondes-boss.md section 5).
+-- Bosses (docs/dossier/20-run-mondes-boss.md section 5, dossier 13 §4 et §11.5).
 -- Every telegraph >= MinTelegraph and passes R <= 16 * (windup - 0.25) unless noted (vault:
 -- "Combat Arena and Encounter Layout", "Boss Animation and Phases").
 
@@ -32,11 +32,12 @@ export type Attack = {
 	speed: number?, -- projectile speed (Fan)
 	summonKind: number?, -- enemy kind; 0 = world elites
 	projectile: string?, -- Fan : objet Assets.FX.Bosses.<fxFolder>.<projectile> (sinon Assets.FX.Enemies.Projectiles.Default)
+	fx: string?, -- objet d'impact Assets.FX.Bosses.<fxFolder>.<fx>, posé par BossRenderer à l'impact (facultatif)
 	whileRooted: boolean?, -- the only attacks the Oak uses while rooted
 }
 
 export type Weakness = {
-	kind: "Height" | "Pillar" | "Platform",
+	kind: "Height" | "Pillar" | "Platform" | "None", -- None : pas de point faible
 	label: Types.LocalizedText,
 	minPhase: number,
 	every: number?, -- Height: root cycle
@@ -78,6 +79,7 @@ local Bosses = {
 	ControlStunMult = 0.25, -- Freeze/Stun from weapons last 25 % on bosses
 	SendHz = 10,
 	GlobalAttackGap = 1.2, -- seconds between two attack starts
+	AnnounceAttacks = 1.5, -- s de bannière au premier usage de chaque attaque dans un combat (0 = jamais)
 	ChestPerPlayer = true,
 	Colors = {
 		Normal = Color3.fromRGB(255, 60, 50),
@@ -86,6 +88,13 @@ local Bosses = {
 	},
 	List = {} :: { [string]: Boss },
 }
+
+-- Boss v2 : 3 attaques de phase 1 chacun, rien d'autre (PhaseEnabled = false). Dégâts de base du
+-- monde 1 : BossService les multiplie par EnemyService._damageScale (Run.WorldScaling[].damage :
+-- x1,35 au monde 2, x1,8 au monde 3, plus l'Overtime). Repères : PV joueur ~130 à la fin du monde 1,
+-- ~170 au 2, ~220 au 3 ; un coup encaissé = 12 à 18 % des PV, un éventail entier encaissé ~35 %.
+-- Cadence : une attaque toutes les 2,2 à 3 s (préparation + GlobalAttackGap), au hasard parmi
+-- celles dont la recharge est finie.
 
 Bosses.List.GrandCheneRonchon = {
 	id = "GrandCheneRonchon",
@@ -97,12 +106,12 @@ Bosses.List.GrandCheneRonchon = {
 	moveSpeed = 3,
 	contactDamage = 20,
 	attacks = {
-		{ id = "RacinesSismiques", label = { en = "Quake Roots", fr = "Quake Roots" }, kind = "TargetCircle", minPhase = 1, windup = 1.0, cooldown = 5, damage = 25, radius = 8, whileRooted = true },
-		{ id = "PluieDeGlands", label = { en = "Acorn Rain", fr = "Acorn Rain" }, kind = "MultiCircle", minPhase = 1, windup = 1.2, cooldown = 8, damage = 18, radius = 5, count = 5 },
-		{ id = "OndeEcorce", label = { en = "Bark Wave", fr = "Bark Wave" }, kind = "Ring", minPhase = 1, windup = 1.5, cooldown = 10, damage = 30, inner = 10, radius = 30 },
-		{ id = "Rejetons", label = { en = "Saplings", fr = "Saplings" }, kind = "Summon", minPhase = 2, windup = 1.0, cooldown = 15, radius = 6, count = 6, summonKind = 1 },
+		{ id = "RacinesSismiques", label = { en = "Get Off My Lawn!", fr = "Get Off My Lawn!" }, kind = "TargetCircle", minPhase = 1, windup = 1.0, cooldown = 5, damage = 20, radius = 8, fx = "RootBurst", whileRooted = true },
+		{ id = "PluieDeGlands", label = { en = "Acorn Drizzle", fr = "Acorn Drizzle" }, kind = "MultiCircle", minPhase = 1, windup = 1.2, cooldown = 8, damage = 15, radius = 5, count = 5, fx = "Acorn" },
+		{ id = "OndeEcorce", label = { en = "Leaf Me Alone!", fr = "Leaf Me Alone!" }, kind = "Ring", minPhase = 1, windup = 1.5, cooldown = 10, damage = 24, inner = 10, radius = 30, fx = "BarkWave" },
 	},
 	weakness = {
+		-- Endormie : minPhase 2 n'arrive pas tant que PhaseEnabled = false (boss simple).
 		kind = "Height",
 		label = { en = "The oak takes root: climb its branches!", fr = "The oak takes root: climb its branches!" },
 		minPhase = 2,
@@ -114,29 +123,23 @@ Bosses.List.GrandCheneRonchon = {
 	},
 }
 
-Bosses.List.PharaonGrillePain = {
-	id = "PharaonGrillePain",
+-- Monde 2 (cimetière) : remplace le Pharaon-Grille-Pain v1 (même kind 17, modèle Boss_HungryCoffin).
+Bosses.List.CercueilAffame = {
+	id = "CercueilAffame",
 	kind = 17,
-	asset = "Boss_HungryCoffin", -- boss v2 du monde 2 (attaques v2 avec A03-06)
+	asset = "Boss_HungryCoffin",
 	fxFolder = "HungryCoffin",
-	name = { en = "The Toaster Pharaoh", fr = "The Toaster Pharaoh" },
+	name = { en = "The Hungry Coffin", fr = "The Hungry Coffin" },
 	hp = 6000,
 	moveSpeed = 6,
 	contactDamage = 20,
 	attacks = {
-		{ id = "TartinesBrulantes", label = { en = "Burning Toast", fr = "Burning Toast" }, kind = "Line", minPhase = 1, windup = 1.0, cooldown = 5, damage = 22, width = 6, length = 40 },
-		{ id = "Miettes", label = { en = "Crumbs", fr = "Crumbs" }, kind = "Fan", minPhase = 1, windup = 0.6, cooldown = 6, damage = 10, radius = 5, count = 7, spread = 60, speed = 18, projectile = "Bone" },
-		{ id = "GrilleArdente", label = { en = "Red-Hot Grill", fr = "Red-Hot Grill" }, kind = "SelfCircle", minPhase = 2, windup = 1.2, cooldown = 9, damage = 30, radius = 14 },
-		{ id = "Momification", label = { en = "Mummify", fr = "Mummify" }, kind = "Summon", minPhase = 2, windup = 1.0, cooldown = 15, radius = 6, count = 5, summonKind = 5 },
-		{ id = "Ruee", label = { en = "Rush", fr = "Rush" }, kind = "Charge", minPhase = 3, windup = 1.2, cooldown = 8, damage = 28, width = 8, length = 50 },
+		{ id = "CroqueCouvercle", label = { en = "Snack Time!", fr = "Snack Time!" }, kind = "TargetCircle", minPhase = 1, windup = 1.0, cooldown = 5, damage = 18, radius = 8, fx = "LidChomp" },
+		{ id = "CrachatDOs", label = { en = "Bone Appetit", fr = "Bone Appetit" }, kind = "Fan", minPhase = 1, windup = 1.0, cooldown = 6, damage = 8, radius = 5, count = 7, spread = 60, speed = 18, projectile = "Bone" },
+		-- Largeur 14 = 2 x (rayon du corps 5 + 2) : la zone touchée pendant la ruée (stepCharge) tient dans la ligne.
+		{ id = "RueeAffamee", label = { en = "Late for Dinner!", fr = "Late for Dinner!" }, kind = "Charge", minPhase = 1, windup = 1.2, cooldown = 9, damage = 22, width = 14, length = 45 },
 	},
-	weakness = {
-		kind = "Pillar",
-		label = { en = "Stuck in a pillar!", fr = "Stuck in a pillar!" },
-		minPhase = 3,
-		damageMult = 2,
-		stunSeconds = 5,
-	},
+	weakness = { kind = "None", label = { en = "", fr = "" }, minPhase = 99, damageMult = 1 },
 }
 
 Bosses.List.DirectriceEternelle = {
@@ -149,12 +152,12 @@ Bosses.List.DirectriceEternelle = {
 	moveSpeed = 7,
 	contactDamage = 20,
 	attacks = {
-		{ id = "RegleTapante", label = { en = "Ruler Smack", fr = "Ruler Smack" }, kind = "TargetCircle", minPhase = 1, windup = 1.0, cooldown = 4.5, damage = 26, radius = 9 },
-		{ id = "AvionsEnPapier", label = { en = "Paper Planes", fr = "Paper Planes" }, kind = "Fan", minPhase = 1, windup = 0.6, cooldown = 5, damage = 11, radius = 5, count = 5, spread = 50, speed = 20, projectile = "PaperPlane" },
-		{ id = "RetenueGenerale", label = { en = "Detention for All", fr = "Detention for All" }, kind = "Ring", minPhase = 2, windup = 1.6, cooldown = 11, damage = 28, inner = 16, radius = 40 },
-		{ id = "AppelEnRang", label = { en = "Line Up!", fr = "Line Up!" }, kind = "Summon", minPhase = 2, windup = 1.0, cooldown = 14, radius = 6, count = 6, summonKind = 9 },
+		{ id = "RegleTapante", label = { en = "Ruler Smack!", fr = "Ruler Smack!" }, kind = "TargetCircle", minPhase = 1, windup = 1.0, cooldown = 4.5, damage = 18, radius = 9, fx = "Ruler" },
+		{ id = "AvionsEnPapier", label = { en = "Pop Quiz Planes", fr = "Pop Quiz Planes" }, kind = "Fan", minPhase = 1, windup = 1.0, cooldown = 5, damage = 8, radius = 5, count = 5, spread = 50, speed = 20, projectile = "PaperPlane" },
+		{ id = "RetenueGenerale", label = { en = "Detention for Everyone!", fr = "Detention for Everyone!" }, kind = "Ring", minPhase = 1, windup = 1.6, cooldown = 11, damage = 22, inner = 16, radius = 40, fx = "DetentionWave" },
 	},
 	weakness = {
+		-- La cloche (plateforme de l'arène, Heightmap) : 2 s dessus, étourdie 6 s, dégâts x2.
 		kind = "Platform",
 		label = { en = "The bell rings: the Headmistress is dazed!", fr = "The bell rings: the Headmistress is dazed!" },
 		minPhase = 1,
@@ -166,6 +169,7 @@ Bosses.List.DirectriceEternelle = {
 	},
 }
 
+-- Réserve v1 : pas utilisée par la run v2 (RunManager ne lit que Worlds[].boss), sans modèle.
 Bosses.List.GrandBrouhaha = {
 	id = "GrandBrouhaha",
 	kind = 19,

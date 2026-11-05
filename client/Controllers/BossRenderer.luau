@@ -58,6 +58,10 @@ local lastState: { [string]: any }? = nil
 
 local telegraphs: { TelegraphEntry } = {}
 local weakMarkers: { Piece } = {}
+-- Impacts à poser (objet `fx` d'une attaque), par numéro de télégraphe (uid) ; dernière donnée reçue.
+local pendingImpacts: { [string]: { [string]: any } } = {}
+local IMPACT_LIFE = 0.8 -- s, si l'objet n'a pas d'attribut Life
+local bossProfileKey = ""
 
 local archeBeam: Piece? = nil
 local runState: { [string]: any } = {}
@@ -117,6 +121,8 @@ local function buildBoss(bossId: string)
 	bossKey = bossId -- même absent, on ne le recherche pas à chaque BossState
 	local def = Bosses.List[bossId]
 	local enemy = def and Enemies[def.kind]
+	-- Profil d'animation : par id de boss, sinon par nom d'ennemi du kind (CercueilAffame -> kind 17).
+	bossProfileKey = if Motion.profiles[bossId] then bossId elseif enemy then enemy.name else bossId
 	local name = (def and def.asset) or (enemy and enemy.asset) or ("Boss_" .. bossId)
 	local template = ArtLibrary.find(name)
 	if not template then
@@ -172,7 +178,52 @@ local function setTelegraphs(list: { { [string]: any } })
 		if tg then
 			table.insert(telegraphs, { data = data, tg = tg })
 		end
+		if type(data.fx) == "string" and type(data.uid) == "number" and type(data.at) == "number" then
+			pendingImpacts[tostring(data.uid)] = data -- dernière donnée : position figée, heure décalée par le gel
+		end
 	end
+end
+
+-- Objet d'impact d'une attaque (Assets.FX.Bosses.<boss>.<fx>, dossier 13 §11.5) : cloné à l'impact,
+-- posé au centre du télégraphe (ligne : au milieu, orientée), puis détruit après son attribut Life.
+-- Attribut Radius facultatif : l'objet est alors mis à l'échelle rayon du télégraphe / Radius.
+-- Les ParticleEmitter qui portent un attribut Burst émettent ce nombre de particules. Absent : rien.
+local function spawnImpact(data: { [string]: any })
+	local template = ArtLibrary.fx(data.fx)
+	if not template then
+		warnOnce(data.fx, `[BossRenderer] objet manquant : Assets.FX.{data.fx} (dossier 13 §11.5) ; impact sans objet`)
+		return
+	end
+	local pos: Vector3 = data.position
+	local base = CFrame.new(pos.X, Heightmap.getY(pos.X, pos.Z), pos.Z)
+	if data.kind == "Line" and typeof(data.dir) == "Vector3" and type(data.length) == "number" then
+		local dir = Vector3.new(data.dir.X, 0, data.dir.Z)
+		if dir.Magnitude > 1e-3 then
+			local mid = base.Position + dir.Unit * (data.length / 2)
+			base = CFrame.lookAt(mid, mid + dir.Unit)
+		end
+	end
+	local refRadius = template:GetAttribute("Radius")
+	local scale = if type(refRadius) == "number" and refRadius > 0 and type(data.radius) == "number" then data.radius / refRadius else nil
+	local parts, offsets = ArtLibrary.clonePivoted(template, scale)
+	for k, p in parts do
+		p.CFrame = base * offsets[k]
+		p.Parent = container
+	end
+	for _, p in parts do
+		for _, d in p:GetDescendants() do
+			local burst = d:GetAttribute("Burst")
+			if d:IsA("ParticleEmitter") and type(burst) == "number" and burst > 0 then
+				d:Emit(math.floor(burst + 0.5))
+			end
+		end
+	end
+	local life = template:GetAttribute("Life")
+	task.delay(if type(life) == "number" then life else IMPACT_LIFE, function()
+		for _, p in parts do
+			p:Destroy()
+		end
+	end)
 end
 
 local function hideWeakMarkers(from: number)
@@ -191,6 +242,7 @@ local function onBossState(payload: unknown)
 	if p.removed or p.defeated then
 		clearBoss()
 		clearTelegraphs()
+		table.clear(pendingImpacts)
 		hideWeakMarkers(1)
 		lastState = nil
 		return
@@ -394,7 +446,7 @@ local function render(dt: number)
 			dir = if root then Vector3.new(root.Position.X - pos.X, 0, root.Position.Z - pos.Z) else -Vector3.zAxis
 		end
 		local base = if dir.Magnitude > .05 then CFrame.lookAt(pos, pos + dir) else CFrame.new(pos)
-		local profile = Motion.profiles[bossKey]
+		local profile = Motion.profiles[bossProfileKey]
 		local gesture = 0
 		if st and st.stunned and not (casting or striking) then
 			base *= CFrame.Angles(0, 0, math.rad(math.sin(now * 20) * 4))
@@ -451,6 +503,16 @@ local function render(dt: number)
 		end
 	end
 
+	-- Impacts (objets d'attaque) : à l'heure du coup ; un télégraphe trop vieux est oublié.
+	for key, d in pendingImpacts do
+		if serverNow >= d.at then
+			pendingImpacts[key] = nil
+			if serverNow < d.at + 1 and typeof(d.position) == "Vector3" then
+				spawnImpact(d)
+			end
+		end
+	end
+
 	-- Revealed Arche beam
 	local beam = archeBeam
 	if beam then
@@ -494,6 +556,7 @@ function BossRenderer.start()
 			if runState.phase == "Ended" or runState.phase == "Loadout" then
 				clearBoss()
 				clearTelegraphs()
+				table.clear(pendingImpacts)
 			end
 		end
 	end)

@@ -195,6 +195,8 @@ Couleurs des télégraphes (`Bosses.Colors`) :
 
 Attaques inactives tant que `PhaseEnabled = false` : Saplings (Oak), Detention for All et Line Up! (Headmistress). Leurs télégraphes utilisent les mêmes objets que les autres.
 
+**Remplacé par §11.5 (A03-06, 5 nov.)** : noms d'attaque revus, Detention for Everyone! passe en phase 1, la Hungry Coffin prend une ruée (Late for Dinner!) au lieu de Grasping Hands, et les attaques de phase 2 et 3 sont retirées.
+
 ---
 
 ## 5. Ce qu'A14 m'a laissé, et ce qui manque
@@ -484,3 +486,60 @@ Côté technique (Ironix). Rien n'a été testé en Play : seulement compilé (`
 | QA-01 | 400 demandés, 300 obtenus sans message | avertissement unique dans la sortie |
 
 **À mesurer en Play** : `tools/perf/HordeStress.server.luau` estime encore EnemySnapshot avec l'ancienne cadence (outil d'A13) : lire plutôt `DataReceiveKbps` côté client. Vérifier que les ennemis du milieu de la horde (mis à jour à 3,75 Hz) restent fluides, que les morts disparaissent tout de suite, les télégraphes de mini-boss, et la mémoire après un changement de monde.
+
+### 11.5 Boss et mini-boss v2 (A03-05, A03-06 ; 5 nov., branche `claude/a03-boss-v4`)
+
+Côté technique. Seulement compilé (`tools/check.sh`), pas testé en Play.
+
+**Règles appliquées** (décisions v2 §6) : 3 attaques par boss, toutes de phase 1 ; chacune annoncée au sol au moins 1 s avant (`Bosses.MinTelegraph`) ; pas de phase d'escalade (`PhaseEnabled = false`, les attaques dormantes de phase 2 et 3 sont retirées). Le nom de l'attaque passe en bannière (`Announce`, kind `BossAttack`, 1,5 s) **la première fois** qu'elle sert dans un combat, pour ne pas encombrer la file du HUD.
+
+**Dégâts.** Les chiffres sont ceux du monde 1. `BossService` les multiplie par `EnemyService._damageScale()` : ×1,35 au monde 2, ×1,8 au monde 3 (`Run.WorldScaling`), plus l'Overtime. Repères : PV du joueur ~130 à la fin du monde 1, ~170 au 2, ~220 au 3. Un coup encaissé coûte 12 à 18 % des PV ; un éventail entier encaissé ~35 %.
+
+**Cadence.** Une attaque toutes les 2,2 à 3 s : préparation + `GlobalAttackGap` (1,2 s), au hasard parmi celles dont la recharge est finie.
+
+| Boss (id) | Attaque (id) | Télégraphe | Dégâts base → effectifs | Recharge |
+| --- | --- | --- | --- | --- |
+| Grumpy Great Oak (`GrandCheneRonchon`), monde 1 | Get Off My Lawn! (`RacinesSismiques`) | cercle r 8 qui suit un joueur, figé 0,5 s avant, 1,0 s | 20 | 5 s |
+| | Acorn Drizzle (`PluieDeGlands`) | 5 cercles r 5 près des joueurs, 1,2 s (+0,15 s chacun) | 15 | 8 s |
+| | Leaf Me Alone! (`OndeEcorce`) | anneau 10 à 30 autour du boss, 1,5 s, se saute | 24 | 10 s |
+| The Hungry Coffin (`CercueilAffame`), monde 2 | Snack Time! (`CroqueCouvercle`) | cercle r 8 qui suit, 1,0 s | 18 → 24 | 5 s |
+| | Bone Appetit (`CrachatDOs`) | cercle r 5 sur le boss 1,0 s, puis 7 os en éventail de 60° (18 studs/s) | 8 → 11 par os | 6 s |
+| | Late for Dinner! (`RueeAffamee`) | ligne 14 × 45 vers un joueur, 1,2 s, puis ruée à 40 studs/s ; s'arrête au bord de l'arène | 22 → 30 | 9 s |
+| Eternal Headmistress (`DirectriceEternelle`), monde 3 | Ruler Smack! (`RegleTapante`) | cercle r 9 qui suit, 1,0 s | 18 → 32 | 4,5 s |
+| | Pop Quiz Planes (`AvionsEnPapier`) | cercle r 5 sur le boss 1,0 s, puis 5 avions en éventail de 50° (20 studs/s) | 8 → 14 par avion | 5 s |
+| | Detention for Everyone! (`RetenueGenerale`) | anneau 16 à 40, 1,6 s, se saute | 22 → 40 | 11 s |
+
+Points faibles : la cloche de la Directrice reste (2 s dessus : étourdie 6 s, dégâts ×2). L'enracinement du chêne reste dans la config mais ne se déclenche pas (phase 2). La Hungry Coffin n'en a pas (`kind = "None"`). Les PV des boss ne changent pas (5000, 6000, 6500, × `WorldScaling.bossHp`).
+
+**Mini-boss** (déjà codés par A03 v3 dans `EnemyService`, vérifiés) : une attaque chacun, annoncée 1 s avant par le télégraphe client `slam`.
+
+| Mini-boss (kind, `name` v1) | Attaque | Télégraphe | Dégâts | Cadence | Portée de déclenchement |
+| --- | --- | --- | --- | --- | --- |
+| Goblin Chief (13, `SoucheGeante`) | Big Ladle | cercle r 6 devant lui | 26 | 7 s | 12 studs |
+| Zombie Ogre (14, `ChameauTirelire`) | Tombstone Slam | cercle r 7 centré sur lui | 28 | 8 s | 8 studs |
+| Spectral Proctor (15, `PionSpectral`) | Whistle Blast | anneau 4 à 14, se saute | 24 | 8 s | 13 studs |
+
+Les libellés joueur sont passés à Goblin Chief, Zombie Ogre et The Hungry Coffin. Les `name` v1 restent : ce sont les clés d'`EnemyMotion` et l'espèce de capture (`CompanionService`).
+
+**Monde 2.** `Worlds.DunesCroustillantes.boss = "CercueilAffame"` (nouvel id, même kind 17 et même modèle `Boss_HungryCoffin` ; `PharaonGrillePain` est retiré de `Bosses.List`). Le monde 3 avait déjà `DirectriceEternelle`.
+
+**Gel du passage de niveau.** `BossService` ne fait plus rien pendant `Workspace.RunFrozen`, et décale toutes ses horloges (télégraphes, recharges, prochaine attaque, étourdissement) de la durée du gel. Un télégraphe en cours reprend donc là où il en était, sans tomber d'un coup au dégel. Le remplissage côté client reste figé, car le début et l'impact glissent ensemble.
+
+**Objets d'impact (nouveau, facultatif).** Chaque télégraphe envoie `attack` (id), `uid` et `fx` (`Bosses.<fxFolder>.<fx>`). À l'heure de l'impact, `BossRenderer` clone l'objet au centre du télégraphe. Pour une ligne, l'objet est posé au milieu et orienté. Il est détruit au bout de son attribut `Life` (0,8 s par défaut). Avec un attribut `Radius`, il est mis à l'échelle rayon du télégraphe ÷ `Radius`. Les `ParticleEmitter` qui ont un attribut `Burst` émettent ce nombre de particules. Si l'objet est absent : un seul avertissement dans la sortie, et l'attaque marche sans visuel.
+
+| Objet attendu | Attaque |
+| --- | --- |
+| `Assets.FX.Bosses.GrumpyGreatOak.RootBurst` | Get Off My Lawn! |
+| `Assets.FX.Bosses.GrumpyGreatOak.Acorn` | Acorn Drizzle (un par cercle) |
+| `Assets.FX.Bosses.GrumpyGreatOak.BarkWave` | Leaf Me Alone! |
+| `Assets.FX.Bosses.HungryCoffin.LidChomp` | Snack Time! |
+| `Assets.FX.Bosses.HungryCoffin.Bone` | Bone Appetit (tir, déjà prévu §11.4) |
+| `Assets.FX.Bosses.EternalHeadmistress.Ruler` | Ruler Smack! |
+| `Assets.FX.Bosses.EternalHeadmistress.PaperPlane` | Pop Quiz Planes (tir, déjà prévu §11.4) |
+| `Assets.FX.Bosses.EternalHeadmistress.DetentionWave` | Detention for Everyone! |
+
+**Contract requests (hors de mes fichiers) :**
+1. `Run.WorldChain` vaut encore `{ "BoisGrognon", "BoisGrognon", "BoisGrognon" }` : une run joue trois fois le chêne. La Hungry Coffin et la Directrice ne sortent qu'avec `{ "BoisGrognon", "DunesCroustillantes", "RecreFantome" }` (Run.luau, A04 ou A02).
+2. `EnemyService` (mini-boss) : pendant le gel, `actT` (os.clock) continue de courir. Un `slam` en préparation tombe donc au dégel, alors que son télégraphe client a déjà disparu. Il faudrait décaler `actT` pendant `RunFrozen`, comme le fait `BossService`.
+3. `Heightmap` (arène) et `EnemyMotion` comparent encore `PharaonGrillePain` : sans conséquence, puisque la Hungry Coffin n'a pas de piliers et que `BossRenderer` retombe sur le profil du kind 17. À renommer quand A02 refait le monde 2.
+4. Le Zombie Ogre garde `coinsPerHit = true` (pièces à chaque coup, gag du Chameau-Tirelire v1). C'est une décision d'économie, à trancher par A04 ou Cantin.

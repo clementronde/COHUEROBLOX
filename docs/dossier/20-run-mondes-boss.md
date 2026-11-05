@@ -206,6 +206,14 @@ Simulés côté serveur (points, mouvement en ligne droite, plafond 150), envoy�
 
 ## 5. Boss
 
+> **v2 (5 nov., A03-06) : les tableaux 5.1 à 5.3 ci-dessous sont ceux de la v1.** Ce qui est codé aujourd'hui : dossier 13 §11.5. En bref :
+> - une seule phase ;
+> - 3 attaques par boss, chacune annoncée au sol au moins 1 s avant (`Bosses.MinTelegraph`) ;
+> - le boss du monde 2 est The Hungry Coffin (`CercueilAffame`), qui remplace le Pharaon ;
+> - tout s'arrête pendant le gel `Workspace.RunFrozen`, horloges comprises.
+>
+> `BossState.telegraphs[]` porte en plus `attack` (id), `uid` et `fx` (objet d'impact facultatif).
+
 Le boss est une entité d'`EnemyService` (pour que les armes du domaine combat le touchent via `queryRadius` / `damage`), pilotée par `BossService` (mouvement, attaques, phases). PV × tier × (1 + 0,8 (n − 1)). Phases 100 / 66 / 33 %. Chaque attaque a un **télégraphe au sol** (rouge = normal, violet = invocation, doré = faiblesse), d'au moins **0,6 s** (vault « Boss Animation and Phases » : minimum 0,5 s ; les marqueurs qui suivent se **verrouillent 0,5 s** avant l'impact), et passe le test d'esquive `R ≤ 16 × (t − 0,25)` (« Combat Arena and Encounter Layout ») sauf mention. Les ondes en anneau (`Ring`) peuvent être **sautées** (pieds > sol + 4 studs). Phase 2 : cooldowns ×0,85 ; phase 3 : ×0,7 (le télégraphe ne descend jamais sous 0,6 s).
 
 Envoi : `BossState` à 10 Hz pendant le combat + immédiatement à chaque nouveau télégraphe. Champ `telegraph` = le premier, champ ajouté `telegraphs` = tous (format : `{ kind = "Circle"|"Ring"|"Line", position, radius, inner?, dir?, length?, at, color }`).

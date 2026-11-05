@@ -380,11 +380,12 @@ local Enemies: { [number]: Def } = {
 	-- Mini-bosses ----------------------------------------------------------------------------
 	[13] = {
 		id = 13,
+		-- Goblin Chief (v2). `name` garde l'id v1 : clé d'EnemyMotion et espèce de capture (CompanionService).
 		name = "SoucheGeante",
-		label = { en = "Giant Stump", fr = "Giant Stump" },
+		label = { en = "Goblin Chief", fr = "Goblin Chief" },
 		world = "BoisGrognon",
 		family = "MiniBoss",
-		asset = "MiniBoss_GoblinChief", -- mini-boss v2 du monde 1 (le nom de config change avec A03-05)
+		asset = "MiniBoss_GoblinChief", -- mini-boss v2 du monde 1
 		legacyAsset = "Enemy_SoucheGeante", -- shortcut: ancien modèle de la place en attendant MiniBoss_GoblinChief (docs/attentes-clement.md)
 		slamName = "BigLadle",
 		slamShape = "Front",
@@ -406,8 +407,9 @@ local Enemies: { [number]: Def } = {
 	},
 	[14] = {
 		id = 14,
+		-- Zombie Ogre (v2). `name` garde l'id v1 (EnemyMotion, capture).
 		name = "ChameauTirelire",
-		label = { en = "Piggy Camel", fr = "Piggy Camel" },
+		label = { en = "Zombie Ogre", fr = "Zombie Ogre" },
 		world = "DunesCroustillantes",
 		family = "MiniBoss",
 		asset = "MiniBoss_ZombieOgre", -- mini-boss v2 du monde 2
@@ -423,7 +425,7 @@ local Enemies: { [number]: Def } = {
 		speed = 8,
 		radius = 3.5,
 		height = 5,
-		color = rgb(240, 160, 180),
+		color = rgb(130, 150, 110), -- gris-vert zombie (teinte d'imposteur et d'effets)
 		contactDamage = 24,
 		xp = 40,
 		weight = 8,
@@ -476,11 +478,12 @@ local Enemies: { [number]: Def } = {
 	},
 	[17] = {
 		id = 17,
+		-- The Hungry Coffin (Bosses.List.CercueilAffame). `name` garde l'id v1 : clé d'EnemyMotion.
 		name = "PharaonGrillePain",
-		label = { en = "The Toaster Pharaoh", fr = "The Toaster Pharaoh" },
+		label = { en = "The Hungry Coffin", fr = "The Hungry Coffin" },
 		world = "DunesCroustillantes",
 		family = "Boss",
-		asset = "Boss_HungryCoffin", -- boss v2 du monde 2 (le nom de config change avec A03-06)
+		asset = "Boss_HungryCoffin", -- boss v2 du monde 2
 		hp = 6000,
 		speed = 6,
 		radius = 5,
