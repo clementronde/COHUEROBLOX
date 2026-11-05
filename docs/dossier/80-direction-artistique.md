@@ -6,7 +6,7 @@ COHUE marie deux matières, **et chacune a un sens** :
 - **La carte est naturelle et peinte**, en plein soleil : herbe lisse aux fondus doux, chemins de terre, arbres en grosses boules de feuillage, rochers à facettes, forêt dense en lisière.
 - **Tout ce avec quoi on interagit est en briques de jouet à tenons** : portail, pads, stations, caisses, coffres, personnages, ennemis, équipement.
 
-Le joueur lit donc d'un coup d'œil ce qui sert : une brique veut dire « on peut s'en servir », la nature veut dire « c'est le décor ». Dans le jeu, les tenons sont posés par le plugin Studio de Clément. Le ciel est peint, bleu franc, avec de gros cumulus. La palette reste celle de COHUE (16 couleurs vives), et le ton reste joyeux et absurde.
+Le joueur lit donc d'un coup d'œil ce qui sert : une brique veut dire « on peut s'en servir », la nature veut dire « c'est le décor ». Dans le jeu, les tenons sont posés par le plugin Studio **Resurface** (section 9). Le ciel est peint, bleu franc, avec de gros cumulus. La palette reste celle de COHUE (16 couleurs vives), et le ton reste joyeux et absurde.
 
 Références :
 - **Pour les briques** : les exemples envoyés par Clément le 5 nov., des devlogs Roblox d'octobre 2026 (« Making a good Roblox game » de devZippy, zombies de GreenCapYT).
@@ -44,7 +44,7 @@ Captures en jeu : `assets/style/captures/`. Elles montrent toutes la v1 voxel ou
 | Proportions, silhouettes, code couleur des rôles, gags | Le décor n'est plus en tons d'ombre ni en cubes : herbe, terre et roche lisses, avec des fondus doux |
 | Équipement et paliers, attaches R15, `ArtLibrary` | Personnages et ennemis : gros yeux ronds blancs |
 | Le plan du lobby compact (tête de gobelin, stations) | Lumière : plein jour, ciel peint bleu franc, cumulus (fin de l'ambiance violette) |
-| | Les tenons ne sont plus modélisés : le plugin de Clément les pose dans Studio |
+| | Les tenons ne sont plus modélisés : le plugin Resurface les pose dans Studio |
 
 ## 1. Ce que montrent les exemples
 
@@ -64,7 +64,7 @@ Captures en jeu : `assets/style/captures/`. Elles montrent toutes la v1 voxel ou
 1. **Ce avec quoi on interagit est en briques chanfreinées**, joints décalés d'une rangée sur l'autre, en deux tailles : 0,25 et 0,5 stud (section 3). Cela comprend le portail, les pads, les stations, les caisses et coffres, les personnages, les ennemis, l'équipement, les armes et le butin.
 2. **La carte est naturelle** : sol, collines, chemins, falaises, arbres, buissons, rochers et eau sont lisses et peints (section 3 bis). Pas de brique dans le décor, pas de nature dans les interactions.
 3. **Seulement la palette COHUE 16** et ses tons `.l`, base, `.d`, `.dd`. Une brique a une seule couleur (±4 % de clarté d'une brique à l'autre). Le décor naturel a droit à des fondus doux entre deux tons de la palette.
-4. **Les tenons sont posés dans Studio par le plugin de Clément**, sur le dessus des briques. On ne les modélise pas : les maquettes les dessinent seulement pour juger le rendu. Pas de tenon sur les dalles où l'on marche, les yeux, le Neon et le verre.
+4. **Les tenons sont posés dans Studio par le plugin Resurface.** On ne les modélise pas : les maquettes les dessinent seulement pour juger le rendu. Pas de tenon sur les dalles où l'on marche, les yeux, le Neon et le verre.
 5. **Pas de bruit** : pas de mouchetis, de damier ni de texture bruitée. Les fondus de l'herbe sont larges (une tache fait au moins 8 studs).
 6. **La famille se lit à la silhouette, le rôle à la couleur.** Le dessus de la tête porte la couleur du rôle, car la caméra est haute et voit surtout le dessus des ennemis.
 7. **Gros yeux ronds blancs** à pupille Ink : ce sont les pixels les plus clairs d'un personnage. On y lit l'humeur (colère, panique, sommeil).
@@ -88,7 +88,7 @@ La brique est réservée aux éléments interactifs (règle 1). On les modélise
 | Longueur | 1 à 3 cellules (sol : 6), largeur 1 | Assez court pour qu'on lise les briques, assez long pour ne pas faire de grille |
 | Pose | En X sur les couches paires, en Y sur les impaires ; joints décalés d'une rangée à l'autre | Appareil de maçonnerie : ça a l'air construit, pas quadrillé |
 | Chanfrein | 7 % de la cellule, 1 segment | Dessine le joint et accroche la lumière |
-| Tenon | Diamètre 60 % de la cellule, hauteur 18 % (dans la maquette) | Signature du style. En jeu, posé par le plugin de Clément : on ne le modélise pas |
+| Tenon | Diamètre 60 % de la cellule, hauteur 18 % (dans la maquette) | Signature du style. En jeu, posé par Resurface : on ne le modélise pas |
 | Couleur | Une par brique, ±4 % de clarté | Les briques se distinguent sans bruit |
 | Matière | Plastique de jouet (rugosité 0,42 dans Blender) | Un léger reflet sur les chanfreins |
 
@@ -227,18 +227,27 @@ Couleurs réservées pour les 5 autres classes (A01-07) : Guardian Stone + Ember
 
 Les briques coûtent beaucoup plus de triangles que les cubes lisses : le chanfrein multiplie environ par trois les faces d'une brique, et un tenon modélisé fait une trentaine de triangles. La maquette du lobby ne sert qu'à juger le style : ses briques ont des tenons modélisés et ne sont pas optimisées. Roblox limite chaque maille à 20 000 triangles.
 
-En jeu, les tenons viennent du plugin de Clément, et les mailles n'en portent pas. Pour les briques elles-mêmes, on combine deux techniques :
+**Les tenons en jeu : le plugin Resurface.** C'est le plugin qu'utilise Clément. Il est gratuit, publié sous licence MIT par cxmeel (anciennement « Surface Tool »), et disponible sur le Creator Store. Il remet les surfaces classiques de Roblox, dont les tenons, sur les Parts, les modèles, les mailles et les unions. Sur les mailles et les unions, il passe par des **MaterialVariants** ([fil DevForum](https://devforum.roblox.com/t/1226536), [code source](https://github.com/cxmeel/resurface-plugin)).
+
+Ce que ça change pour nous :
+- **les mailles ne portent pas de tenons**, Resurface les ajoute ;
+- **il faut de vraies UV.** Une MaterialVariant se répète selon les UV de la maille. Or notre export v1 pose des UV neutres (tout en 0,5), et les tenons n'apparaîtraient pas. Il faut des UV à l'échelle de la cellule : une cellule = un tenon ;
+- **un matériau couvre toute la MeshPart.** Les parties sans tenons (yeux, Neon, dalles où l'on marche) doivent donc être des MeshParts séparées ;
+- **les tenons d'une MaterialVariant couvrent toutes les faces**, pas seulement le dessus. Si on ne les veut que sur le dessus, il faut séparer les faces du dessus.
+
+Pour les briques elles-mêmes, on combine deux techniques :
 
 | Technique | Comment | Pour quoi |
 | --- | --- | --- |
-| **A. Briques en géométrie** | Briques chanfreinées modélisées, sans tenons (le plugin les pose) | Ce qu'on voit de près et en un seul exemplaire : portail, stations du lobby, boss. Chaque maille reste sous 20 000 triangles |
-| **B. Briques en texture** | Maille fusionnée (comme en v1), avec des UV à l'échelle de la cellule et une texture répétée de joints | Tout ce qui est répété : ennemis de horde, équipement, armes, butin |
+| **A. Briques en géométrie** | Briques chanfreinées modélisées, sans tenons (Resurface les pose) | Ce qu'on voit de près et en un seul exemplaire : portail, stations du lobby, boss. Chaque maille reste sous 20 000 triangles |
+| **B. Maille fusionnée** | Maille fusionnée comme en v1, avec des UV à l'échelle de la cellule ; les tenons de Resurface suffisent à dire « brique » | Tout ce qui est répété : ennemis de horde, équipement, armes, butin |
 | **Décor naturel** | Mailles lisses à couleurs par sommet (arbres, rochers), Terrain ou maille pour le sol (section 3 bis) | Toute la carte |
 
 **À tester dans Studio avant de convertir les 23 meshes** (A01-02 bis) :
 
-- ce que fait le plugin de tenons sur un MeshPart (géométrie ou texture), et ce qu'il coûte en triangles et en mémoire ;
-- la technique B : la couleur par sommet survit-elle sous une `SurfaceAppearance` ?
+- Resurface sur une de nos MeshParts (un gobelin, une station) exportée avec des UV à l'échelle de la cellule : les tenons tombent-ils un par cellule ?
+- la couleur par sommet survit-elle sous la MaterialVariant de Resurface, ou faut-il une MeshPart par couleur ?
+- le coût : une MaterialVariant est partagée par toutes les pièces, donc a priori peu de mémoire, à mesurer sur téléphone ;
 - la lisibilité des briques et des tenons à 20 studs sur téléphone.
 
 | Classe | Technique | Triangles visés / plafond |
@@ -377,9 +386,9 @@ models.py (grille) → cohue_voxel.py (maille fusionnée) → build.py (GLB) →
 - **Maille fusionnée et étanche** : une face par rectangle de même couleur, avec insertion des coins voisins dans les arêtes longues (0 arête de bord, environ +35 % de triangles).
 - **Couleurs** : couleur par coin de face (`BYTE_COLOR`, sRGB), un jeu d'UV neutre, un seul matériau.
 - **À faire pour le style briques (A01-02 bis)** :
-  - UV à l'échelle de la cellule (une cellule = une tuile de tenon) ;
-  - garder un quad par cellule sur les faces qui reçoivent la texture ;
-  - fabriquer la texture de joints et de tenons, puis tester dans Studio (section 9).
+  - UV à l'échelle de la cellule (une cellule = un tenon de Resurface), en projection par face ;
+  - séparer en MeshParts ce qui ne doit pas porter de tenons (yeux, Neon, dalles) ;
+  - appliquer Resurface dans Studio, puis faire les tests de la section 9.
 - **Toujours exporter en ligne de commande.** Forcer le contexte d'une autre scène dans un Blender ouvert l'a fait planter.
 
 ### 13.3 Importer dans Studio

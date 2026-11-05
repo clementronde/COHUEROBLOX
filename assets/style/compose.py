@@ -283,7 +283,7 @@ def board_lobby_bricks():
     rules = ("Briques à tenons pour ce avec quoi on interagit : portail, pads, stations, caisses, personnages, "
              "ennemis, équipement · décor naturel et peint : herbe lisse en fondus doux, chemins de terre, arbres "
              "en boules de feuillage, rochers à facettes, forêt dense en lisière · tenons posés en jeu par le "
-             "plugin de Clément · ciel bleu franc et cumulus · Neon seulement sur ce qui compte. Une brique veut dire : on "
+             "plugin Resurface · ciel bleu franc et cumulus · Neon seulement sur ce qui compte. Une brique veut dire : on "
              "peut s'en servir ; la nature, c'est le décor.")
     wrap(d, (60, y + 50), rules, BODY, INK, W - 120)
     im.save(os.path.join(HERE, "06-lobby-nature-briques.png"), optimize=True)

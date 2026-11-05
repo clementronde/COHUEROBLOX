@@ -2,7 +2,7 @@
 
 Style (5 nov., deux retours de Clément) : carte naturelle (sol lisse, arbres peints, rochers à facettes,
 nature.py) et éléments interactifs en briques à tenons (brick.py). Les tenons seront posés en jeu par le
-plugin de Clément. La première version de la maquette était en voxels ; la grille de modélisation des
+plugin Resurface. La première version de la maquette était en voxels ; la grille de modélisation des
 éléments interactifs reste la même.
 
 Remplace le premier lobby en Parts (refusé par Clément : « beaucoup trop AI slop »). Principes :
