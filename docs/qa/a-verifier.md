@@ -1,6 +1,6 @@
 # COHUE — À vérifier en jouant (Cantin)
 
-État au 5 nov. 2026, après la fusion de la vague dev (A02, A03, A05, A06, A10, A11, A12, A13). Les tests automatiques sont déjà passés (résultats : `docs/security/tests-exploits.md`, `docs/qa/mesure-horde.md`). Reste ce qui demande un humain : le ressenti, la coop, le téléphone. Parcours complet : `docs/qa/plan-de-test.md`.
+État au 5 nov. 2026 (soir), après les vagues dev 2 et 3. Les tests automatiques sont déjà passés (résultats : `docs/security/tests-exploits.md`, `docs/qa/mesure-horde.md`). Reste ce qui demande un humain : le ressenti, la coop, le téléphone. Parcours complet : `docs/qa/plan-de-test.md`.
 
 Cocher, et noter tout problème dans la liste de bugs de `plan-de-test.md` §3.
 
@@ -14,6 +14,10 @@ Cocher, et noter tout problème dans la liste de bugs de `plan-de-test.md` §3.
 - [ ] **Capture** : ennemi capturable, cage au sol 10 s, 2 s dedans, interrompue si touché ; la créature suit et attaque à la run suivante.
 - [ ] **Tamer** : 2 compagnons, capture plus rapide.
 - [ ] **Run complète** : 3 mondes enchaînés, Overtime, Victory, Cash out et Keep going, écran de fin.
+- [ ] **Vague 3 — lobby** : PLAY lance la run (3 s), retour au lobby 5 s après une défaite ou une victoire ; compagnons équipés qui suivent dans le lobby, collection qui se promène dans l'enclos.
+- [ ] **Vague 3 — choix de carte** : tout se fige (horde, boss, butin, autels, chrono), le joueur ne bouge plus, rien n'est perdu à la reprise ; les ennemis ne foncent pas tous d'un coup à la reprise.
+- [ ] **Vague 3 — horde** : ennemis fluides au milieu de la horde (mis à jour à 3,75 Hz), les morts disparaissent tout de suite ; anciens modèles affichés pour la faune, les zombies et les fantômes.
+- [ ] **Vague 3 — compagnons** : les techniques de chaque espèce apparaissent dans les cartes et se ressentent (valeurs jamais mesurées en run).
 
 ## Demande un réglage ou un objet avant d'être testable
 
@@ -25,5 +29,5 @@ Cocher, et noter tout problème dans la liste de bugs de `plan-de-test.md` §3.
 
 ## Coop et téléphone
 
-- [ ] **Coop à 2-4** (Studio, onglet Test, plusieurs joueurs) : à terre et relève, choix de carte en coop, et le test T6 de `tests-exploits.md` (se téléporter puis mourir : réapparaître près de la position d'avant).
+- [ ] **Coop à 2-4** (Studio, onglet Test, plusieurs joueurs) : à terre et relève ; choix de carte en coop (l'autre joueur voit l'attente, carte prise d'office au bout de 15 s) ; Cash out d'un seul joueur (les autres continuent, le dernier termine la run) ; Solo et Party une fois `MatchMode` envoyé par le lobby ; et le test T6 de `tests-exploits.md` (se téléporter puis mourir : réapparaître près de la position d'avant).
 - [ ] **Téléphone** : procédure de `docs/qa/mesure-horde.md` §3 (FPS et réseau de 100 à 400 ennemis). Point à surveiller : 31 Ko/s par joueur à 300 ennemis (PERF-01).
