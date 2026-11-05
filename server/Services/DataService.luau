@@ -29,7 +29,7 @@ local Bus = require(script.Parent.Parent:WaitForChild("Bus"))
 
 local CFG = Progression.Data
 local IS_STUDIO = RunService:IsStudio()
-local CURRENT_SCHEMA = 1
+local CURRENT_SCHEMA = 2 -- 2 : v2 (A12-01). Publier la place de run avant le lobby.
 
 export type LoadStatus = "loading" | "ready" | "locked" | "failed" | "left" | "released"
 type SessionState = "active" | "lost" | "released"
@@ -217,10 +217,25 @@ local function newProfile(): { [string]: any }
 		eggsHatched = 0,
 		cosmetics = {},
 		equipped = {},
+		seasons = {}, -- [seasonId] = XP de saison (A12-04) ; paliers et récompenses dérivés
+		-- Collection v2 (A12-01, dossier 40 §3.1) : owned[espèce] = { n = captures, at = 1re capture },
+		-- equipped = { espèce1, espèce2? (Tamer) }, keys[captureKey] = os.time (idempotence, 200 max).
+		companions = { v = 1, owned = {}, equipped = {}, keys = {} },
 		settings = { keepHat = false, colorblind = false, reduceFlashes = false, textScale = 1 },
 		loadout = { classId = Progression.DefaultLoadout.classId, companionId = Progression.DefaultLoadout.companionId },
 		weekly = { week = -1, done = false, bestSeconds = 0, everDone = false },
-		boards = { week = -1, kills = 0, bestFinalWave = 0 },
+		-- kills / bestFinalWave : compteurs v1 (plus écrits au classement). best / weekBest : relevé
+		-- de la meilleure run (KO en une run, regles-v2 §4.2) ; quarantined : 20 derniers relevés
+		-- refusés (§4.5) ; lastRunKey : idempotence « une écriture par run ».
+		boards = {
+			week = -1,
+			kills = 0,
+			bestFinalWave = 0,
+			lastRunKey = "",
+			best = {},
+			weekBest = {},
+			quarantined = {},
+		},
 		receipts = {},
 		receiptOrder = {},
 		purchaseLog = {},
@@ -231,6 +246,22 @@ end
 
 -- STEPS[n] upgrades data from schema n to n + 1. Deterministic, no yields, never edited after release.
 local STEPS: { [number]: (any) -> any } = {}
+
+-- 1 -> 2 (A12-01, v2) : classes classiques et compagnons capturés (dossier 40 §3.1). Les classes et
+-- lignées v1 n'existent plus : le dernier choix repasse au défaut (sans compagnon). Les traces v1
+-- (maîtrise, Lien, unlocks.Companion, cosmétiques) restent dans le profil, ignorées par le code v2.
+STEPS[1] = function(data: any): any
+	local loadout = data.loadout
+	local classId = if type(loadout) == "table" then loadout.classId else nil
+	if type(classId) ~= "string" or not table.find(Progression.Classes, classId) then
+		classId = Progression.DefaultLoadout.classId
+	end
+	data.loadout = { classId = classId, companionId = "" }
+	if type(data.companions) ~= "table" then
+		data.companions = { v = 1, owned = {}, equipped = {}, keys = {} }
+	end
+	return data
+end
 
 -- Fills fields missing from data (additive, never overwrites a valid value). Unknown keys are kept.
 local function reconcile(data: { [string]: any }, template: { [string]: any })
@@ -450,7 +481,10 @@ local function saveWithRetries(player: Player, release: boolean, attempts: numbe
 		end
 	end
 	inFlight -= 1
-	lastSaveAt[player] = os.clock()
+	-- S-15 : une sauvegarde qui finit après onPlayerRemoving ne recrée pas l'entrée du joueur parti.
+	if sessions[player] == session then
+		lastSaveAt[player] = os.clock()
+	end
 	if result == "lost" then
 		notify(
 			player,

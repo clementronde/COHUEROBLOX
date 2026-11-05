@@ -22,13 +22,16 @@ local Registry = require(Shared:WaitForChild("Registry"))
 
 local MonetizationService = {}
 
+-- Octroi de chaque produit développeur (synchrone, appelé dans DataService.mutate). VIDE : tout
+-- objet permanent est un pass de jeu (audit S-10, un produit se rachète sans fin). Un futur produit
+-- doit être réachetable sans perte pour le joueur, rester cosmétique et non aléatoire.
+local PRODUCT_GRANTS: { [string]: (data: { [string]: any }) -> () } = {}
+
 local productKeyById: { [number]: string } = {}
 local passKeyById: { [number]: string } = {}
 for key, def in Products.Products do
-	assert(type(def.cosmetics) == "table" and #def.cosmetics > 0, `[Monetization] product {key} grants nothing`)
-	for _, id in def.cosmetics do
-		assert(Cosmetics[id] ~= nil, `[Monetization] product {key}: unknown cosmetic {id}`)
-	end
+	assert((def :: any).cosmetics == nil, `[Monetization] product {key}: permanent cosmetics must be a game pass (S-10)`)
+	assert(PRODUCT_GRANTS[key] ~= nil, `[Monetization] product {key} has no grant`)
 	if def.id ~= 0 then
 		assert(productKeyById[def.id] == nil, `[Monetization] product id {def.id} used twice`)
 		productKeyById[def.id] = key
@@ -38,9 +41,16 @@ for key, def in Products.Passes do
 	for _, id in def.cosmetics do
 		assert(Cosmetics[id] ~= nil, `[Monetization] pass {key}: unknown cosmetic {id}`)
 	end
+	if def.season then
+		assert(Products.Seasons.List[def.season] ~= nil, `[Monetization] pass {key}: unknown season {def.season}`)
+	end
 	if def.id ~= 0 then
+		assert(passKeyById[def.id] == nil, `[Monetization] pass id {def.id} used twice`)
 		passKeyById[def.id] = key
 	end
+end
+for _, key in Products.ShopOrder do
+	assert(Products.Passes[key] ~= nil, `[Monetization] ShopOrder: unknown pass {key}`)
 end
 
 local function dataService(): any
@@ -121,15 +131,6 @@ end
 ---------------------------------------------------------------------------------------------------
 local inFlight: { [string]: boolean } = {}
 
-local function ownsAll(data: { [string]: any }, def: Products.ProductDef): boolean
-	for _, id in def.cosmetics do
-		if not data.cosmetics[id] then
-			return false
-		end
-	end
-	return true
-end
-
 local function trimReceipts(data: { [string]: any })
 	local maxReceipts = Progression.Data.MaxReceipts
 	while #data.receiptOrder > maxReceipts do
@@ -179,13 +180,11 @@ local function processReceipt(receiptInfo: { [string]: any }): Enum.ProductPurch
 			end
 			return
 		end
-		local def = Products.Products[key]
+		local grant = PRODUCT_GRANTS[key]
 		local spent = tonumber(receiptInfo.CurrencySpent) or 0
 		-- Grant + marker + log in the same document, with no yield in between.
 		local mutated = ds.mutate(player, function(d)
-			for _, id in def.cosmetics do
-				d.cosmetics[id] = true
-			end
+			grant(d)
 			d.receipts[purchaseId] = os.time()
 			table.insert(d.receiptOrder, purchaseId)
 			table.insert(d.purchaseLog, { k = key, r = spent, t = os.time() })
@@ -232,8 +231,7 @@ local function onRequestPurchase(player: Player, productKey: any)
 	end
 	local product = Products.Products[productKey]
 	if product then
-		local data = ds.peek(player)
-		if product.id == 0 or not data or ownsAll(data, product) then
+		if product.id == 0 then
 			return
 		end
 		pcall(function()
@@ -245,6 +243,13 @@ local function onRequestPurchase(player: Player, productKey: any)
 	if pass then
 		if pass.id == 0 or MonetizationService.ownsPass(player, productKey) then
 			return
+		end
+		-- Pass saisonnier : vendu seulement pendant sa saison (le retirer aussi de la vente au Dashboard).
+		if pass.season then
+			local active = Products.activeSeason(os.time())
+			if not active or active.id ~= pass.season then
+				return
+			end
 		end
 		pcall(function()
 			MarketplaceService:PromptGamePassPurchase(player, pass.id)

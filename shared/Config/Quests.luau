@@ -24,19 +24,7 @@ export type QuestDef = {
 
 local Quests = {}
 
-local CLASSES = {
-	"Cornu",
-	"Plumeline",
-	"Mecano",
-	"Felyne",
-	"Rocailleux",
-	"Sporelin",
-	"Ecaille",
-	"Astrel",
-	"Cristallin",
-	"Tentaculos",
-}
-local LINES = { "Braise", "Ronce", "Maree", "Volt", "Givre", "Echo" }
+local CLASSES = { "Knight", "Archer", "Mage", "Guardian", "Rogue", "Cleric", "Barbarian", "Tamer" }
 local WORLDS = { "BoisGrognon", "DunesCroustillantes", "RecreFantome" }
 local WORLD_NAMES = {
 	BoisGrognon = { fr = "Bois Grognon", en = "Grumblewood" },
@@ -94,6 +82,8 @@ Quests.ExternalKeys = {
 	CompanionKills = true,
 	CompanionTechsLearned = true,
 	CompanionTreats = true,
+	CompanionsCaptured = true, -- v2 (A05)
+	CompanionNewSpecies = true, -- v2 (A05)
 	-- avatar
 	Hops = true,
 	DistanceTraveled = true,
@@ -159,17 +149,12 @@ end
 
 local TOKENS = { 10, 20, 35, 50, 75, 100, 150 }
 
--- Unlock (11)
-q("Q_Felyne", "Unlock", "Kills", 5000, { tokens = 30, unlock = { kind = "Class", id = "Felyne" } }, "Vaincre 5 000 ennemis", "Defeat 5,000 enemies")
-q("Q_Rocailleux", "Unlock", "DamageTaken", 50000, { tokens = 30, unlock = { kind = "Class", id = "Rocailleux" } }, "Encaisser 50 000 dégâts", "Take 50,000 damage")
-q("Q_Sporelin", "Unlock", "ShrinesCompleted", 25, { tokens = 30, unlock = { kind = "Class", id = "Sporelin" } }, "Compléter 25 autels", "Complete 25 shrines")
-q("Q_Ecaille", "Unlock", "BossesDefeated", 5, { tokens = 30, unlock = { kind = "Class", id = "Ecaille" } }, "Vaincre 5 boss", "Defeat 5 bosses")
-q("Q_Astrel", "Unlock", "ChestsOpened", 100, { tokens = 30, unlock = { kind = "Class", id = "Astrel" } }, "Ouvrir 100 coffres", "Open 100 chests")
-q("Q_Cristallin", "Unlock", "BestRunLevel", 30, { tokens = 30, unlock = { kind = "Class", id = "Cristallin" } }, "Atteindre le niveau 30 en run", "Reach level 30 in a run")
-q("Q_Tentaculos", "Unlock", "FullBuildStageClears", 1, { tokens = 30, unlock = { kind = "Class", id = "Tentaculos" } }, "Vaincre un boss avec 4 armes et 4 Grimoires", "Defeat a boss with 4 weapons and 4 grimoires")
-q("Q_Volt", "Unlock", "DamageDealt", 250000, { tokens = 30, unlock = { kind = "Companion", id = "Volt" } }, "Infliger 250 000 dégâts", "Deal 250,000 damage")
-q("Q_Givre", "Unlock", "FinalWaveSecondsTotal", 600, { tokens = 30, unlock = { kind = "Companion", id = "Givre" } }, "Survivre 10 min en Vague Finale (cumulé)", "Survive 10 min of Final Wave (total)")
-q("Q_Echo", "Unlock", "RunsPlayed", 25, { tokens = 30, unlock = { kind = "Companion", id = "Echo" } }, "Jouer 25 runs", "Play 25 runs")
+-- Unlock (6) : classes v2 (01-decisions-v2 §3) + Rune interdite. Les compagnons se capturent.
+q("Q_Guardian", "Unlock", "DamageTaken", 50000, { tokens = 30, unlock = { kind = "Class", id = "Guardian" } }, "Encaisser 50 000 dégâts", "Take 50,000 damage")
+q("Q_Rogue", "Unlock", "Kills", 5000, { tokens = 30, unlock = { kind = "Class", id = "Rogue" } }, "Vaincre 5 000 ennemis", "Defeat 5,000 enemies")
+q("Q_Cleric", "Unlock", "ShrinesCompleted", 25, { tokens = 30, unlock = { kind = "Class", id = "Cleric" } }, "Compléter 25 autels", "Complete 25 shrines")
+q("Q_Barbarian", "Unlock", "BossesDefeated", 5, { tokens = 30, unlock = { kind = "Class", id = "Barbarian" } }, "Vaincre 5 boss", "Defeat 5 bosses")
+q("Q_Tamer", "Unlock", "CompanionsCaptured", 10, { tokens = 30, unlock = { kind = "Class", id = "Tamer" } }, "Capturer 10 créatures", "Capture 10 creatures")
 q("Q_GrimoireInterdit", "Unlock", "WinsTier3", 1, { tokens = 50, unlock = { kind = "Grimoire", id = "Interdit" } }, "Gagner un Tier 3", "Win a Tier 3 run")
 
 -- Kill (31)
@@ -274,22 +259,12 @@ for _, c in CLASSES do
 	q(`Q_Class_{c}_Win_2`, "Class", `Class_{c}_Wins`, 10, { tokens = 60 }, `Gagner 10 runs avec {c}`, `Win 10 runs with {c}`)
 end
 
--- Companion (16)
-for _, l in LINES do
-	q(`Q_Comp_{l}_Stage3`, "Companion", `Companion_{l}_Stage3`, 1, { tokens = 30 }, `Faire évoluer {l} au stade 3`, `Evolve {l} to stage 3`)
-	q(`Q_Comp_{l}_Bond10`, "Companion", `Bond_{l}`, 10, { tokens = 40 }, `Lien 10 avec {l}`, `Bond 10 with {l}`)
+-- Companion (6) : capture et collection (dossier 40 §9 ; clés envoyées par CompanionService).
+for i, goal in { 1, 10, 50 } do
+	q(`Q_Capture_{i}`, "Companion", "CompanionsCaptured", goal, { tokens = TOKENS[i + 1], cosmetic = if i == 3 then "Title_Dresseur" else nil }, `Capturer {goal} créature(s)`, `Capture {goal} creature(s)`)
 end
-for i, goal in { 10, 50 } do
-	local reward: Reward = { tokens = TOKENS[i + 2] }
-	if i == 1 then
-		reward.egg = 1
-	else
-		reward.cosmetic = "Title_Dresseur"
-	end
-	q(`Q_Comp_Evolve_{i}`, "Companion", "CompanionEvolved", goal, reward, `{goal} évolutions de compagnon`, `{goal} companion evolutions`)
-end
-for i, goal in { 10, 100 } do
-	q(`Q_Comp_Ultimate_{i}`, "Companion", "UltimatesUsed", goal, { tokens = TOKENS[i + 1] }, `Déclencher {goal} ultimes`, `Trigger {goal} ultimates`)
+for i, goal in { 3, 10, 25 } do
+	q(`Q_Species_{i}`, "Companion", "CompanionNewSpecies", goal, { tokens = TOKENS[i + 2] }, `Collectionner {goal} espèces`, `Collect {goal} species`)
 end
 
 -- Coop (10)

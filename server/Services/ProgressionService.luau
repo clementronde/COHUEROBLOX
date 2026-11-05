@@ -18,12 +18,14 @@ local AnalyticsService = game:GetService("AnalyticsService")
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Progression = require(Config:WaitForChild("Progression"))
 local Quests = require(Config:WaitForChild("Quests"))
 local Cosmetics = require(Config:WaitForChild("Cosmetics"))
+local Products = require(Config:WaitForChild("Products"))
 local Net = require(Shared:WaitForChild("Net"))
 local Registry = require(Shared:WaitForChild("Registry"))
 local Signal = require(Shared:WaitForChild("Signal"))
@@ -241,6 +243,11 @@ local function unlockedIn(data: Data?, kind: string, id: string): boolean
 		end
 		return price <= 0 or stored(data, "Item", id)
 	end
+	if kind == "Companion" then
+		-- v2 : la collection capturée (A12-01), plus de règle de déblocage.
+		local c = data and data.companions
+		return type(c) == "table" and type(c.owned) == "table" and c.owned[id] ~= nil
+	end
 	local rules = Progression.Unlocks[kind]
 	if not rules then
 		return false
@@ -318,7 +325,25 @@ local function ownsCosmetic(player: Player, data: Data, id: string): boolean
 	if def.source == "Pass" then
 		return def.pass ~= nil and ownsPass(player, def.pass)
 	end
+	if def.source == "Season" then
+		-- Dérivé (jamais stocké) : palier atteint, et pass de la saison pour la piste premium.
+		local season = def.season and Products.Seasons.List[def.season]
+		if not season or not def.tier then
+			return false
+		end
+		local xp = type(data.seasons) == "table" and tonumber(data.seasons[season.id]) or 0
+		if (xp or 0) < def.tier * season.xpPerTier then
+			return false
+		end
+		return def.track == "Free" or ownsPass(player, season.pass)
+	end
 	return type(data.cosmetics) == "table" and data.cosmetics[id] == true
+end
+
+-- XP de saison d'une run (A12-04) : gagnée en jouant, jamais achetée.
+local function seasonXpFor(kills: number, worldsCleared: number): number
+	local x = Products.Seasons.Xp
+	return math.min(x.Cap, x.Base + math.floor(kills / x.KoPerXp) + x.PerWorld * worldsCleared)
 end
 
 local function grantCosmetic(data: Data, id: string)
@@ -410,28 +435,10 @@ local function metaBonusesOf(data: Data?): { weaponSlots: number, grimoireSlots:
 	}
 end
 
-local function eggCandidates(data: Data?): { string }
-	local companions = optionalConfig("Companions")
-	local pool: { string } = {}
-	local eggs = companions and companions.Eggs
-	if type(eggs) == "table" and type(eggs.EggLines) == "table" then
-		for _, l in eggs.EggLines do
-			if type(l) == "string" and LINE_SET[l] then
-				table.insert(pool, l)
-			end
-		end
-	else
-		for _, l in Progression.Lines do
-			table.insert(pool, l)
-		end
-	end
-	local out: { string } = {}
-	for _, l in pool do
-		if not unlockedIn(data, "Companion", l) then
-			table.insert(out, l)
-		end
-	end
-	return out
+-- v2 (A12-01) : un compagnon se gagne uniquement par capture (01-decisions-v2 §5). Un œuf gagné
+-- (quêtes v1, défi hebdo) n'éclôt plus en créature : il donne les jetons de repli (Eggs.DuplicateTokens).
+local function eggCandidates(_data: Data?): { string }
+	return {}
 end
 
 function ProgressionService.getWeeklyChallenge(): { week: number, classId: string, companionId: string, modifier: string, worldId: string, tier: number, endsAt: number }
@@ -439,12 +446,11 @@ function ProgressionService.getWeeklyChallenge(): { week: number, classId: strin
 	local week = Progression.weekIndex(now)
 	local rng = Random.new(week * 7919 + 17)
 	local classes = Progression.Classes
-	local lines = Progression.Lines
 	local mods = Progression.Weekly.Modifiers
 	return {
 		week = week,
 		classId = classes[rng:NextInteger(1, #classes)],
-		companionId = lines[rng:NextInteger(1, #lines)],
+		companionId = "", -- v2 : compagnon libre (collection capturée, chacun la sienne)
 		modifier = mods[rng:NextInteger(1, #mods)],
 		worldId = Progression.Weekly.WorldId,
 		tier = Progression.Weekly.Tier,
@@ -473,6 +479,11 @@ local function buildView(player: Player, data: Data): { [string]: any }
 		end
 	end
 	unlocks.Item = itemBucket
+	local companionBucket: { [string]: boolean } = {}
+	for id in data.companions.owned do
+		companionBucket[id] = true
+	end
+	unlocks.Companion = companionBucket -- contrat v1 : vue des espèces possédées
 
 	local quests = table.create(#Quests.List)
 	for i, def in Quests.List do
@@ -510,17 +521,38 @@ local function buildView(player: Player, data: Data): { [string]: any }
 	end
 
 	local passes: { [string]: boolean } = {}
-	local products = optionalConfig("Products")
-	if products and type(products.Passes) == "table" then
-		for key in products.Passes do
-			if ownsPass(player, key) then
-				passes[key] = true
-			end
+	for key in Products.Passes do
+		if ownsPass(player, key) then
+			passes[key] = true
 		end
+	end
+
+	-- Pass saisonnier : saison en cours (ou nil), XP, palier, piste premium possédée.
+	local seasonView = nil
+	local active = Products.activeSeason(os.time())
+	if active then
+		local xp = tonumber(data.seasons[active.id]) or 0
+		seasonView = {
+			id = active.id,
+			xp = xp,
+			tier = math.min(active.tiers, math.floor(xp / active.xpPerTier)),
+			tiers = active.tiers,
+			xpPerTier = active.xpPerTier,
+			premium = passes[active.pass] == true,
+			endsAt = active.endsAt,
+		}
 	end
 
 	local challenge = ProgressionService.getWeeklyChallenge()
 	local weeklyDone = data.weekly.week == challenge.week and data.weekly.done == true
+
+	-- Record perso de KO en une run (A12-02). Jamais l'état de quarantaine : le tricheur ne voit rien.
+	local wb, best = data.boards.weekBest, data.boards.best
+	local koRecord = {
+		weekly = if type(wb) == "table" and wb.week == challenge.week then tonumber(wb.ko) or 0 else 0,
+		allTime = if type(best) == "table" then tonumber(best.ko) or 0 else 0,
+		weekEndsAt = challenge.endsAt,
+	}
 
 	return {
 		silver = data.silver,
@@ -543,6 +575,21 @@ local function buildView(player: Player, data: Data): { [string]: any }
 		passes = passes,
 		vip = passes.VIP == true,
 		companionStartTech = table.clone(data.companionStartTech),
+		-- Collection v2 (A09-07) : owned[espèce] = { n, at }, equipped = { espèce1, espèce2? } (sans keys).
+		companions = {
+			owned = (function()
+				local owned = {}
+				for id, e in data.companions.owned do
+					if type(e) == "table" then
+						owned[id] = { n = tonumber(e.n) or 1, at = tonumber(e.at) or 0 }
+					end
+				end
+				return owned
+			end)(),
+			equipped = ProgressionService.getCompanionLoadout(player),
+		},
+		koRecord = koRecord,
+		season = seasonView,
 	}
 end
 
@@ -656,25 +703,143 @@ function ProgressionService.recordStat(player: Player, key: string, amount: numb
 end
 
 ---------------------------------------------------------------------------------------------------
--- Loadout
+-- Loadout et collection de compagnons (A12-01, dossier 40 §3 et §4, regles-v2 §3)
 ---------------------------------------------------------------------------------------------------
 local selected: { [Player]: boolean } = {}
 
+-- Id de classe canonique v2. Accepte les alias v1 encore envoyés par l'UI (Cornu -> Knight, résolus
+-- par Config.Classes) pendant la transition.
+local function canonicalClass(classId: any): string?
+	if not validId(classId, 32) then
+		return nil
+	end
+	if CLASS_SET[classId] then
+		return classId
+	end
+	local classes = optionalConfig("Classes")
+	local def = classes and classes[classId]
+	if type(def) == "table" and type(def.id) == "string" and CLASS_SET[def.id] then
+		return def.id
+	end
+	return nil
+end
+
+-- Espèce capturable (CompanionService.isSpecies) ; sans CompanionService, un id bien formé.
+local function validSpecies(id: any): boolean
+	if not validId(id, 48) then
+		return false
+	end
+	local companions = Registry.find("CompanionService")
+	if companions and type(companions.isSpecies) == "function" then
+		local ok, yes = pcall(companions.isSpecies, id)
+		return ok and yes == true
+	end
+	return true
+end
+
+local function slotsFor(classId: string): number
+	local companions = Registry.find("CompanionService")
+	if companions and type(companions.slotsFor) == "function" then
+		local ok, n = pcall(companions.slotsFor, classId)
+		if ok and isFiniteNumber(n) then
+			return math.clamp(math.floor(n), 1, 2)
+		end
+	end
+	return if classId == "Tamer" then 2 else 1
+end
+
+local function ownsSpecies(data: Data?, id: string): boolean
+	local c = data and data.companions
+	return type(c) == "table" and type(c.owned) == "table" and c.owned[id] ~= nil
+end
+
+function ProgressionService.hasCompanion(player: Player, speciesId: string): boolean
+	if not isPlayer(player) or type(speciesId) ~= "string" then
+		return false
+	end
+	return ownsSpecies(dataService().peek(player), speciesId)
+end
+
+-- Espèces équipées, déjà validées : possédées, capturables, sans doublon, au plus slotsFor(classe).
+function ProgressionService.getCompanionLoadout(player: Player): { string }
+	local out: { string } = {}
+	local data = if isPlayer(player) then dataService().peek(player) else nil
+	local c = data and data.companions
+	if type(c) ~= "table" or type(c.equipped) ~= "table" then
+		return out
+	end
+	local classId = canonicalClass(data and data.loadout and data.loadout.classId) or Progression.DefaultLoadout.classId
+	local max = slotsFor(classId)
+	for i = 1, 2 do
+		local id = c.equipped[i]
+		if #out < max and type(id) == "string" and ownsSpecies(data, id) and validSpecies(id) and not table.find(out, id) then
+			table.insert(out, id)
+		end
+	end
+	return out
+end
+
+-- Contrat : (classId, companionId). companionId = 1re espèce équipée, "" si aucune.
 function ProgressionService.getLoadout(player: Player): (string, string)
 	local def = Progression.DefaultLoadout
 	local data = if isPlayer(player) then dataService().peek(player) else nil
 	if not data or type(data.loadout) ~= "table" then
-		return def.classId, def.companionId
+		return def.classId, ""
 	end
-	local classId = data.loadout.classId
-	local companionId = data.loadout.companionId
-	if type(classId) ~= "string" or not unlockedIn(data, "Class", classId) then
+	local classId = canonicalClass(data.loadout.classId)
+	if not classId or not unlockedIn(data, "Class", classId) then
 		classId = def.classId
 	end
-	if type(companionId) ~= "string" or not unlockedIn(data, "Companion", companionId) then
-		companionId = def.companionId
+	local list = ProgressionService.getCompanionLoadout(player)
+	return classId :: string, list[1] or ""
+end
+
+-- Capture accordée par CompanionService (regles-v2 §3.1.7) : un seul mutate, clé d'idempotence
+-- dans le profil. Ne cède jamais. Profil non modifiable -> "Unavailable" (refusée, jamais différée).
+function ProgressionService.grantCapture(player: Player, speciesId: any, captureKey: any): (string, boolean)
+	if not isPlayer(player) or not validSpecies(speciesId) or type(captureKey) ~= "string" or #captureKey == 0 or #captureKey > 120 then
+		return "Unavailable", false
 	end
-	return classId, companionId
+	local result, isNew = "Unavailable", false
+	local ok = withProfile(player, function(d, done)
+		local c = d.companions
+		if c.keys[captureKey] then
+			result = "AlreadyGranted"
+			return
+		end
+		local now = os.time()
+		c.keys[captureKey] = now
+		local entry = c.owned[speciesId]
+		if type(entry) == "table" then
+			entry.n = (tonumber(entry.n) or 0) + 1
+		else
+			c.owned[speciesId] = { n = 1, at = now }
+			isNew = true
+		end
+		-- Garder les MaxKeys clés les plus récentes (les vieilles runs ne reviennent jamais).
+		local count, oldestKey, oldestAt = 0, nil :: string?, math.huge
+		for k, t in c.keys do
+			count += 1
+			if type(t) == "number" and t < oldestAt then
+				oldestKey, oldestAt = k, t
+			end
+		end
+		if count > Progression.Collection.MaxKeys and oldestKey then
+			c.keys[oldestKey] = nil
+		end
+		-- Premier compagnon : équipé d'office (collection vide à la première run).
+		if #c.equipped == 0 then
+			c.equipped[1] = speciesId
+		end
+		result = "Granted"
+	end)
+	if not ok then
+		return "Unavailable", false
+	end
+	if result == "Granted" then
+		dataService().saveSoon(player)
+	end
+	return result, isNew
 end
 
 function ProgressionService.hasSelectedLoadout(player: Player): boolean
@@ -690,28 +855,43 @@ local function loadoutChangeAllowed(): boolean
 	return not ok or phase == "Loadout" or phase == "Ended"
 end
 
--- Validated loadout change (remote and MatchService arrival). Returns accepted.
-function ProgressionService.setLoadout(player: Player, classId: any, companionId: any): boolean
-	if not validId(classId, 32) or not validId(companionId, 32) then
-		return false
-	end
-	if not CLASS_SET[classId] or not LINE_SET[companionId] then
+-- Choix validé (remote et arrivée MatchService). companionId / companionId2 : "" ou nil = aucun.
+-- Chaque espèce doit être possédée ; la 2e seulement si slotsFor(classe) == 2 ; pas de doublon.
+function ProgressionService.setLoadout(player: Player, classId: any, companionId: any, companionId2: any): boolean
+	local cls = canonicalClass(classId)
+	if not cls then
 		return false
 	end
 	local data = dataService().peek(player)
-	if not data or not unlockedIn(data, "Class", classId) or not unlockedIn(data, "Companion", companionId) then
+	if not data or not unlockedIn(data, "Class", cls) then
+		return false
+	end
+	local list: { string } = {}
+	for _, id in { companionId, companionId2 } do
+		if id == nil or id == "" then
+			continue
+		end
+		if not validSpecies(id) or not ownsSpecies(data, id) or table.find(list, id) then
+			return false
+		end
+		table.insert(list, id)
+	end
+	if #list > slotsFor(cls) then
 		return false
 	end
 	local ok = withProfile(player, function(d)
-		d.loadout.classId = classId
-		d.loadout.companionId = companionId
+		d.loadout.classId = cls
+		d.loadout.companionId = list[1] or ""
+		d.companions.equipped = list
 	end)
 	if ok then
 		selected[player] = true
-		ProgressionService.logCustom(player, "ClassPicked", 1, { classId })
-		ProgressionService.logCustom(player, "CompanionPicked", 1, { companionId })
+		ProgressionService.logCustom(player, "ClassPicked", 1, { cls })
+		if list[1] then
+			ProgressionService.logCustom(player, "CompanionPicked", 1, { "Species" })
+		end
 		onboarding(player, 3, "LoadoutSelected")
-		ProgressionService.LoadoutSelected:fire(player, classId, companionId)
+		ProgressionService.LoadoutSelected:fire(player, cls, list[1] or "")
 	end
 	return ok
 end
@@ -774,12 +954,20 @@ end
 ---------------------------------------------------------------------------------------------------
 type RunInfo = {
 	runId: number,
+	runKey: string, -- JobId:runId, clé d'idempotence du classement (boards.lastRunKey)
 	worldId: string,
 	tier: number,
 	partySize: number,
+	startedAt: number,
 	downed: boolean,
 	bossHit: boolean,
 	statsBefore: { [string]: number },
+	-- Classement (A12-02)
+	ko: number, -- dernier total de KO lu sur Bus.KOScored (source : StatsService)
+	koCounted: number, -- KO faits dans la fenêtre de score (ScoreWindowOvertimeSeconds)
+	lastDamagedAt: number, -- os.clock du dernier dégât subi (ou de la dernière inactivité)
+	noDamage: boolean, -- signal « aucun dégât en Overtime » levé
+	scored: boolean, -- score déjà soumis pour cette run
 }
 local runCounter = 0
 local runInfo: { [Player]: RunInfo } = {}
@@ -790,6 +978,16 @@ local firstKill: { [Player]: boolean } = {}
 
 local function runManager(): any?
 	return Registry.find("RunManager")
+end
+
+-- Overtime cumulé de la run (une run par serveur) : Bus.FinalWaveStarted ouvre un segment,
+-- Bus.StageStarted (monde suivant) le ferme. Sert aux signaux du classement, pas à l'affichage.
+local overtimeSince: number? = nil
+local overtimeAccum = 0
+
+local function overtimeSeconds(): number
+	local since = overtimeSince
+	return overtimeAccum + (if since then os.clock() - since else 0)
 end
 
 local function currentPhase(): string?
@@ -808,6 +1006,8 @@ local function onRunStarted(players: { Player }, worldId: string, tier: number)
 		return
 	end
 	runCounter += 1
+	overtimeSince = nil
+	overtimeAccum = 0
 	local size = #players
 	for _, p in players do
 		if not isPlayer(p) then
@@ -822,6 +1022,7 @@ local function onRunStarted(players: { Player }, worldId: string, tier: number)
 		end
 		runInfo[p] = {
 			runId = runCounter,
+			runKey = `{game.JobId}:{runCounter}`,
 			worldId = if type(worldId) == "string" then worldId else "?",
 			tier = if isFiniteNumber(tier) then tier else 1,
 			partySize = size,
@@ -829,6 +1030,11 @@ local function onRunStarted(players: { Player }, worldId: string, tier: number)
 			downed = false,
 			bossHit = false,
 			statsBefore = before,
+			ko = 0,
+			koCounted = 0,
+			lastDamagedAt = os.clock(),
+			noDamage = false,
+			scored = false,
 		}
 		if size >= 2 then
 			withProfile(p, function(d, done)
@@ -868,6 +1074,10 @@ local function onPlayerDamaged(player: Player, amount: number)
 		return
 	end
 	bufferStat(player, "DamageTaken", amount)
+	local hit = runInfo[player]
+	if hit then
+		hit.lastDamagedAt = os.clock()
+	end
 	if currentPhase() == "Boss" then
 		local info = runInfo[player]
 		if info then
@@ -938,6 +1148,30 @@ local function onStageStarted()
 	for _, info in runInfo do
 		info.bossHit = false
 	end
+	local since = overtimeSince
+	if since then
+		overtimeAccum += os.clock() - since
+		overtimeSince = nil
+	end
+end
+
+local function onFinalWaveStarted()
+	if not overtimeSince then
+		overtimeSince = os.clock()
+	end
+end
+
+-- KO compté par StatsService (A04-03) : on ne recalcule rien, on garde le dernier total.
+local function onKOScored(player: Player, runKills: number)
+	local info = runInfo[player]
+	if not info or not isFiniteNumber(runKills) then
+		return
+	end
+	info.ko = runKills
+	local window = Progression.Leaderboards.ScoreWindowOvertimeSeconds
+	if window <= 0 or overtimeSeconds() <= window then
+		info.koCounted = runKills
+	end
 end
 
 local function onPlayerDowned(player: Player)
@@ -989,6 +1223,9 @@ local function onCompanionEvolved(player: Player, stage: number)
 	end)
 end
 
+-- Défini dans la section Leaderboards (plus bas).
+local scoreRun: (player: Player, info: RunInfo, kills: number, ending: string) -> ()
+
 local function num(v: any, lo: number, hi: number): number
 	if not isFiniteNumber(v) then
 		return lo
@@ -1024,6 +1261,11 @@ function ProgressionService.grantRunRewards(player: Player, summary: Types.RunSu
 	local line = if type(summary.companionId) == "string" and LINE_SET[summary.companionId] then summary.companionId else nil
 	local partySize = if info then info.partySize else 1
 	local downed = info ~= nil and info.downed
+	-- Classement (regles-v2 §4.2) : une écriture par run, par ce serveur de run, avant les gains.
+	-- Les retardataires (pas de runInfo) ne sont jamais classés (§5.5).
+	if info then
+		scoreRun(player, info, kills, if summary.cashedOut == true then "CashOut" else "End")
+	end
 
 	local cfgS = Progression.Silver
 	-- Review findings 1, 2, 5: only players who started this run get credit (late joiners and
@@ -1056,10 +1298,18 @@ function ProgressionService.grantRunRewards(player: Player, summary: Types.RunSu
 
 	local challenge = ProgressionService.getWeeklyChallenge()
 	local weeklyNow = false
+	-- Pass saisonnier (A12-04) : XP gagnée en jouant, bornée par la saison.
+	local season = Products.activeSeason(os.time())
+	local worldsCleared = math.floor(num((summary :: any).worldsCleared, 0, 3))
+	local seasonXp = if season and (played or victory) then seasonXpFor(kills, worldsCleared) else 0
 	local ok = withProfile(player, function(d, done)
 		rollWeek(d)
 		d.silver += silver
 		d.silverEarnedTotal += silver
+		if season and seasonXp > 0 then
+			local current = tonumber(d.seasons[season.id]) or 0
+			d.seasons[season.id] = math.min(season.tiers * season.xpPerTier, current + seasonXp)
+		end
 		if played or victory then
 			applyStat(d, "RunsPlayed", 1, done)
 		end
@@ -1110,7 +1360,7 @@ function ProgressionService.grantRunRewards(player: Player, summary: Types.RunSu
 			d.weekly.done = false
 			d.weekly.bestSeconds = 0
 		end
-		if victory and not d.weekly.done and classId == challenge.classId and line == challenge.companionId then
+		if victory and not d.weekly.done and classId == challenge.classId and (challenge.companionId == "" or line == challenge.companionId) then
 			d.weekly.done = true
 			weeklyNow = true
 			local w = Progression.Weekly
@@ -1129,6 +1379,7 @@ function ProgressionService.grantRunRewards(player: Player, summary: Types.RunSu
 		rewardedRun[player] = runId
 	end
 	out.silverEarned = silver
+	out.seasonXp = seasonXp -- champ en plus du contrat RunSummary (écran de fin)
 
 	-- Quests that moved during this run (completed first, then closest to their goal), max 8.
 	local data = dataService().peek(player)
@@ -1174,16 +1425,26 @@ end
 ---------------------------------------------------------------------------------------------------
 -- Remote handlers
 ---------------------------------------------------------------------------------------------------
-local function onSelectLoadout(player: Player, classId: any, companionId: any)
+local function onSelectLoadout(player: Player, classId: any, companionId: any, companionId2: any)
 	if not loadoutChangeAllowed() then
 		return
 	end
-	if not ProgressionService.setLoadout(player, classId, companionId) then
+	if not ProgressionService.setLoadout(player, classId, companionId, companionId2) then
 		markDirty(player) -- resend the real state so the client UI resyncs
 	end
 end
 
-local SIMPLE_SLOTS = { Title = true, Emote = true, Footstep = true, Aura = true }
+-- Pose / Tint : un cosmétique sans classId (premium, saison) va sur toutes les classes (A12-04).
+local SIMPLE_SLOTS = {
+	Title = true,
+	Emote = true,
+	Footstep = true,
+	Aura = true,
+	Trail = true,
+	KoEffect = true,
+	CompanionHat = true,
+	CompanionColor = true,
+}
 local CLASS_SLOTS = { Tint = true, Pose = true }
 local LINE_SLOTS = { CompanionTint = true, CompanionPose = true }
 
@@ -1245,9 +1506,6 @@ local function onEquipCosmetic(player: Player, slot: any, cosmeticId: any)
 			return
 		end
 		if CLASS_SLOTS[base] and def.classId ~= nil and def.classId ~= arg then
-			return
-		end
-		if base == "Pose" and def.classId == nil then
 			return
 		end
 		if LINE_SLOTS[base] and def.line ~= arg then
@@ -1397,97 +1655,402 @@ local function onHatchEgg(player: Player)
 end
 
 ---------------------------------------------------------------------------------------------------
--- Leaderboards (OrderedDataStore: index, never truth; never lowered; never from Studio tests)
+-- Leaderboards v2 (A12-02) : meilleur nombre de KO en UNE run, hebdo + all-time.
+-- Règles : docs/security/regles-v2.md §4 (corrige S-06). OrderedDataStore = index, jamais la vérité :
+-- le profil garde le relevé (boards.best / boards.weekBest). Écrit une fois par run et par joueur,
+-- par le serveur de run (fin de run, Cash out ou départ en cours de run), jamais depuis Studio,
+-- jamais pour un retardataire, un banni ou une run en quarantaine. Le tricheur ne voit rien.
 ---------------------------------------------------------------------------------------------------
 local LB = Progression.Leaderboards
-local lastWritten: { [Player]: { [string]: number } } = {}
+local QC = LB.Quarantine
+local WEEKLY_BOARD, ALLTIME_BOARD = LB.Boards[1], LB.Boards[2]
+for _, board in LB.Boards do
+	if board.weekly then
+		WEEKLY_BOARD = board
+	else
+		ALLTIME_BOARD = board
+	end
+end
+local IS_STUDIO = RunService:IsStudio()
 local boardCache: { [string]: { { userId: number, value: number } } } = {}
+local memoryBoards: { [string]: { [string]: number } } = {}
+local bannedIds: { [number]: boolean } = {}
+for _, id in LB.BoardBans do
+	if type(id) == "number" then
+		bannedIds[id] = true
+	end
+end
 
-local function boardsEnabled(): boolean
+-- Repli en mémoire : Studio (jamais d'écriture réelle depuis Studio, §4.2), profil de test, ou
+-- magasin de données en mémoire. En live, une erreur reste une erreur (réessais, puis log).
+local function boardsInMemory(): boolean
 	local ds = dataService()
-	return not ds.isTestSession() and not ds.isMemoryBackend()
+	return IS_STUDIO or ds.isTestSession() or ds.isMemoryBackend()
+end
+
+local warnedMemoryBoards = false
+local function noteMemoryBoards()
+	if not warnedMemoryBoards then
+		warnedMemoryBoards = true
+		warn(
+			"[ProgressionService] Leaderboards use an IN-MEMORY store (Studio / test profile / no API access):"
+				.. " nothing is written to the real OrderedDataStores and scores vanish when the server stops."
+		)
+	end
 end
 
 local function storeName(board: { store: string, weekly: boolean }, week: number): string
 	return if board.weekly then `{board.store}_W{week}` else board.store
 end
 
-local function boardValue(data: Data, source: string, week: number): number
-	if source == "boards.kills" then
-		return if data.boards.week == week then tonumber(data.boards.kills) or 0 else 0
-	elseif source == "boards.bestFinalWave" then
-		return if data.boards.week == week then tonumber(data.boards.bestFinalWave) or 0 else 0
-	end
-	return tonumber(data.stats[source]) or 0
+local function boardKey(userId: number): string
+	return `u_{userId}`
 end
 
--- Captures values synchronously (profile may be gone after), then writes in a thread.
-local function writeBoards(player: Player)
-	if not boardsEnabled() then
-		return
+-- Garde le maximum, ne baisse jamais une valeur. Yields (réessais). true si écrit ou déjà >= value.
+local function boardUpdate(name: string, userId: number, value: number): boolean
+	local key = boardKey(userId)
+	if boardsInMemory() then
+		noteMemoryBoards()
+		local t = memoryBoards[name]
+		if not t then
+			t = {}
+			memoryBoards[name] = t
+		end
+		if (t[key] or 0) < value then
+			t[key] = value
+		end
+		return true
 	end
-	local data = dataService().peek(player)
-	if not data or data.flags.boardBanned then
-		return
-	end
-	local week = Progression.weekIndex(os.time())
-	local userId = player.UserId
-	local mine = lastWritten[player]
-	if not mine then
-		mine = {}
-		lastWritten[player] = mine
-	end
-	local jobs: { { name: string, value: number } } = {}
-	for _, board in LB.Boards do
-		local value = math.floor(boardValue(data, board.source, week))
-		local name = storeName(board, week)
-		if value > 0 and mine[name] ~= value then
-			table.insert(jobs, { name = name, value = value })
+	for attempt = 1, LB.WriteAttempts do
+		local ok, err = pcall(function()
+			DataStoreService:GetOrderedDataStore(name):UpdateAsync(key, function(old: any): any
+				if type(old) == "number" and old >= value then
+					return nil -- score monotone dans sa période
+				end
+				return value
+			end)
+		end)
+		if ok then
+			return true
+		end
+		warn(`[ProgressionService] board {name} write failed ({attempt}/{LB.WriteAttempts}): {err}`)
+		if attempt < LB.WriteAttempts then
+			task.wait(attempt * 2 * (0.5 + math.random()))
 		end
 	end
-	if #jobs == 0 then
+	return false
+end
+
+local function boardRemove(name: string, userId: number)
+	local key = boardKey(userId)
+	if boardsInMemory() then
+		local t = memoryBoards[name]
+		if t then
+			t[key] = nil
+		end
 		return
 	end
-	task.spawn(function()
-		for _, job in jobs do
-			local ok, err = pcall(function()
-				local store = DataStoreService:GetOrderedDataStore(job.name)
-				store:UpdateAsync(`u_{userId}`, function(old: any): any
-					if type(old) == "number" and old >= job.value then
-						return nil -- never lower a monotonic score
-					end
-					return job.value
-				end)
-			end)
-			if ok then
-				mine[job.name] = job.value
-			else
-				warn(`[ProgressionService] board {job.name} write failed: {err}`)
+	for attempt = 1, LB.WriteAttempts do
+		local ok, err = pcall(function()
+			DataStoreService:GetOrderedDataStore(name):RemoveAsync(key)
+		end)
+		if ok then
+			return
+		end
+		warn(`[ProgressionService] board {name} remove failed ({attempt}/{LB.WriteAttempts}): {err}`)
+		if attempt < LB.WriteAttempts then
+			task.wait(attempt * 2)
+		end
+	end
+end
+
+local function boardRead(name: string): { { userId: number, value: number } }
+	local rows: { { userId: number, value: number } } = {}
+	if boardsInMemory() then
+		for key, value in memoryBoards[name] or {} do
+			local userId = tonumber(string.match(key, "^u_(%d+)$"))
+			if userId then
+				table.insert(rows, { userId = userId, value = value })
 			end
+		end
+		table.sort(rows, function(a, b)
+			return a.value > b.value
+		end)
+		while #rows > LB.TopN do
+			table.remove(rows)
+		end
+		return rows
+	end
+	local page = DataStoreService:GetOrderedDataStore(name):GetSortedAsync(false, LB.TopN):GetCurrentPage()
+	for _, entry in page do
+		local userId = tonumber(string.match(entry.key, "^u_(%d+)$"))
+		if userId and type(entry.value) == "number" then
+			table.insert(rows, { userId = userId, value = entry.value })
+		end
+	end
+	return rows
+end
+
+local function safeCall(service: any, fnName: string, ...: any): any
+	if service and type(service[fnName]) == "function" then
+		local ok, result = pcall(service[fnName], ...)
+		if ok then
+			return result
+		end
+	end
+	return nil
+end
+
+-- Petit résumé du build pour le relevé (purge par filtre plus tard) : "<arme>:<niveau>", 4 max.
+local function buildDigest(player: Player): { string }
+	local out: { string } = {}
+	local build = safeCall(Registry.find("StatsService"), "getBuild", player)
+	if type(build) == "table" and type(build.weapons) == "table" then
+		for _, w in build.weapons do
+			if #out >= 4 then
+				break
+			end
+			if type(w) == "table" and validId(w.id, 32) and isFiniteNumber(w.level) then
+				table.insert(out, `{w.id}:{math.floor(w.level)}`)
+			end
+		end
+	end
+	return out
+end
+
+-- Pousse le relevé du profil vers les tableaux (écriture déjà validée par un serveur de run).
+-- Marque `written` si le joueur est toujours là ; sinon on repoussera au prochain chargement.
+local function pushRecords(player: Player, week: number, pushWeek: boolean, pushAll: boolean, ko: number)
+	local userId = player.UserId
+	task.spawn(function()
+		local okWeek = not pushWeek or boardUpdate(storeName(WEEKLY_BOARD, week), userId, ko)
+		local okAll = not pushAll or boardUpdate(storeName(ALLTIME_BOARD, week), userId, ko)
+		if player.Parent then
+			dataService().mutate(player, function(d)
+				local b = d.boards
+				if pushWeek and okWeek and type(b.weekBest) == "table" and b.weekBest.week == week then
+					b.weekBest.written = true
+				end
+				if pushAll and okAll and type(b.best) == "table" then
+					b.best.written = true
+				end
+			end)
 		end
 	end)
 end
 
-local function refreshBoards()
-	if not boardsEnabled() then
+local function countRecent(list: { any }, now: number, windowSeconds: number): number
+	local n = 0
+	for _, rec in list do
+		if type(rec) == "table" and isFiniteNumber(rec.at) and now - rec.at <= windowSeconds then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- Soumet le score d'une run (synchrone pour le profil ; les écritures de tableau partent en tâche).
+-- ending : "End" | "CashOut" | "Left". kills : total serveur de la run (StatsService).
+function scoreRun(player: Player, info: RunInfo, kills: number, ending: string)
+	if info.scored then
 		return
 	end
-	local week = Progression.weekIndex(os.time())
-	for _, board in LB.Boards do
-		local ok, result = pcall(function()
-			local store = DataStoreService:GetOrderedDataStore(storeName(board, week))
-			local page = store:GetSortedAsync(false, LB.TopN):GetCurrentPage()
-			local rows = {}
-			for _, entry in page do
-				local userId = tonumber(string.match(entry.key, "^u_(%d+)$"))
-				if userId and type(entry.value) == "number" then
-					table.insert(rows, { userId = userId, value = entry.value })
+	info.scored = true
+	local userId = player.UserId
+	local ko = math.floor(num(kills, 0, LB.MaxValue))
+	if LB.ScoreWindowOvertimeSeconds > 0 then
+		ko = math.min(ko, math.floor(num(info.koCounted, 0, LB.MaxValue)))
+	end
+	local duration = math.max(1, os.clock() - info.startedAt)
+	local reasons: { string } = {}
+	local logs: { string } = {}
+
+	-- §2.3 : on juge les conditions qui ont produit le score, pas le nombre seul.
+	local strikes = safeCall(Registry.find("MovementGuard"), "getRunStrikes", player)
+	strikes = if isFiniteNumber(strikes) then strikes else 0
+	if strikes >= QC.MaxStrikes then
+		table.insert(reasons, "Strikes")
+	end
+	local invuln = safeCall(runManager(), "getInvulnerableSeconds", player)
+	if isFiniteNumber(invuln) and duration >= QC.MinRunSecondsForShare and invuln / duration > QC.MaxInvulnShare then
+		table.insert(reasons, "Invulnerable")
+	end
+	if info.noDamage then
+		table.insert(if QC.NoDamageEnforce then reasons else logs, "NoDamageOvertime")
+	end
+	local perMinute = ko / (duration / 60)
+	if QC.KoPerMinuteCap > 0 then
+		if perMinute > QC.KoPerMinuteCap then
+			table.insert(reasons, "KoRate")
+		end
+	elseif perMinute > QC.KoPerMinuteLog then
+		table.insert(logs, "KoRate")
+	end
+	-- §2.2 invariants (si EnemyService expose le nombre d'ennemis apparus : contract request A03/A04).
+	local spawned = safeCall(Registry.find("EnemyService"), "getRunSpawned")
+	if isFiniteNumber(spawned) then
+		local sum = 0
+		local all = safeCall(Registry.find("StatsService"), "getRunKills")
+		if type(all) == "table" then
+			for _, n in all do
+				if isFiniteNumber(n) then
+					sum += n
 				end
 			end
-			return rows
+		end
+		if ko > spawned or sum > spawned then
+			warn(`[ProgressionService] KO invariant broken for {userId}: ko={ko} sum={sum} spawned={spawned}`)
+			table.insert(reasons, "Invariant")
+		end
+	end
+	if #logs > 0 then
+		warn(`[ProgressionService] board signal (log only) {userId}: {table.concat(logs, ",")} ko={ko} kpm={math.floor(perMinute)}`)
+	end
+
+	local now = os.time()
+	local week = Progression.weekIndex(now)
+	local record = {
+		ko = ko,
+		runKey = info.runKey,
+		seconds = math.floor(duration),
+		overtimeSeconds = math.floor(overtimeSeconds()),
+		partySize = info.partySize,
+		strikes = strikes,
+		worldId = info.worldId,
+		tier = info.tier,
+		ending = ending,
+		build = buildDigest(player),
+		at = now,
+	}
+	local quarantined = #reasons > 0
+	local banNow, pushWeek, pushAll = false, false, false
+	withProfile(player, function(d)
+		local b = d.boards
+		if b.lastRunKey == info.runKey then
+			return -- déjà soumis (idempotence, même après un double appel)
+		end
+		b.lastRunKey = info.runKey
+		if quarantined then
+			local rec = table.clone(record)
+			rec.reasons = reasons
+			table.insert(b.quarantined, rec)
+			while #b.quarantined > QC.KeepRecords do
+				table.remove(b.quarantined, 1)
+			end
+			if not d.flags.boardBanned and countRecent(b.quarantined, now, QC.BanWindowDays * 86400) >= QC.BanCount then
+				d.flags.boardBanned = true
+				banNow = true
+			end
+			return
+		end
+		if d.flags.boardBanned or bannedIds[userId] or ko <= 0 then
+			return
+		end
+		local wb = b.weekBest
+		if type(wb) ~= "table" or wb.week ~= week or ko > (tonumber(wb.ko) or 0) then
+			local rec = table.clone(record)
+			rec.week = week
+			rec.written = false
+			b.weekBest = rec
+			pushWeek = true
+		end
+		if type(b.best) ~= "table" or ko > (tonumber(b.best.ko) or 0) then
+			local rec = table.clone(record)
+			rec.build = table.clone(record.build)
+			rec.written = false
+			b.best = rec
+			pushAll = true
+		end
+	end, true)
+
+	if quarantined then
+		-- Log serveur seulement ; l'écran de fin reste normal (§0.5).
+		warn(`[ProgressionService] run quarantined for {userId}: {table.concat(reasons, ",")} ko={ko}`)
+	end
+	if banNow then
+		warn(`[ProgressionService] {userId} removed from leaderboards (3 quarantined runs in 7 days)`)
+		task.spawn(function()
+			for _, board in LB.Boards do
+				boardRemove(storeName(board, week), userId)
+			end
 		end)
+	end
+	if pushWeek or pushAll then
+		pushRecords(player, week, pushWeek, pushAll, ko)
+		dataService().saveSoon(player)
+	end
+end
+
+-- Au chargement : repousse un relevé validé dont l'écriture de tableau a échoué (idempotent, max).
+local function pushPendingRecords(player: Player)
+	local data = dataService().peek(player)
+	if not data or data.flags.boardBanned or bannedIds[player.UserId] then
+		return
+	end
+	local b = data.boards
+	local week = Progression.weekIndex(os.time())
+	local wb, best = b.weekBest, b.best
+	local pushWeek = type(wb) == "table" and wb.week == week and wb.written == false and isFiniteNumber(wb.ko) and wb.ko > 0
+	local pushAll = type(best) == "table" and best.written == false and isFiniteNumber(best.ko) and best.ko > 0
+	if pushWeek then
+		pushRecords(player, week, true, false, math.floor(wb.ko))
+	end
+	if pushAll then
+		pushRecords(player, week, false, true, math.floor(best.ko))
+	end
+end
+
+-- Départ en cours de run : les KO déjà faits comptent pour le classement (§4.2, §6.4).
+local function scoreOnLeave(player: Player)
+	local info = runInfo[player]
+	if not info or info.scored then
+		return
+	end
+	local phase = currentPhase()
+	if phase == "Loadout" or phase == "Ended" then
+		return
+	end
+	local kills = safeCall(Registry.find("StatsService"), "getKills", player)
+	scoreRun(player, info, math.max(info.ko, if isFiniteNumber(kills) then kills else 0), "Left")
+end
+
+-- Signal « aucun dégât en Overtime » (§2.3), 1 Hz. Un joueur inactif (à terre, fantôme) remet le
+-- compteur à zéro : il ne peut pas être touché, ce n'est pas suspect.
+local function checkNoDamage()
+	local ot = overtimeSeconds()
+	if ot < QC.NoDamageAfterOvertime then
+		return
+	end
+	local now = os.clock()
+	local thresholdAt = now - (ot - QC.NoDamageAfterOvertime)
+	local run = runManager()
+	for player, info in runInfo do
+		if info.noDamage then
+			continue
+		end
+		if safeCall(run, "isActive", player) ~= true then
+			info.lastDamagedAt = now
+			continue
+		end
+		if now - math.max(info.lastDamagedAt, thresholdAt) >= QC.NoDamageSeconds then
+			info.noDamage = true
+		end
+	end
+end
+
+local function refreshBoards()
+	local week = Progression.weekIndex(os.time())
+	for _, board in LB.Boards do
+		local ok, result = pcall(boardRead, storeName(board, week))
 		if ok then
-			boardCache[board.key] = result
+			local rows = {}
+			for _, row in result do
+				if not bannedIds[row.userId] then -- §4.4 : bannis filtrés à la lecture aussi
+					table.insert(rows, row)
+				end
+			end
+			boardCache[board.key] = rows
 		else
 			warn(`[ProgressionService] board {board.key} read failed: {result}`)
 		end
@@ -1528,6 +2091,7 @@ local function onProfileLoaded(player: Player)
 		end
 	end)
 	markDirty(player)
+	pushPendingRecords(player)
 	if next(boardCache) then
 		Net.event("Leaderboards"):FireClient(player, boardCache)
 	end
@@ -1535,7 +2099,7 @@ end
 
 local function beforeRelease(player: Player)
 	flushPending(player)
-	writeBoards(player)
+	scoreOnLeave(player) -- profil encore modifiable : le relevé part dans la sauvegarde finale
 	local started = joinedAt[player]
 	if started then
 		ProgressionService.logCustom(player, "SessionMinutes", math.floor((os.clock() - started) / 60), nil)
@@ -1572,7 +2136,6 @@ local function onPlayerRemoving(player: Player)
 		joinedAt[player] = nil
 		firstKill[player] = nil
 		onboardingMax[player] = nil
-		lastWritten[player] = nil
 	end)
 end
 
@@ -1596,6 +2159,8 @@ function ProgressionService.init()
 	Bus.PlayerRevived:connect(onPlayerRevived)
 	Bus.ShrineCompleted:connect(onShrineCompleted)
 	Bus.CompanionEvolved:connect(onCompanionEvolved)
+	Bus.FinalWaveStarted:connect(onFinalWaveStarted)
+	Bus.KOScored:connect(onKOScored)
 
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
@@ -1619,6 +2184,7 @@ function ProgressionService.start()
 				for p in pending do
 					flushPending(p)
 				end
+				checkNoDamage()
 			end
 			for p in dirty do
 				dirty[p] = nil
@@ -1637,17 +2203,7 @@ function ProgressionService.start()
 			end
 		end
 	end)
-	-- Leaderboards: write every 120 s (only changed values), read every 120 s + jitter
-	task.spawn(function()
-		task.wait(math.random() * LB.WriteSeconds)
-		while true do
-			for _, p in Players:GetPlayers() do
-				writeBoards(p)
-				task.wait(0.5) -- spread the ordered write budget
-			end
-			task.wait(LB.WriteSeconds)
-		end
-	end)
+	-- Leaderboards: written once per run (scoreRun) ; tops read every 120 s + jitter
 	task.spawn(function()
 		task.wait(5 + math.random() * LB.RefreshJitter)
 		while true do

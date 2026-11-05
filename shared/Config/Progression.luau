@@ -6,52 +6,49 @@ export type UnlockRule = { free: boolean?, quest: string?, silver: number?, clas
 
 local Progression = {}
 
--- Ids (docs/ARCHITECTURE.md section 3)
+-- Classes v2 (01-decisions-v2 §3 ; ids de shared/Config/Classes.luau, domaine avatar).
+-- Knight, Archer, Mage gratuites ; les autres par quête. Jamais vendues.
 Progression.Classes = {
-	"Cornu",
-	"Plumeline",
-	"Mecano",
-	"Felyne",
-	"Rocailleux",
-	"Sporelin",
-	"Ecaille",
-	"Astrel",
-	"Cristallin",
-	"Tentaculos",
+	"Knight",
+	"Archer",
+	"Mage",
+	"Guardian",
+	"Rogue",
+	"Cleric",
+	"Barbarian",
+	"Tamer",
 } :: { string }
 
+-- Lignées v1 (évolution, Lien, œufs) : plus de contenu en v2 (capture et collection, dossier 40).
+-- Gardées pour lire les vieux profils et les cosmétiques de Lien déjà accordés.
 Progression.Lines = { "Braise", "Ronce", "Maree", "Volt", "Givre", "Echo" } :: { string }
 
 Progression.Worlds = { "BoisGrognon", "DunesCroustillantes", "RecreFantome" } :: { string }
 Progression.MaxTier = 3
 
--- Class start weapons, same order as Classes (ARCHITECTURE section 3).
+-- Arme de départ de chaque classe (lue dans Config.Classes[classId].startWeapon, domaine avatar).
 Progression.StartWeapon = {
-	Cornu = "HacheBoomerang",
-	Plumeline = "PlumesDards",
-	Mecano = "CleTourelle",
-	Felyne = "GriffesEclair",
-	Rocailleux = "PoingSeisme",
-	Sporelin = "NuageSpores",
-	Ecaille = "SouffleBraise",
-	Astrel = "Meteorite",
-	Cristallin = "EclatsPrisme",
-	Tentaculos = "FouetTentacule",
+	Knight = "Broadsword",
+	Archer = "Longbow",
+	Mage = "FireStaff",
+	Guardian = "QuakeHammer",
+	Rogue = "ThrowingDaggers",
+	Cleric = "HolyAura",
+	Barbarian = "SpinningAxes",
+	Tamer = "BeastWhip",
 } :: { [string]: string }
 
 -- Unlock rules per kind. Quest unlocks are derived from questsDone (never stored twice).
 Progression.Unlocks = {
 	Class = {
-		Cornu = { free = true },
-		Plumeline = { free = true },
-		Mecano = { free = true },
-		Felyne = { quest = "Q_Felyne" },
-		Rocailleux = { quest = "Q_Rocailleux" },
-		Sporelin = { quest = "Q_Sporelin" },
-		Ecaille = { quest = "Q_Ecaille" },
-		Astrel = { quest = "Q_Astrel" },
-		Cristallin = { quest = "Q_Cristallin" },
-		Tentaculos = { quest = "Q_Tentaculos" },
+		Knight = { free = true },
+		Archer = { free = true },
+		Mage = { free = true },
+		Guardian = { quest = "Q_Guardian" },
+		Rogue = { quest = "Q_Rogue" },
+		Cleric = { quest = "Q_Cleric" },
+		Barbarian = { quest = "Q_Barbarian" },
+		Tamer = { quest = "Q_Tamer" },
 	},
 	Weapon = {
 		HacheBoomerang = { free = true },
@@ -87,14 +84,7 @@ Progression.Unlocks = {
 		Chance = { silver = 120 },
 		Interdit = { quest = "Q_GrimoireInterdit" },
 	},
-	Companion = {
-		Braise = { free = true },
-		Ronce = { free = true },
-		Maree = { free = true },
-		Volt = { quest = "Q_Volt" },
-		Givre = { quest = "Q_Givre" },
-		Echo = { quest = "Q_Echo" },
-	},
+	-- Companion : plus de regle en v2. Un compagnon se capture (ProgressionService.hasCompanion).
 } :: { [string]: { [string]: UnlockRule } }
 
 -- Items (Config.Items is owned by combat): an item with no `unlock` field, or unlock = "Free",
@@ -113,7 +103,11 @@ Progression.WorldUnlock = {
 	RecreFantome = { stat = "Win_DunesCroustillantes_T2", goal = 1 },
 } :: { [string]: { free: boolean?, stat: string?, goal: number? } }
 
-Progression.DefaultLoadout = { classId = "Cornu", companionId = "Braise" }
+-- companionId "" = aucun : la collection est vide à la première run (dossier 40 §11.1, défaut).
+Progression.DefaultLoadout = { classId = "Knight", companionId = "" }
+
+-- Collection de compagnons (A12-01) : clés d'idempotence de capture gardées dans le profil.
+Progression.Collection = { MaxKeys = 200 }
 
 -- Silver per run (doc 11.1)
 Progression.Silver = {
@@ -207,18 +201,39 @@ function Progression.weekEndsAt(unixTime: number): number
 	return (Progression.weekIndex(unixTime) + 1) * SECONDS_PER_WEEK + MONDAY_OFFSET
 end
 
--- Leaderboards (OrderedDataStore). Weekly boards get "_W<week>" appended.
+-- Classements v2 (A12-02, docs/security/regles-v2.md §4) : meilleur nombre de KO en UNE run.
+-- OrderedDataStore = index, le profil (boards.best / boards.weekBest) = vérité.
+-- Hebdo : store "<store>_W<week>" (week = weekIndex, reset lundi 00:00 UTC par le nom, sans suppression).
+-- Écrit une fois par run et par joueur, par le serveur de run, en fin de run ou au départ du joueur.
 Progression.Leaderboards = {
-	WriteSeconds = 120,
-	RefreshSeconds = 120,
+	RefreshSeconds = 120, -- lecture des tops (par serveur)
 	RefreshJitter = 30,
-	TopN = 50,
+	TopN = 100, -- GetSortedAsync(false, 100)
+	MaxValue = 10_000_000, -- borne d'une valeur écrite
+	WriteAttempts = 3,
 	Boards = {
-		{ key = "KillsAllTime", store = "LB_Kills_AllTime_v1", weekly = false, source = "Kills" },
-		{ key = "KillsWeekly", store = "LB_Kills_v1", weekly = true, source = "boards.kills" },
-		{ key = "FinalWaveAllTime", store = "LB_FinalWave_AllTime_v1", weekly = false, source = "BestFinalWave" },
-		{ key = "FinalWaveWeekly", store = "LB_FinalWave_v1", weekly = true, source = "boards.bestFinalWave" },
-	} :: { { key: string, store: string, weekly: boolean, source: string } },
+		{ key = "KoRunWeekly", store = "LB_KoRun", weekly = true },
+		{ key = "KoRunAllTime", store = "LB_KoRun_AllTime_v1", weekly = false },
+	} :: { { key: string, store: string, weekly: boolean } },
+	-- §4.3.1 (décision de Clément en attente) : seuls les KO faits jusqu'à N s d'Overtime cumulé
+	-- comptent au classement. 0 = désactivé (tous les KO de la run comptent).
+	ScoreWindowOvertimeSeconds = 0,
+	-- Signaux de quarantaine (§2.3, §4.5). Un seuil non mesuré en playtest ne fait que journaliser.
+	Quarantine = {
+		MaxStrikes = 3, -- MovementGuard.getRunStrikes >= 3 -> quarantaine
+		MaxInvulnShare = 0.3, -- temps invulnérable / durée de la run (RunManager.getInvulnerableSeconds)
+		MinRunSecondsForShare = 60, -- en dessous, la part d'invulnérabilité n'est pas jugée
+		NoDamageAfterOvertime = 180, -- à partir de +03:00 d'Overtime...
+		NoDamageSeconds = 180, -- ...3 min d'affilée sans dégât subi en étant actif
+		NoDamageEnforce = false, -- log seul tant que non mesuré
+		KoPerMinuteCap = 0, -- 0 = pas encore mesuré (p99,9 x 1,5) : log seul au-delà de KoPerMinuteLog
+		KoPerMinuteLog = 600,
+		KeepRecords = 20, -- relevés de runs en quarantaine gardés dans le profil
+		BanCount = 3, -- 3 runs en quarantaine...
+		BanWindowDays = 7, -- ...en 7 jours -> flags.boardBanned + retrait des deux classements
+	},
+	-- Ban manuel (Clément seulement) : userIds exclus à l'écriture ET à la lecture.
+	BoardBans = {} :: { number },
 }
 
 -- Shrine kinds counted as "trial" shrines (loot domain owns the kinds)
