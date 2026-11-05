@@ -156,7 +156,7 @@ Maquettes Figma : **[COHUE — Menus & Lobby (A09)](https://www.figma.com/design
 
 Planche des 8 écrans habillés (4 nov.) : [img/65-maquettes-v2.png](img/65-maquettes-v2.png).
 
-**Style UI : v3 « briques » de A08** (validé par Clément le 5 nov. pour le lobby ; la v2 glossy puis « studs » a été jugée AI slop). Les 8 écrans du 4 nov. sont encore en v2. **Un menu concept en v3 est fait : Classes** (cadre « 2 · Classes — concept v3 » de la page 02, composants `Window` Plum, `Tile`, `Tag`, `Button`, `BrickIcon/*` de A08). Il est à valider par Clément avant de passer les 7 autres menus et de maquetter les 3 nouveaux (§6.9 à 6.11). Archer n'a pas encore d'icône d'arc (sprite d'arme attendu d'A14).
+**Style UI : v3 « briques » de A08** (validé par Clément le 5 nov. pour le lobby ; la v2 glossy puis « studs » a été jugée AI slop). Les 8 écrans du 4 nov. sont encore en v2. **Un menu concept en v3 est fait : Classes** (cadre « 2 · Classes — concept v3 » de la page 02, composants `Window` Plum, `Tile`, `Tag`, `Button`, `BrickIcon/*` de A08). Capture : [img/65-classes-v3.png](img/65-classes-v3.png). Il est à valider par Clément avant de passer les 7 autres menus et de maquetter les 3 nouveaux (§6.9 à 6.11). Relecture à l'aveugle (5 nov.) : HUD 6,7 / 10, Classes 6,3 / 10 plafonné à 5 parce que les boutons taille M de A08 font 40 px ; corrigé (boutons taille L de 48 px, aperçu d'avatar garni, une ligne de texte en moins). Reste noté : les animations ne sont pas spécifiées (U4 = 0). Archer n'a pas encore d'icône d'arc (sprite d'arme attendu d'A14).
 
 Règles communes :
 
