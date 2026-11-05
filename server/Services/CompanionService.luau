@@ -11,6 +11,7 @@
 --   pour A03 : isSpecies(kind) · onCapturableDefeated(kind, x, z, killer) -> cageId?
 --   pour A12 : slotsFor(classId) · isSpecies(id) · speciesName(id)
 --   contrat  : getCardOptions · applyCard · chargeUltimate (sans effet) · getState · ensure · getCages
+--   aspect   : refreshLook(player) (A05-05 : attributs joueur CompanionLook<slot>, dossier 40 §8.2)
 -- Appels sortants (tous optionnels, Registry.find dans les fonctions) : RunManager, EnemyService,
 -- StatsService, CardService, MovementGuard, ProgressionService.
 
@@ -39,6 +40,7 @@ local DT = 1 / Companions.SimHz
 local CAP = Companions.Capture
 local FOLLOW = Companions.Follow
 local NET = Companions.Net
+local LOOK = Companions.Look
 local IS_STUDIO = RunService:IsStudio()
 local TWO_PI = math.pi * 2
 local MAX_I16 = 32767
@@ -694,12 +696,66 @@ local function flushKills(o: Owner)
 	end
 end
 
+-- Personnalisation (A05-05, dossier 40 §8.2) : chapeau, couleur, aura du compagnon, lus dans le profil
+-- (equipped, validé et vérifié en possession par ProgressionService à l'équipement) et publiés sur le
+-- joueur (attribut CompanionLook<slot>) pour que tous les clients les dessinent. 100 % visuel.
+local function ownsLook(player: Player, id: string): boolean
+	-- Revérification de possession si ProgressionService l'expose (contract request A05-05) ; sinon,
+	-- l'id a déjà été vérifié par EquipCosmetic.
+	local ok, owned = try(find("ProgressionService"), "ownsCosmetic", player, id)
+	return not ok or owned == true
+end
+
+local function lookFor(player: Player, species: string): string
+	local okD, data = try(find("DataService"), "peek", player)
+	if not okD or type(data) ~= "table" then
+		return ""
+	end
+	local ids = table.create(#LOOK.Slots)
+	local any = false
+	for k, base in LOOK.Slots do
+		local id = LOOK.resolve(data.equipped, base, species)
+		if id and ownsLook(player, id) then
+			ids[k] = id
+			any = true
+		else
+			ids[k] = ""
+		end
+	end
+	return if any then table.concat(ids, LOOK.Separator) else ""
+end
+
+local function publishLook(c: Companion)
+	if c.slot <= LOOK.MaxSlots then
+		local value = lookFor(c.owner.player, c.species)
+		c.owner.player:SetAttribute(LOOK.AttributePrefix .. c.slot, if value ~= "" then value else nil)
+	end
+end
+
+local function clearLook(player: Player)
+	for slot = 1, LOOK.MaxSlots do
+		player:SetAttribute(LOOK.AttributePrefix .. slot, nil)
+	end
+end
+
+-- Profil modifié pendant que les compagnons sont posés (EquipCosmetic) : republie leur aspect.
+-- Appel conseillé à ProgressionService après EquipCosmetic (contract request A05-05).
+function CompanionService.refreshLook(player: Player)
+	local o = owners[player]
+	if o then
+		for _, c in o.companions do
+			publishLook(c)
+		end
+	end
+end
+
 local function removeOwner(player: Player)
 	local o = owners[player]
 	if not o then
 		return
 	end
 	flushKills(o)
+	clearLook(player)
 	owners[player] = nil
 	for k = #order, 1, -1 do
 		if order[k].owner == o then
@@ -744,6 +800,7 @@ local function addCompanion(o: Owner, kind: number)
 	table.insert(o.companions, c)
 	table.insert(order, c)
 	rebuildAttack(c)
+	publishLook(c)
 	o.stateDirty = true
 end
 

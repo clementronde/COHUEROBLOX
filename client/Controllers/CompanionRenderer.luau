@@ -12,6 +12,10 @@
 -- Mode lobby (65-lobby.md §10, dossier 40 §8.1), client seul : hors run, le(s) compagnon(s) équipé(s)
 -- (Profile.companions.equipped) suivent le joueur local et le reste de sa collection se promène dans
 -- l'enclos (LobbyRole = "CritterPen"). Positions locales, aucun remote envoyé.
+--
+-- Personnalisation (A05-05, dossier 40 §8.2) : chapeau (Assets.Cosmetics.CompanionHats.<id>), couleur
+-- (Config/Cosmetics def.color) et aura (Assets.FX.CompanionAuras.<id>) par compagnon. En run : attribut
+-- CompanionLook<slot> du propriétaire (posé par CompanionService) ; au lobby : Profile.equipped.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -29,6 +33,7 @@ local ArtLibrary = require(Shared:WaitForChild("ArtLibrary"))
 local NET = Companions.Net
 local R = Companions.Render
 local LOBBY = Companions.Lobby
+local LOOK = Companions.Look
 local FOLLOW = Companions.Follow
 local HIDDEN = CFrame.new(0, -10000, 0)
 local TWO_PI = math.pi * 2
@@ -41,10 +46,15 @@ type Visual = {
 	height: number,
 }
 
+-- Personnalisation (A05-05) : chapeau et aura clonés, posés avec le corps.
+type Dress = { hat: Visual?, aura: Visual? }
+
 type Entry = {
 	key: number,
 	kind: number,
 	body: Visual?,
+	dress: Dress?,
+	look: string, -- valeur de CompanionLook<slot> appliquée
 	stun: Visual?,
 	fromPos: Vector3,
 	toPos: Vector3,
@@ -70,6 +80,7 @@ type Fx = { visual: Visual, untilT: number, cf: CFrame }
 type LobbyPet = {
 	species: string,
 	body: Visual?,
+	dress: Dress?,
 	slot: number?,
 	flying: boolean,
 	pos: Vector3,
@@ -100,7 +111,7 @@ local moveCFrames: { CFrame } = {}
 -- Lobby
 local speciesKind: { [string]: number } = {}
 local runPhase = "Loadout"
-local collection: { owned: { [string]: any }, equipped: { string } }? = nil
+local collection: { owned: { [string]: any }, equipped: { string }, cosmetics: { [string]: any } }? = nil
 local lobbyPets: { LobbyPet } = {}
 local lobbySignature = ""
 local lobbyShown = false
@@ -144,6 +155,87 @@ local function place(v: Visual?, cf: CFrame)
 	end
 end
 
+-- Personnalisation (A05-05, dossier 40 §8.2) -------------------------------------------------------
+-- Chapeau : Assets.Cosmetics.CompanionHats.<id> (pivot au bas du chapeau), posé en haut du corps.
+-- Couleur : def.color de Config/Cosmetics sur les pièces du corps marquées Tint = true (sinon toutes).
+-- Aura : Assets.FX.CompanionAuras.<id> (pivot aux pieds), ses particules suivent le corps.
+-- Objet absent : avertissement une fois, le compagnon reste dessiné sans cet ajout.
+
+local function lookTemplate(group: string, folder: string, id: string): Instance?
+	local assets = ReplicatedStorage:FindFirstChild("Assets")
+	local g = assets and assets:FindFirstChild(group)
+	local f = g and g:FindFirstChild(folder)
+	local t = f and f:FindFirstChild(id)
+	if t and (t:IsA("Model") or t:IsA("BasePart")) then
+		return t
+	end
+	warnOnce(`{group}.{folder}.{id}`)
+	return nil
+end
+
+local function cloneDressPart(template: Instance, scale: number): Visual?
+	local parts, offsets = ArtLibrary.clonePivoted(template, scale)
+	if #parts == 0 then
+		return nil
+	end
+	for _, p in parts do
+		p.CFrame = HIDDEN
+		p.Parent = container
+	end
+	return { parts = parts, offsets = offsets, height = 0 }
+end
+
+local function tint(body: Visual, color: Color3)
+	local marked = false
+	for _, p in body.parts do
+		if p:GetAttribute(LOOK.TintAttribute) == true then
+			marked = true
+			p.Color = color
+		end
+	end
+	if not marked then
+		for _, p in body.parts do
+			p.Color = color
+		end
+	end
+end
+
+-- Habille un corps fraîchement cloné selon une valeur CompanionLook ("" = rien).
+local function dress(body: Visual?, look: string): Dress?
+	if not body or look == "" then
+		return nil
+	end
+	local hatId, colorId, auraId = LOOK.decode(look)
+	local color = LOOK.color(colorId)
+	if color then
+		tint(body, color)
+	end
+	local scale = math.clamp(body.height / R.HatRefHeight, R.HatScaleMin, R.HatScaleMax)
+	local hatT = if hatId then lookTemplate("Cosmetics", LOOK.HatFolder, hatId) else nil
+	local auraT = if auraId then lookTemplate("FX", LOOK.AuraFolder, auraId) else nil
+	return {
+		hat = if hatT then cloneDressPart(hatT, scale) else nil,
+		aura = if auraT then cloneDressPart(auraT, scale) else nil,
+	}
+end
+
+local function undress(d: Dress?)
+	if d then
+		destroyVisual(d.hat)
+		destroyVisual(d.aura)
+	end
+end
+
+local function placeDressed(body: Visual?, d: Dress?, cf: CFrame)
+	place(body, cf)
+	if d and body then
+		if d.hat then
+			place(d.hat, cf * CFrame.new(0, body.height * (1 - R.HatSink), 0))
+		end
+		place(d.aura, cf)
+	end
+end
+
 -- Compagnons -------------------------------------------------------------------------------------
 
 local function bodyFor(kind: number): Visual?
@@ -164,9 +256,34 @@ local function removeEntry(key: number)
 	local e = entries[key]
 	if e then
 		destroyVisual(e.body)
+		undress(e.dress)
 		destroyVisual(e.stun)
 		entries[key] = nil
 	end
+end
+
+-- Aspect publié par le serveur sur le propriétaire (CompanionService, attribut CompanionLook<slot>).
+local function lookOf(userId: number, slot: number): string
+	local owner = Players:GetPlayerByUserId(userId)
+	local v = owner and owner:GetAttribute(LOOK.AttributePrefix .. slot)
+	return if type(v) == "string" then v else ""
+end
+
+-- (Re)habille une entrée quand son aspect change : corps recloné pour retrouver ses couleurs d'origine.
+local function applyLook(e: Entry, look: string)
+	if e.look == look then
+		return
+	end
+	local old = e.look
+	e.look = look
+	undress(e.dress)
+	e.dress = nil
+	if old ~= "" then
+		-- l'ancien aspect a pu teindre le corps : nouveau clone, couleurs d'origine
+		destroyVisual(e.body)
+		e.body = bodyFor(e.kind)
+	end
+	e.dress = dress(e.body, look)
 end
 
 local function spawnHit(x: number, z: number)
@@ -214,6 +331,8 @@ local function onSnapshot(b: buffer)
 				key = key,
 				kind = kind,
 				body = bodyFor(kind),
+				dress = nil,
+				look = "",
 				stun = nil,
 				fromPos = pos,
 				toPos = pos,
@@ -229,6 +348,7 @@ local function onSnapshot(b: buffer)
 			e = fresh
 		end
 		local entry = e :: Entry
+		applyLook(entry, lookOf(userId, slot))
 		-- Repart de la position affichée actuelle vers le nouvel échantillon.
 		local alpha = math.clamp((now - entry.t0) / R.InterpDelay, 0, 1)
 		entry.fromPos = entry.fromPos:Lerp(entry.toPos, alpha)
@@ -368,6 +488,7 @@ end
 local function clearLobby()
 	for _, pet in lobbyPets do
 		destroyVisual(pet.body)
+		undress(pet.dress)
 	end
 	table.clear(lobbyPets)
 	lobbySignature = ""
@@ -378,10 +499,15 @@ local function newPet(species: string, slot: number?, pos: Vector3): LobbyPet?
 	if not kind then
 		return nil -- espèce inconnue (ancien id v1) : ignorée
 	end
+	local body = bodyFor(kind)
+	local c = collection
+	-- Suiveurs : emplacement propre puis global ; enclos : emplacement propre seulement.
+	local look = LOOK.encode(if c then c.cosmetics else nil, species, slot == nil)
 	local override = Companions.Species[species]
 	return {
 		species = species,
-		body = bodyFor(kind),
+		body = body,
+		dress = dress(body, look),
 		slot = slot,
 		flying = override ~= nil and override.flying == true,
 		pos = pos,
@@ -418,6 +544,15 @@ local function rebuildLobby()
 		table.remove(pen)
 	end
 	local signature = table.concat(equipped, ",") .. "|" .. table.concat(pen, ",") .. "|" .. (if roam then "pen" else "")
+	-- Aspect (A05-05) : un changement de chapeau, de couleur ou d'aura refait les créatures.
+	local looks = table.create(#equipped + #pen)
+	for k, species in equipped do
+		looks[k] = if type(species) == "string" then LOOK.encode(c and c.cosmetics, species) else ""
+	end
+	for _, species in pen do
+		table.insert(looks, LOOK.encode(c and c.cosmetics, species, true))
+	end
+	signature ..= "|" .. table.concat(looks, ",")
 	if signature == lobbySignature then
 		return
 	end
@@ -535,12 +670,12 @@ local function stepLobby(dt: number, now: number)
 		if pet.slot then
 			if root then
 				stepFollower(pet, root, dt)
-				place(pet.body, CFrame.new(pet.pos.X, pet.pos.Y + hopOffset(pet, now), pet.pos.Z) * CFrame.Angles(0, pet.yaw, 0))
+				placeDressed(pet.body, pet.dress, CFrame.new(pet.pos.X, pet.pos.Y + hopOffset(pet, now), pet.pos.Z) * CFrame.Angles(0, pet.yaw, 0))
 			end
 		elseif penAwake and r then
 			-- Loin de l'enclos : rien ne bouge (les pièces restent où elles sont, aucun déplacement).
 			stepWanderer(pet, r, dt, now)
-			place(pet.body, CFrame.new(pet.pos.X, pet.pos.Y + hopOffset(pet, now), pet.pos.Z) * CFrame.Angles(0, pet.yaw, 0))
+			placeDressed(pet.body, pet.dress, CFrame.new(pet.pos.X, pet.pos.Y + hopOffset(pet, now), pet.pos.Z) * CFrame.Angles(0, pet.yaw, 0))
 		end
 	end
 end
@@ -553,6 +688,7 @@ local function onProfile(profile: any)
 	collection = {
 		owned = if type(c.owned) == "table" then c.owned else {},
 		equipped = if type(c.equipped) == "table" then c.equipped else {},
+		cosmetics = if type(profile.equipped) == "table" then profile.equipped else {},
 	}
 	if lobbyShown then
 		rebuildLobby()
@@ -576,7 +712,7 @@ local function render(dt: number)
 		local moving = (e.toPos - e.fromPos).Magnitude > 0.2
 		local hop = if moving and not e.stunned then math.abs(math.sin(now * R.HopHz * math.pi + e.phase)) * R.HopHeight else 0
 		local cf = CFrame.new(pos.X, pos.Y + hop, pos.Z) * CFrame.Angles(0, yaw, 0)
-		place(e.body, cf)
+		placeDressed(e.body, e.dress, cf)
 		if e.stun then
 			local h = if e.body then e.body.height else 2
 			place(e.stun, CFrame.new(pos.X, pos.Y + h + 0.5, pos.Z) * CFrame.Angles(0, now * 3, 0))
