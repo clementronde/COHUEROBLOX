@@ -131,7 +131,7 @@ local Enemies: { [number]: Def } = {
 		radius = 1.2,
 		height = 2.4,
 		color = rgb(150, 105, 60),
-		contactDamage = 6,
+		contactDamage = 5, -- A04-12 : 6 -> 5 (le contact de la foule faisait 30 à 45 % des dégâts reçus)
 		xp = 1,
 	},
 	[2] = {
@@ -175,7 +175,7 @@ local Enemies: { [number]: Def } = {
 		shotWindup = 0.6,
 		shotCooldown = 3.2,
 		shotSpeed = 18,
-		shotDamage = 9,
+		shotDamage = 6, -- A04-12 : 9 -> 6 (les tirs, hors de portée de mêlée, faisaient ~30 % des dégâts reçus)
 		shotRadius = 1.2,
 	},
 	[4] = {
@@ -561,7 +561,7 @@ local Enemies: { [number]: Def } = {
 		radius = 1.2,
 		height = 2.9,
 		color = LIME,
-		contactDamage = 6,
+		contactDamage = 5, -- A04-12 : 6 -> 5 (le contact de la foule faisait 30 à 45 % des dégâts reçus)
 		xp = 1,
 	},
 	[22] = {
@@ -584,7 +584,7 @@ local Enemies: { [number]: Def } = {
 		shotWindup = 0.6,
 		shotCooldown = 3.2,
 		shotSpeed = 18,
-		shotDamage = 9,
+		shotDamage = 6, -- A04-12 : 9 -> 6 (les tirs, hors de portée de mêlée, faisaient ~30 % des dégâts reçus)
 		shotRadius = 1.2,
 	},
 	[23] = {

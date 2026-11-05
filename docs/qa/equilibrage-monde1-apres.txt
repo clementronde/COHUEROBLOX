@@ -1,0 +1,57 @@
+A04-12 modèle monde 1 : 200 runs par classe, graine 12
+
+== Knight : victoire 89 % (177/200), dont 0 boss trop longs
+   1re arme en plus : médiane 0:09, avant 1:30 dans 100 % des runs
+   niveaux (médiane) : N2 0:09 N5 0:35 N10 1:31 N15 2:43 N20 4:03 N25 5:34 N30 7:21
+   niveau final médian 35 ; KO médians 9267 ; PV restants médians (victoires) 80 % ; boss tué en 0:10 ; morts : médiane 8:12
+   dégâts reçus : contact 30 % (102 PV/run) boss 11 % (36 PV/run) sauts 1 % (2 PV/run) tirs 31 % (105 PV/run) élites 2 % (7 PV/run) mini-boss 27 % (91 PV/run)
+   mini-boss tués : 382, en 0:52 (médiane)
+   min | vivants | PV ennemi | foule | niveau | PV joueur | dps foule  (moyennes des runs encore en vie)
+     0 |      10 |      10.0 |   0.2 |    1.0 |       140 |       10  (200 runs)
+     1 |      38 |      11.7 |   0.3 |    7.0 |       146 |       77  (200 runs)
+     2 |      57 |      11.7 |   0.1 |   12.1 |       152 |      151  (200 runs)
+     3 |      75 |      11.4 |   0.1 |   16.1 |       155 |      223  (200 runs)
+     4 |      99 |      11.4 |   0.0 |   19.5 |       127 |      356  (200 runs)
+     5 |     113 |      11.4 |   0.0 |   23.7 |       126 |      578  (192 runs)
+     6 |     132 |      11.4 |   0.0 |   26.7 |       154 |      768  (191 runs)
+     7 |     158 |      11.4 |   0.0 |   29.1 |       158 |      916  (191 runs)
+     8 |     170 |      11.5 |   0.0 |   32.5 |       150 |     1280  (189 runs)
+     9 |     189 |      11.5 |   0.0 |   35.3 |       158 |     1469  (186 runs)
+    10 |      75 |      11.2 |   0.0 |   38.0 |       158 |      300  (2 runs)
+
+== Archer : victoire 76 % (152/200), dont 0 boss trop longs
+   1re arme en plus : médiane 0:08, avant 1:30 dans 100 % des runs
+   niveaux (médiane) : N2 0:08 N5 0:35 N10 1:31 N15 2:43 N20 4:01 N25 5:34 N30 7:19
+   niveau final médian 35 ; KO médians 9228 ; PV restants médians (victoires) 77 % ; boss tué en 0:07 ; morts : médiane 8:39
+   dégâts reçus : contact 36 % (144 PV/run) boss 7 % (28 PV/run) sauts 0 % (2 PV/run) tirs 39 % (156 PV/run) élites 1 % (3 PV/run) mini-boss 17 % (66 PV/run)
+   mini-boss tués : 379, en 0:41 (médiane)
+   min | vivants | PV ennemi | foule | niveau | PV joueur | dps foule  (moyennes des runs encore en vie)
+     0 |       9 |      10.0 |   0.0 |    1.0 |       140 |       14  (200 runs)
+     1 |      38 |      11.7 |   0.2 |    7.0 |       143 |       82  (200 runs)
+     2 |      56 |      11.6 |   0.0 |   12.0 |       149 |      165  (200 runs)
+     3 |      75 |      11.4 |   0.0 |   16.0 |       150 |      242  (200 runs)
+     4 |      99 |      11.4 |   0.0 |   19.4 |       124 |      394  (198 runs)
+     5 |     113 |      11.4 |   0.0 |   23.5 |       125 |      672  (191 runs)
+     6 |     132 |      11.4 |   0.0 |   26.6 |       150 |      884  (189 runs)
+     7 |     158 |      11.4 |   0.0 |   29.0 |       148 |     1039  (189 runs)
+     8 |     170 |      11.4 |   0.0 |   32.4 |       135 |     1453  (185 runs)
+     9 |     189 |      11.4 |   0.0 |   35.0 |       142 |     1632  (172 runs)
+
+== Mage : victoire 68 % (135/200), dont 0 boss trop longs
+   1re arme en plus : médiane 0:07, avant 1:30 dans 100 % des runs
+   niveaux (médiane) : N2 0:07 N5 0:34 N10 1:31 N15 2:43 N20 4:08 N25 5:34 N30 7:24
+   niveau final médian 35 ; KO médians 9256 ; PV restants médians (victoires) 80 % ; boss tué en 0:10 ; morts : médiane 8:27
+   dégâts reçus : contact 34 % (136 PV/run) boss 8 % (32 PV/run) sauts 0 % (0 PV/run) tirs 37 % (151 PV/run) élites 1 % (6 PV/run) mini-boss 20 % (80 PV/run)
+   mini-boss tués : 365, en 0:57 (médiane)
+   min | vivants | PV ennemi | foule | niveau | PV joueur | dps foule  (moyennes des runs encore en vie)
+     0 |       9 |      10.0 |   0.0 |    1.0 |       140 |       20  (200 runs)
+     1 |      38 |      11.7 |   0.0 |    7.0 |       146 |      102  (200 runs)
+     2 |      57 |      11.7 |   0.0 |   12.1 |       153 |      220  (200 runs)
+     3 |      75 |      11.4 |   0.0 |   16.1 |       156 |      364  (200 runs)
+     4 |      99 |      11.4 |   0.0 |   19.3 |       125 |      583  (198 runs)
+     5 |     113 |      11.4 |   0.0 |   23.3 |       122 |      922  (188 runs)
+     6 |     132 |      11.5 |   0.0 |   26.4 |       152 |     1262  (185 runs)
+     7 |     158 |      11.5 |   0.0 |   28.7 |       150 |     1560  (184 runs)
+     8 |     170 |      11.5 |   0.0 |   32.0 |       140 |     2069  (172 runs)
+     9 |     189 |      11.5 |   0.0 |   34.8 |       148 |     2435  (161 runs)
+    10 |      75 |      11.2 |   0.0 |   35.0 |        12 |      481  (1 runs)

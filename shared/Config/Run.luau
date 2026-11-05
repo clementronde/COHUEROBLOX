@@ -89,12 +89,14 @@ local Run = {
 
 	-- Player vitals
 	Player = {
-		BaseMaxHp = 100,
+		BaseMaxHp = 140, -- repli seulement : les PV max viennent de Grimoires.BaseStats.MaxHp (A04-12 : aligné)
 		DodgeCap = 0.6,
 		ArmorK = 100, -- taken = amount * K / (K + armor)
 		RegenInterval = 0.25,
 		ContactHz = 15,
-		ContactCooldown = 0.5,
+		-- A04-12 : 0,5 -> 0,75 s entre deux coups de contact. Le contact (foule, mini-boss à 22) faisait 30 à
+		-- 45 % des dégâts reçus ; 0,75 s laisse le temps de sortir de la mêlée sans changer la horde.
+		ContactCooldown = 0.75,
 		ContactMaxEnemies = 3,
 		ContactHalfWidth = 1.5,
 		ContactVerticalSlack = 2,

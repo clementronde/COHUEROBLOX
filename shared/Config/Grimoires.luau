@@ -54,7 +54,8 @@ Grimoires.Defs = {
 	Luck = rune("Luck", "Luck Rune", "+3 luck per level: rarer cards and loot", 8, { Luck = 3 }),
 	Wisdom = rune("Wisdom", "Wisdom Rune", "+10% XP per level", 8, { XpGain = 0.10 }),
 	Magnet = rune("Magnet", "Magnet Rune", "+3 studs pickup range per level", 8, { Magnet = 3 }),
-	Vitality = rune("Vitality", "Vitality Rune", "+15 max HP and +0.1 HP/s per level", 8, { MaxHp = 15, Regen = 0.1 }),
+	-- A04-12 : Regen 0,1 -> 0,2 par niveau (0,1 ne se voyait pas face à la régénération de base 0,5).
+	Vitality = rune("Vitality", "Vitality Rune", "+15 max HP and +0.2 HP/s per level", 8, { MaxHp = 15, Regen = 0.2 }),
 	Armor = rune("Armor", "Armor Rune", "+3 armor per level", 8, { Armor = 3 }),
 	Agility = rune("Agility", "Agility Rune", "+4% move speed and +2% dodge per level", 8, { MoveSpeed = 0.04, Dodge = 0.02 }),
 	Cursed = rune("Cursed", "Cursed Rune", "Tougher, more numerous enemies, but more loot, XP and damage", 5, { Difficulty = 0.10, LootBonus = 0.12, XpGain = 0.05, Damage = 0.05 }),
@@ -73,9 +74,12 @@ Grimoires.BaseStats = {
 	Luck = 0,
 	XpGain = 0,
 	Magnet = 0,
-	MaxHp = 100,
+	-- A04-12 (docs/qa/equilibrage-monde1.md) : 100 -> 140 PV et 0 -> 0,5 PV/s. Le jeu n'a aucun soin
+	-- régulier (pas de PV au sol) : sans régénération, chaque coup reçu s'additionnait sur 10 min et le
+	-- joueur moyen mourait vers 3:30-4:00 (mini-boss). 0,5 PV/s rend ~300 PV par monde.
+	MaxHp = 140,
 	Armor = 0,
-	Regen = 0,
+	Regen = 0.5,
 	MoveSpeed = 0,
 	Dodge = 0,
 	Thorns = 0,
