@@ -341,6 +341,14 @@ function UITheme.screen(name: string, displayOrder: number, insets: Enum.ScreenI
 	return gui
 end
 
+-- v3 templates: a zone placed in the place keeps its own UIScale; register it so device changes rescale it.
+function UITheme.adoptScale(s: UIScale?)
+	if s then
+		s.Scale = currentScale
+		scales[s] = true
+	end
+end
+
 -- A layout zone: offset-sized frame anchored to a screen point, scaled by its own UIScale.
 function UITheme.zone(parent: Instance, name: string, anchor: Vector2, position: UDim2, size: UDim2): Frame
 	local frame = UITheme.new("Frame", {

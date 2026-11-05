@@ -1,11 +1,11 @@
 --!strict
--- Run HUD v2 ("Toy-block gloss", Figma screens L01-L11 / P01-P11 / C01-C11, validated 4 Nov 2026):
--- vitals (level, HP + shield extension, XP, coins), build (4 weapons + 4 Runes), team, ping feed,
--- run timer that turns into the red Overtime stopwatch, KO counter + personal best, boss arrow and
--- bar, announcements (subtitles), downed / ghost overlay. Also starts VictoryBanner and CaptureUI.
--- Design: docs/dossier/60-ui-ux.md section 0 (+ sections 3 and 14 for the update rules).
--- Listens: RunState (v2 fields overtime*, worldIndex/worldCount, victory), PlayerVitals,
--- PlayerProgress (level, xp, kills), Coins, Build, CompanionState, BossState, Announce, Profile.
+-- Run HUD v3 « vraies briques » (Figma Run v3 L01-L11 / P01-P11 / C01-C11, validé le 5 nov. 2026).
+-- Rien n'est fabriqué ici : le HUD est posé dans la place (StarterGui.COHUE_HUD, COHUE_Downed,
+-- COHUE_Vignette, montés par tools/ui/build-ui-v3.luau). Ce module retrouve les objets par leur nom,
+-- écrit les valeurs, recolore et anime. Un objet absent est signalé dans la sortie (UIKit), jamais recréé.
+-- Contenu : vitals (niveau, vie + bouclier, XP, Silver), équipiers, fil des pings, chrono → Overtime,
+-- KO + record, flèche et barre du boss, annonces, armes, panneau À terre / fantôme.
+-- Écoute : RunState, PlayerVitals, PlayerProgress, Coins, Build, CompanionState, BossState, Announce, Profile.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -13,6 +13,7 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local UITheme = require(script.Parent:WaitForChild("UITheme"))
+local UIKit = require(script.Parent:WaitForChild("UIKit"))
 local VictoryBanner = require(script.Parent:WaitForChild("VictoryBanner"))
 local CaptureUI = require(script.Parent:WaitForChild("CaptureUI"))
 
@@ -47,16 +48,16 @@ local kills = 0
 local bestKills: number? = nil
 local newBestShown = false
 
-type Slot = { frame: Frame, icon: Frame, level: UITheme.Pill }
-type TeamRow = { frame: Frame, avatar: TextLabel, name: TextLabel, bar: UITheme.Bar, state: UITheme.Pill }
+type Slot = { frame: Frame, icon: ImageLabel, initials: TextLabel?, level: UIKit.Tag }
+type TeamRow = { frame: Frame, portrait: ImageLabel, rim: UIStroke?, avatar: TextLabel, name: TextLabel, bar: UIKit.Bar, state: UIKit.Tag, userId: number? }
 
--- instances (built in start) -------------------------------------------------------------------
+-- instances (posées dans la place, retrouvées dans bind) ---------------------------------------
 local hudGui: ScreenGui
-local topGui: ScreenGui
 local leftZone: Frame
-local bottomLeft: Frame
 local timerZone: Frame
 local koZone: Frame
+local buildZone: Frame
+local announceZone: Frame
 local buildBox: Frame
 local teamBox: Frame
 local feedBox: Frame
@@ -66,26 +67,25 @@ local hpFill: Frame
 local shieldFill: Frame
 local hpText: TextLabel
 local shieldText: TextLabel
-local xpBar: UITheme.Bar
+local xpBar: UIKit.Bar
 local coinText: TextLabel
 local companionText: TextLabel
 local timerChip: Frame
-local timerStroke: UIStroke
 local timerText: TextLabel
-local clockIcon: Frame
-local stopwatchIcon: Frame
+local clockIcon: GuiObject
+local stopwatchIcon: GuiObject
 local worldText: TextLabel
-local overtimePill: UITheme.Pill
-local dangerPill: UITheme.Pill
+local overtimePill: UIKit.Tag
+local dangerPill: UIKit.Tag
 local koText: TextLabel
 local bestText: TextLabel
-local newBestPill: UITheme.Pill
+local newBestPill: UIKit.Tag
 local arrowBox: Frame
 local arrowHolder: Frame
 local arrowDist: TextLabel
 local bossBox: Frame
 local bossName: TextLabel
-local bossBar: UITheme.Bar
+local bossBar: UIKit.Bar
 local bossPct: TextLabel
 local bossPips: { Frame } = {}
 local teamRows: { TeamRow } = {}
@@ -93,45 +93,22 @@ local feedRows: { { frame: Frame, dot: Frame, text: TextLabel } } = {}
 local weaponSlots: { Slot } = {}
 local runeSlots: { Slot } = {}
 local downedGui: ScreenGui
-local downedPanel: Frame
+local downedHeader: Frame
 local downedTitle: TextLabel
 local downedSeconds: TextLabel
-local downedSecondsCaption: TextLabel
 local downedHint: TextLabel
 local reviveText: TextLabel
-local reviveBar: UITheme.Bar
-local ghostPill: UITheme.Pill
+local reviveBar: UIKit.Bar
+local ghostPill: UIKit.Tag
 local downedPanelStroke: UIStroke
 local vignetteGui: ScreenGui
 local vignetteStroke: UIStroke
 local vignetteTween: Tween?
-local announceGui: ScreenGui
-local announceZone: Frame
-local announceSlab: UITheme.Gloss
+local announceBanner: Frame
 local announceText: TextLabel
-
-local VITALS_W = 240
+local announceLine: TextLabel?
 
 ---------------------------------------------------------------------------- small helpers
-
-local function list(parent: Instance, horizontal: boolean, padding: number, align: Enum.HorizontalAlignment?): UIListLayout
-	return UITheme.new("UIListLayout", {
-		FillDirection = if horizontal then Enum.FillDirection.Horizontal else Enum.FillDirection.Vertical,
-		Padding = UDim.new(0, padding),
-		SortOrder = Enum.SortOrder.LayoutOrder,
-		HorizontalAlignment = align or Enum.HorizontalAlignment.Left,
-		VerticalAlignment = Enum.VerticalAlignment.Center,
-	}, parent)
-end
-
-local function holder(parent: Instance?, name: string, size: UDim2, order: number?): Frame
-	return UITheme.new("Frame", {
-		Name = name,
-		Size = size,
-		BackgroundTransparency = 1,
-		LayoutOrder = order or 0,
-	}, parent)
-end
 
 local function minimapSize(): number
 	return (Config.Minimap.Size :: any)[UITheme.device()] or 120
@@ -142,326 +119,166 @@ local function worldsPerRun(): number
 	return if runCfg and type(runCfg.WorldsPerRun) == "number" then runCfg.WorldsPerRun else 3
 end
 
----------------------------------------------------------------------------- builders
-
-local function buildVitals(parent: Instance)
-	local box = holder(parent, "Vitals", UDim2.fromOffset(VITALS_W, 70), 1)
-	-- Level badge: glossy aqua slab (XP family), "LV" over the number.
-	local badge = UITheme.glossy(box, { name = "Level", role = "Xp", size = UDim2.fromOffset(42, 46), radius = 11, lip = 5, position = UDim2.fromOffset(0, 2) })
-	levelBadge = badge.root
-	UITheme.label(badge.content, {
-		name = "LV",
-		size = UDim2.new(1, 0, 0, 14),
-		position = UDim2.fromOffset(0, 1),
-		role = "LabelS",
-		color = "OnLight",
-		text = S.Level,
-	})
-	levelText = UITheme.label(badge.content, {
-		name = "Number",
-		size = UDim2.new(1, 0, 0, 24),
-		position = UDim2.fromOffset(0, 14),
-		role = "NumberM",
-		font = "number",
-		outline = true,
-		text = "1",
-	})
-	UITheme.heartIcon(box, 30).Position = UDim2.fromOffset(44, 1)
-	-- HP track with the shield as a silver extension after the red fill.
-	local track = UITheme.new("Frame", { Name = "Hp", Size = UDim2.fromOffset(180, 20), Position = UDim2.fromOffset(60, 6), BorderSizePixel = 0, ZIndex = 0 }, box)
-	UITheme.paint(track, "BackgroundColor3", "PanelSunken")
-	UITheme.back(track, 0.15)
-	UITheme.round(track)
-	UITheme.stroke(track, 2.5, "Outline")
-	hpFill = UITheme.new("Frame", { Name = "Fill", Size = UDim2.fromScale(1, 1), BorderSizePixel = 0 }, track)
-	UITheme.paint(hpFill, "BackgroundColor3", "Hp")
-	UITheme.round(hpFill)
-	local band = UITheme.new("Frame", { Name = "Band", Position = UDim2.fromOffset(3, 2), Size = UDim2.new(1, -6, 0.32, 0), BorderSizePixel = 0, BackgroundTransparency = 0.55 }, hpFill)
-	UITheme.paint(band, "BackgroundColor3", "Shine")
-	UITheme.round(band)
-	shieldFill = UITheme.new("Frame", { Name = "Shield", Size = UDim2.fromScale(0, 1), BorderSizePixel = 0, Visible = false }, track)
-	UITheme.paint(shieldFill, "BackgroundColor3", "Shield")
-	UITheme.round(shieldFill)
-	hpText = UITheme.label(track, { name = "Value", size = UDim2.new(1, -40, 1, 0), position = UDim2.fromOffset(22, 0), role = "LabelM", outline = true, text = "", z = 3 })
-	shieldText = UITheme.label(track, {
-		name = "ShieldValue",
-		size = UDim2.fromOffset(40, 20),
-		position = UDim2.new(1, -4, 0, 0),
-		anchor = Vector2.new(1, 0),
-		role = "LabelS",
-		color = "Shield",
-		align = Enum.TextXAlignment.Right,
-		outline = true,
-		text = "",
-		z = 3,
-	})
-	xpBar = UITheme.glossBar(box, UDim2.fromOffset(180, 10), UDim2.fromOffset(60, 33), "Xp", "Xp")
-	-- Coins
-	local coin = UITheme.new("Frame", { Name = "Coin", Size = UDim2.fromOffset(16, 16), Position = UDim2.fromOffset(62, 49), BorderSizePixel = 0 }, box)
-	UITheme.paint(coin, "BackgroundColor3", "Coin")
-	UITheme.round(coin)
-	UITheme.stroke(coin, 2, "Outline")
-	local coinCore = UITheme.new("Frame", { Size = UDim2.fromOffset(6, 6), AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), BorderSizePixel = 0 }, coin)
-	UITheme.paint(coinCore, "BackgroundColor3", "CoinLight")
-	coinText = UITheme.label(box, {
-		name = "Coins",
-		size = UDim2.fromOffset(150, 20),
-		position = UDim2.fromOffset(84, 47),
-		role = "LabelM",
-		color = "CoinLight",
-		align = Enum.TextXAlignment.Left,
-		outline = true,
-		text = "0",
-	})
+-- Portrait d'équipier : vignette Roblox (HeadShot), mise en cache ; l'initiale reste en secours.
+local headshots: { [number]: string } = {}
+local function setHeadshot(row: TeamRow, userId: number)
+	if row.userId == userId then
+		return
+	end
+	row.userId = userId
+	local cached = headshots[userId]
+	if cached then
+		row.portrait.Image = cached
+		row.avatar.Visible = cached == ""
+		return
+	end
+	row.portrait.Image = ""
+	row.avatar.Visible = true
+	task.spawn(function()
+		local ok, img = pcall(function()
+			return Players:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+		end)
+		headshots[userId] = if ok then img else ""
+		if row.userId == userId and ok then
+			row.portrait.Image = img
+			row.avatar.Visible = false
+		end
+	end)
 end
 
-local function makeSlot(parent: Instance, size: number, order: number): Slot
-	local frame = UITheme.new("Frame", { Name = "Slot" .. order, Size = UDim2.fromOffset(size, size), LayoutOrder = order, BorderSizePixel = 0 }, parent)
-	UITheme.paint(frame, "BackgroundColor3", "PanelLight")
-	UITheme.back(frame, 0.05)
-	UITheme.corner(frame, if size >= 40 then 11 else 9)
-	UITheme.stroke(frame, 2.5, "Outline").Name = "Ink"
-	local band = UITheme.new("Frame", { Name = "Band", Position = UDim2.fromOffset(3, 3), Size = UDim2.new(1, -6, 0.36, 0), BorderSizePixel = 0 }, frame)
-	UITheme.paint(band, "BackgroundColor3", "Highlight")
-	UITheme.corner(band, 6)
-	local iconSize = math.round(size * 0.72)
-	local icon = UITheme.icon(frame, "?", iconSize, "Icon")
-	icon.AnchorPoint = Vector2.new(0.5, 0.5)
-	icon.Position = UDim2.fromScale(0.5, 0.5)
-	local level = UITheme.pill(frame, { name = "Level", tone = "Premium", textColor = "OnLight", text = "" })
-	level.frame.AnchorPoint = Vector2.new(1, 1)
-	level.frame.Position = UDim2.new(1, 5, 1, 5)
-	level.frame.Size = UDim2.fromOffset(0, 18)
-	level.frame.ZIndex = 4
-	local pad = level.frame:FindFirstChildOfClass("UIPadding")
-	if pad then
-		pad.PaddingLeft = UDim.new(0, 5)
-		pad.PaddingRight = UDim.new(0, 5)
-	end
-	return { frame = frame, icon = icon, level = level }
+---------------------------------------------------------------------------- bind (gabarits posés)
+
+local function bindSlot(frame: Frame): Slot
+	return {
+		frame = frame,
+		icon = UIKit.find(frame, "Icon"),
+		-- lihfolk-ignore: findfirstchild-chain -- fwjelaa-ignore: findfirstchild-chain (optional child, typed nil-able and checked)
+		initials = frame:FindFirstChild("Initials") :: TextLabel?,
+		level = UIKit.tag(UIKit.find(frame, "Level")),
+	}
 end
 
-local function buildBuild(): Frame
-	local box = holder(nil, "Build", UDim2.fromOffset(VITALS_W, 92), 3)
-	list(box, false, 7).VerticalAlignment = Enum.VerticalAlignment.Top
-	local weaponsRow = holder(box, "Weapons", UDim2.fromOffset(VITALS_W, 46), 1)
-	list(weaponsRow, true, 7)
-	local runesRow = holder(box, "Runes", UDim2.fromOffset(VITALS_W, 36), 2)
-	list(runesRow, true, 7)
-	for i = 1, 6 do
-		weaponSlots[i] = makeSlot(weaponsRow, 44, i)
-		weaponSlots[i].frame.Visible = false
+local function bind(): boolean
+	local gui = UIKit.screen("COHUE_HUD")
+	local downed = UIKit.screen("COHUE_Downed")
+	local vig = UIKit.screen("COHUE_Vignette")
+	if not (gui and downed and vig) then
+		return false
 	end
-	for i = 1, 6 do
-		runeSlots[i] = makeSlot(runesRow, 34, i)
-		runeSlots[i].frame.Visible = false
-	end
-	return box
-end
+	hudGui = gui
+	downedGui = downed
+	vignetteGui = vig
 
-local function buildTeam(parent: Instance)
-	teamBox = holder(parent, "Team", UDim2.fromOffset(VITALS_W, 0), 4)
-	teamBox.AutomaticSize = Enum.AutomaticSize.Y
-	list(teamBox, false, 4).VerticalAlignment = Enum.VerticalAlignment.Top
+	leftZone = UIKit.find(gui, "TopLeft")
+	timerZone = UIKit.find(gui, "TopCenter")
+	koZone = UIKit.find(gui, "TopRight")
+	buildZone = UIKit.find(gui, "BottomCenter")
+	announceZone = UIKit.find(gui, "Announce")
+	for _, z in { leftZone, timerZone, koZone, buildZone, announceZone } do
+		-- lihfolk-ignore: findfirstchild-chain -- fwjelaa-ignore: findfirstchild-chain (optional child, typed nil-able and checked)
+		UITheme.adoptScale(z and z:FindFirstChild("Scale") :: UIScale?)
+	end
+
+	-- vitals
+	levelBadge = UIKit.find(leftZone, "Vitals.Level")
+	levelText = UIKit.find(leftZone, "Vitals.Level.Number")
+	hpFill = UIKit.find(leftZone, "Vitals.Hp.Fill")
+	shieldFill = UIKit.find(leftZone, "Vitals.Hp.Shield")
+	hpText = UIKit.find(leftZone, "Vitals.Hp.Value")
+	shieldText = UIKit.find(leftZone, "Vitals.Hp.ShieldValue")
+	xpBar = UIKit.bar(UIKit.find(leftZone, "Vitals.Xp"))
+	coinText = UIKit.find(leftZone, "Vitals.Silver")
+	companionText = UIKit.find(leftZone, "Companion")
+
+	-- équipiers
+	teamBox = UIKit.find(leftZone, "Team")
 	for i = 1, Config.Hud.TeamMax do
-		local row = UITheme.chip(teamBox, { Name = "Mate" .. i, Size = UDim2.fromOffset(176, 28), LayoutOrder = i, Visible = false })
-		UITheme.back(row, 0.25)
-		local avatar = UITheme.label(row, {
-			name = "Avatar",
-			size = UDim2.fromOffset(20, 20),
-			position = UDim2.fromOffset(4, 4),
-			role = "LabelS",
-			color = "OnLight",
-		})
-		avatar.BackgroundTransparency = 0
-		UITheme.paint(avatar, "BackgroundColor3", "MapAlly")
-		UITheme.corner(avatar, 6)
-		local name = UITheme.label(row, {
-			name = "Name",
-			size = UDim2.fromOffset(60, 28),
-			position = UDim2.fromOffset(30, 0),
-			role = "LabelS",
-			align = Enum.TextXAlignment.Left,
-			outline = true,
-		})
-		local bar = UITheme.glossBar(row, UDim2.fromOffset(76, 10), UDim2.fromOffset(94, 9), "Hp")
-		local state = UITheme.pill(row, { name = "State", tone = "Downed", text = "" })
-		state.frame.Position = UDim2.fromOffset(92, 3)
-		state.frame.Visible = false
-		teamRows[i] = { frame = row, avatar = avatar, name = name, bar = bar, state = state }
+		local m = UIKit.find(teamBox, "Mate" .. i) :: Frame?
+		if m then
+			local portrait = UIKit.find(m, "Portrait") :: ImageLabel
+			teamRows[i] = {
+				frame = m,
+				portrait = portrait,
+				-- lihfolk-ignore: findfirstchild-chain -- fwjelaa-ignore: findfirstchild-chain (optional child, typed nil-able and checked)
+				rim = portrait and portrait:FindFirstChild("Rim") :: UIStroke?,
+				avatar = UIKit.find(portrait, "Initial"),
+				name = UIKit.find(m, "Name"),
+				bar = UIKit.bar(UIKit.find(m, "Bar")),
+				state = UIKit.tag(UIKit.find(m, "State")),
+			}
+		end
 	end
-end
 
-local function buildFeed(parent: Instance)
-	feedBox = holder(parent, "Feed", UDim2.fromOffset(VITALS_W, 0), 5)
-	feedBox.AutomaticSize = Enum.AutomaticSize.Y
-	list(feedBox, false, 4).VerticalAlignment = Enum.VerticalAlignment.Top
+	-- fil des pings
+	feedBox = UIKit.find(leftZone, "Feed")
 	for i = 1, Config.Hud.FeedMax do
-		local row = UITheme.chip(feedBox, { Name = "Line" .. i, Size = UDim2.fromOffset(0, 24), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = i, Visible = false })
-		UITheme.back(row, 0.3)
-		UITheme.new("UIPadding", { PaddingLeft = UDim.new(0, 3), PaddingRight = UDim.new(0, 10) }, row)
-		list(row, true, 6)
-		local dot = UITheme.new("Frame", { Name = "Dot", Size = UDim2.fromOffset(18, 18), BorderSizePixel = 0, LayoutOrder = 1 }, row)
-		UITheme.round(dot)
-		UITheme.stroke(dot, 2, "Outline")
-		UITheme.paint(dot, "BackgroundColor3", "PingRegroup")
-		local text = UITheme.label(row, { name = "Text", size = UDim2.new(0, 0, 1, 0), autoSize = Enum.AutomaticSize.X, role = "LabelS", align = Enum.TextXAlignment.Left })
-		text.LayoutOrder = 2
-		feedRows[i] = { frame = row, dot = dot, text = text }
+		local line = UIKit.find(feedBox, "Line" .. i) :: Frame?
+		if line then
+			feedRows[i] = { frame = line, dot = UIKit.find(line, "Dot"), text = UIKit.find(line, "Text") }
+		end
 	end
-end
 
-local function buildTimer(parent: Instance)
-	timerZone = UITheme.zone(parent, "Timer", Vector2.new(0.5, 0), UDim2.new(0.5, 0, 0, 4), UDim2.fromOffset(260, 160))
-	list(timerZone, false, 4, Enum.HorizontalAlignment.Center).VerticalAlignment = Enum.VerticalAlignment.Top
-	timerChip = UITheme.chip(timerZone, { Name = "Chip", Size = UDim2.fromOffset(0, 46), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 1 })
-	timerStroke = timerChip:WaitForChild("Ink") :: UIStroke
-	UITheme.new("UIPadding", { PaddingLeft = UDim.new(0, 8), PaddingRight = UDim.new(0, 12) }, timerChip)
-	list(timerChip, true, 6)
-	clockIcon = UITheme.clockIcon(timerChip, 28, false)
-	clockIcon.LayoutOrder = 1
-	stopwatchIcon = UITheme.clockIcon(timerChip, 28, true)
-	stopwatchIcon.LayoutOrder = 1
-	stopwatchIcon.Visible = false
-	timerText = UITheme.label(timerChip, { name = "Time", size = UDim2.new(0, 0, 1, 0), autoSize = Enum.AutomaticSize.X, role = "NumberL", font = "number", outline = true, text = "10:00" })
-	timerText.LayoutOrder = 2
-	UITheme.new("UIScale", { Name = "PopScale" }, timerChip)
-
-	local caption = holder(timerZone, "Caption", UDim2.fromOffset(0, 22), 2)
-	caption.AutomaticSize = Enum.AutomaticSize.X
-	list(caption, true, 4)
-	worldText = UITheme.label(caption, { name = "World", size = UDim2.new(0, 0, 1, 0), autoSize = Enum.AutomaticSize.X, role = "LabelS", color = "TextDim", outline = true })
-	worldText.LayoutOrder = 1
-	overtimePill = UITheme.pill(caption, { name = "Overtime", tone = "Danger", text = S.Overtime })
-	overtimePill.frame.LayoutOrder = 2
-	overtimePill.frame.Visible = false
-	dangerPill = UITheme.pill(caption, { name = "DangerStep", tone = "Ko", text = S.Danger, args = { n = 1 } })
-	dangerPill.frame.LayoutOrder = 3
-	dangerPill.frame.Visible = false
-
-	-- Boss arrow: red-rimmed chip, a chevron that turns toward the boss, distance.
-	arrowBox = UITheme.chip(timerZone, { Name = "BossArrow", Size = UDim2.fromOffset(0, 30), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 3, Visible = false })
-	local ink = arrowBox:WaitForChild("Ink") :: UIStroke
-	UITheme.paint(ink, "Color", "MapBoss")
-	UITheme.new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 10) }, arrowBox)
-	list(arrowBox, true, 6)
-	arrowHolder = holder(arrowBox, "Arrow", UDim2.fromOffset(22, 22), 1)
-	for i, x in { -4, 4 } do
-		local bar = UITheme.new("Frame", {
-			Size = UDim2.fromOffset(13, 5),
-			AnchorPoint = Vector2.new(0.5, 0.5),
-			Position = UDim2.new(0.5, x, 0.5, 0),
-			Rotation = if i == 1 then -45 else 45,
-			BorderSizePixel = 0,
-		}, arrowHolder)
-		UITheme.paint(bar, "BackgroundColor3", "MapBoss")
-		UITheme.corner(bar, 2)
-	end
-	arrowDist = UITheme.label(arrowBox, { name = "Distance", size = UDim2.new(0, 0, 1, 0), autoSize = Enum.AutomaticSize.X, role = "LabelS", outline = true })
-	arrowDist.LayoutOrder = 2
-
-	bossBox = holder(timerZone, "BossBar", UDim2.fromOffset(260, 40), 4)
-	bossBox.Visible = false
-	bossName = UITheme.label(bossBox, { name = "Name", size = UDim2.fromOffset(260, 18), role = "LabelM", outline = true })
-	bossBar = UITheme.glossBar(bossBox, UDim2.fromOffset(260, 16), UDim2.fromOffset(0, 21), "Boss")
-	bossPct = UITheme.label(bossBar.frame, { name = "Pct", size = UDim2.fromScale(1, 1), role = "LabelS", outline = true, z = 3 })
+	-- chrono, monde, Overtime, boss
+	timerChip = UIKit.find(timerZone, "Timer")
+	timerText = UIKit.find(timerChip, "Time")
+	clockIcon = UIKit.find(timerChip, "Clock")
+	stopwatchIcon = UIKit.find(timerChip, "Stopwatch")
+	worldText = UIKit.find(timerZone, "Caption.World")
+	overtimePill = UIKit.tag(UIKit.find(timerZone, "Caption.Overtime"))
+	dangerPill = UIKit.tag(UIKit.find(timerZone, "Caption.Danger"))
+	arrowBox = UIKit.find(timerZone, "BossArrow")
+	arrowHolder = UIKit.find(arrowBox, "Row.Arrow")
+	arrowDist = UIKit.find(arrowBox, "Row.Distance")
+	bossBox = UIKit.find(timerZone, "BossBar")
+	bossName = UIKit.find(bossBox, "Name")
+	bossBar = UIKit.bar(UIKit.find(bossBox, "Bar"))
+	bossPct = UIKit.find(bossBox, "Bar.Pct")
 	for i = 1, 4 do
-		local pip = UITheme.new("Frame", {
-			Size = UDim2.fromOffset(8, 8),
-			Position = UDim2.new(1, -10 * i, 0, 5),
-			Rotation = 45,
-			BorderSizePixel = 0,
-			Visible = false,
-		}, bossBox)
-		UITheme.paint(pip, "BackgroundColor3", "Hp")
-		UITheme.stroke(pip, 1.5, "Outline")
-		bossPips[i] = pip
+		-- lihfolk-ignore: findfirstchild-chain -- fwjelaa-ignore: findfirstchild-chain (optional child, typed nil-able and checked)
+		local pip = bossBox and bossBox:FindFirstChild("Pip" .. i) :: Frame?
+		if pip then
+			bossPips[i] = pip
+		end
 	end
-end
 
-local function buildKo(parent: Instance)
-	koZone = UITheme.zone(parent, "Ko", Vector2.new(1, 0), UDim2.new(1, -M, 0, 4), UDim2.fromOffset(200, 76))
-	list(koZone, false, 3, Enum.HorizontalAlignment.Right).VerticalAlignment = Enum.VerticalAlignment.Top
-	local chip = UITheme.chip(koZone, { Name = "Chip", Size = UDim2.fromOffset(0, 46), AutomaticSize = Enum.AutomaticSize.X, LayoutOrder = 1 })
-	UITheme.new("UIPadding", { PaddingLeft = UDim.new(0, 6), PaddingRight = UDim.new(0, 12) }, chip)
-	list(chip, true, 6)
-	UITheme.koIcon(chip, 34).LayoutOrder = 1
-	koText = UITheme.label(chip, { name = "Count", size = UDim2.new(0, 0, 1, 0), autoSize = Enum.AutomaticSize.X, role = "NumberL", font = "number", outline = true, text = "0" })
-	koText.LayoutOrder = 2
-	local suffix = UITheme.label(chip, { name = "Suffix", size = UDim2.new(0, 0, 1, 0), autoSize = Enum.AutomaticSize.X, role = "LabelM", color = "Ko", outline = true, text = S.Ko })
-	suffix.LayoutOrder = 3
-	UITheme.new("UIScale", { Name = "PopScale" }, chip)
-	local best = holder(koZone, "Best", UDim2.fromOffset(0, 22), 2)
-	best.AutomaticSize = Enum.AutomaticSize.X
-	list(best, true, 4)
-	bestText = UITheme.label(best, { name = "BestText", size = UDim2.new(0, 0, 1, 0), autoSize = Enum.AutomaticSize.X, role = "LabelS", color = "CoinLight", outline = true, text = S.BestUnknown })
-	newBestPill = UITheme.pill(best, { name = "NewBest", tone = "Premium", textColor = "OnLight", text = S.NewBest })
-	newBestPill.frame.Visible = false
-end
+	-- KO et record
+	local koRow = UIKit.find(koZone, "Ko")
+	koText = UIKit.find(koRow, "Count")
+	bestText = UIKit.find(koZone, "Best.BestText")
+	newBestPill = UIKit.tag(UIKit.find(koZone, "Best.NewBest"))
 
-local function buildDowned()
-	-- Under the HUD (DisplayOrder 9 < 10) so the vitals stay readable (Figma L10).
-	vignetteGui = UITheme.screen("COHUE_Vignette", 9, Enum.ScreenInsets.None)
-	vignetteGui.Enabled = false
-	local ring = UITheme.new("Frame", {
-		BackgroundTransparency = 1,
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		Position = UDim2.fromScale(0.5, 0.5),
-		Size = UDim2.new(1, -40, 1, -40),
-	}, vignetteGui)
-	vignetteStroke = UITheme.stroke(ring, 46, "Downed")
-	vignetteStroke.Transparency = 0.45
+	-- armes (et Runes)
+	buildBox = UIKit.find(buildZone, "Build")
+	for i = 1, 6 do
+		local w = UIKit.find(buildBox, "Weapons.Slot" .. i) :: Frame?
+		if w then
+			weaponSlots[i] = bindSlot(w)
+		end
+		local r = UIKit.find(buildBox, "Runes.Slot" .. i) :: Frame?
+		if r then
+			runeSlots[i] = bindSlot(r)
+		end
+	end
 
-	downedGui = UITheme.screen("COHUE_Downed", 25)
-	downedGui.Enabled = false
-	local zone = UITheme.zone(downedGui, "Center", Vector2.new(0.5, 0.5), UDim2.fromScale(0.5, 0.42), UDim2.fromOffset(300, 150))
-	downedPanel = UITheme.popup(zone, { Size = UDim2.fromScale(1, 1) })
-	downedPanelStroke = downedPanel:WaitForChild("Ink") :: UIStroke
-	UITheme.paint(downedPanelStroke, "Color", "Downed")
-	downedTitle = UITheme.label(downedPanel, { name = "Title", size = UDim2.new(1, -16, 0, 34), position = UDim2.fromOffset(8, 8), role = "NumberL", font = "number", color = "Downed", outline = true })
-	local secRow = holder(downedPanel, "Seconds", UDim2.new(1, 0, 0, 26), 0)
-	secRow.Position = UDim2.fromOffset(0, 44)
-	list(secRow, true, 6, Enum.HorizontalAlignment.Center)
-	downedSeconds = UITheme.label(secRow, { name = "N", size = UDim2.new(0, 0, 1, 0), autoSize = Enum.AutomaticSize.X, role = "NumberM", font = "number", outline = true })
-	downedSeconds.LayoutOrder = 1
-	downedSecondsCaption = UITheme.label(secRow, { name = "Caption", size = UDim2.new(0, 0, 1, 0), autoSize = Enum.AutomaticSize.X, role = "BodyM", font = "heavy", color = "TextDim", text = S.DownedSeconds })
-	downedSecondsCaption.LayoutOrder = 2
-	reviveBar = UITheme.glossBar(downedPanel, UDim2.new(1, -40, 0, 16), UDim2.fromOffset(20, 76), "Revive")
-	reviveText = UITheme.label(downedPanel, { name = "Revive", size = UDim2.new(1, -16, 0, 18), position = UDim2.fromOffset(8, 96), role = "LabelS", color = "ReviveLight", outline = true })
-	downedHint = UITheme.label(downedPanel, { name = "Hint", size = UDim2.new(1, -24, 0, 34), position = UDim2.fromOffset(12, 114), role = "BodyS", font = "body", color = "TextMuted", wrap = true })
-	ghostPill = UITheme.pill(downedPanel, { name = "Back", tone = "PanelLight", text = S.GhostBack })
-	ghostPill.frame.AnchorPoint = Vector2.new(0.5, 0)
-	ghostPill.frame.Position = UDim2.new(0.5, 0, 0, 104)
-	ghostPill.frame.Visible = false
-end
+	-- annonces
+	announceBanner = UIKit.find(announceZone, "Banner")
+	announceText = UIKit.find(announceBanner, "Text.Title")
+	announceLine = UIKit.find(announceBanner, "Text.Line")
 
-local function buildAnnounce()
-	announceGui = UITheme.screen("COHUE_Announce", 30)
-	announceZone = UITheme.zone(announceGui, "Banner", Vector2.new(0.5, 0), UDim2.new(0.5, 20, 0, 56), UDim2.fromOffset(440, 52))
-	announceSlab = UITheme.glossy(announceZone, {
-		name = "Slab",
-		role = "Danger",
-		size = UDim2.fromOffset(0, 44),
-		anchor = Vector2.new(0.5, 0),
-		position = UDim2.fromScale(0.5, 0),
-		radius = 16,
-		lip = 5,
-	})
-	local root = announceSlab.root
-	root.AutomaticSize = Enum.AutomaticSize.X
-	root.Visible = false
-	announceSlab.face.AutomaticSize = Enum.AutomaticSize.X
-	announceSlab.content.AutomaticSize = Enum.AutomaticSize.X
-	announceSlab.content.Size = UDim2.new(0, 0, 1, 0)
-	UITheme.new("UIPadding", { PaddingLeft = UDim.new(0, 22), PaddingRight = UDim.new(0, 22) }, announceSlab.content)
-	announceText = UITheme.label(announceSlab.content, {
-		name = "Text",
-		size = UDim2.new(0, 0, 1, 0),
-		autoSize = Enum.AutomaticSize.X,
-		role = "TitleM",
-		outline = true,
-	})
-	UITheme.new("UIScale", { Name = "PopScale" }, root)
+	-- À terre / fantôme
+	local center = UIKit.find(downed, "Center")
+	-- lihfolk-ignore: findfirstchild-chain -- fwjelaa-ignore: findfirstchild-chain (optional child, typed nil-able and checked)
+	UITheme.adoptScale(center and center:FindFirstChild("Scale") :: UIScale?)
+	downedHeader = UIKit.find(center, "Panel.Header")
+	downedTitle = UIKit.find(downedHeader, "Title")
+	downedPanelStroke = UIKit.find(center, "Panel.Body.RimFrame.Rim")
+	downedSeconds = UIKit.find(center, "Panel.Body.Seconds.N")
+	reviveBar = UIKit.bar(UIKit.find(center, "Panel.Body.ReviveBar"))
+	reviveText = UIKit.find(center, "Panel.Body.Revive")
+	downedHint = UIKit.find(center, "Panel.Body.Hint")
+	ghostPill = UIKit.tag(UIKit.find(center, "Panel.Body.Back"))
+	vignetteStroke = UIKit.find(vig, "Ring.Edge")
+	return true
 end
 
 ---------------------------------------------------------------------------- layout per device
@@ -472,26 +289,24 @@ local function layout()
 	local scale = UITheme.scale()
 	local mm = minimapSize()
 	if portrait then
-		-- P01: KO in the Roblox bar row (right), timer under it, left column under the timer.
-		koZone.Position = UDim2.new(1, -M, 0, 2)
-		timerZone.Position = UDim2.new(0.5, math.round(-30 * scale), 0, math.round(52 * scale))
-		leftZone.Position = UDim2.fromOffset(M, math.round(66 * scale))
-		announceZone.Position = UDim2.new(0.5, 0, 0.5, -60)
+		-- P01 : chrono et KO sous l'encoche, puis vitals et mini-carte, puis équipiers ; armes au-dessus des boutons.
+		timerZone.AnchorPoint = Vector2.new(0, 0)
+		timerZone.Position = UDim2.fromOffset(M, math.round(52 * scale))
+		koZone.Position = UDim2.new(1, -M, 0, math.round(48 * scale))
+		leftZone.Position = UDim2.fromOffset(M, math.round(124 * scale))
+		buildZone.Position = UDim2.new(0.5, 0, 1, -math.round(262 * scale))
+		announceZone.Position = UDim2.new(0.5, 0, 0, math.round(330 * scale))
 	else
-		-- L01 / C01: timer centred in the Roblox bar row, KO left of the minimap, left column under the bar.
-		koZone.Position = UDim2.new(1, -(M + math.round((mm + 8) * scale)), 0, 4)
+		-- L01 / C01 : chrono centré dans la rangée de la barre Roblox, KO à gauche de la mini-carte,
+		-- colonne gauche sous la barre, armes en bas au centre, annonces dans le couloir central.
+		timerZone.AnchorPoint = Vector2.new(0.5, 0)
 		timerZone.Position = UDim2.new(0.5, 0, 0, 4)
-		leftZone.Position = UDim2.fromOffset(M, M)
-		announceZone.Position = UDim2.new(0.5, math.round(20 * scale), 0, math.round(56 * scale))
+		koZone.Position = UDim2.new(1, -(M + math.round((mm + 14) * scale)), 0, 2)
+		leftZone.Position = UDim2.fromOffset(M, math.round(64 * scale))
+		buildZone.Position = UDim2.new(0.5, 0, 1, -math.round(24 * scale))
+		announceZone.Position = UDim2.new(0.5, math.round(66 * scale), 0, math.round(84 * scale))
 	end
-	if device == "phone" then
-		buildBox.Parent = leftZone
-		buildBox.LayoutOrder = 3
-	else
-		buildBox.Parent = bottomLeft
-		buildBox.LayoutOrder = 1
-	end
-	-- During the 8 s card offer (phone), the build, team and feed step aside (Figma L04 / P04).
+	-- Pendant le passage de niveau (téléphone), armes, équipiers et fil s'effacent (Figma L04 / P04).
 	local cardsOpen = UITheme.flag("cardsOpen") == true and device == "phone"
 	buildBox.Visible = not cardsOpen
 	teamBox.Visible = not cardsOpen
@@ -545,9 +360,7 @@ local function updateTimer()
 		worldText.Visible = not ot
 		overtimePill.frame.Visible = ot
 		dangerPill.frame.Visible = ot and lastStep > 0
-		UITheme.paint(timerStroke, "Color", if ot then "Overtime" else "Outline")
-		timerStroke.Thickness = if ot then 3 else 2.5
-		UITheme.paint(timerText, "TextColor3", if ot then "Overtime" else "Text")
+		timerText.TextColor3 = if ot then UIKit.tone("Tomato.l") else Color3.new(1, 1, 1)
 		if ot then
 			UITheme.pop(timerChip, 0.85)
 		end
@@ -659,8 +472,8 @@ local function setDowned(v: any)
 	vignetteGui.Enabled = downed and UITheme.inRun()
 	if downed then
 		UITheme.setText(downedTitle, S.DownedTitle)
-		UITheme.paint(downedTitle, "TextColor3", "Downed")
-		UITheme.paint(downedPanelStroke, "Color", "Downed")
+		UIKit.tint(downedHeader, "Tomato")
+		downedPanelStroke.Color = UIKit.tone("Tomato")
 		local left = math.max(0, math.ceil(tonumber(v.downedTimeLeft) or 0))
 		downedSeconds.Text = tostring(left)
 		downedSeconds.Parent.Visible = true
@@ -669,8 +482,8 @@ local function setDowned(v: any)
 		reviveBar.set(progress)
 		reviveText.Visible = progress > 0
 		UITheme.setText(reviveText, S.ReviveBy, { p = math.floor(progress * 100) })
-		UITheme.setText(downedHint, S.DownedHint)
-		downedHint.Position = UDim2.fromOffset(12, 114)
+		-- v3 : une seule information à la fois (le temps, puis qui relève) ; pas de phrase d'aide.
+		downedHint.Visible = false
 		ghostPill.frame.Visible = false
 		if not vignetteTween and not UITheme.flashesReduced() then
 			-- Slow breathing (0.4 Hz, far under the 3 Hz flash limit). Static with Reduce flashes.
@@ -690,13 +503,13 @@ local function setDowned(v: any)
 		end
 		if ghost then
 			UITheme.setText(downedTitle, S.GhostTitle)
-			UITheme.paint(downedTitle, "TextColor3", "Ghost")
-			UITheme.paint(downedPanelStroke, "Color", "Ghost")
+			UIKit.tint(downedHeader, "Plum")
+			downedPanelStroke.Color = UIKit.tone("Plum")
 			downedSeconds.Parent.Visible = false
 			reviveBar.frame.Visible = false
 			reviveText.Visible = false
 			UITheme.setText(downedHint, S.GhostHint)
-			downedHint.Position = UDim2.fromOffset(12, 48)
+			downedHint.Visible = true
 			ghostPill.frame.Visible = true
 		end
 	end
@@ -784,13 +597,17 @@ function HUD.setTeam(team: { [any]: any })
 				row.name.Text = name
 				row.avatar.Text = string.upper(string.sub(name, 1, 1))
 			end
+			setHeadshot(row, userId)
 			local maxHp = math.max(1, tonumber(info.maxHp) or 1)
 			row.bar.set((tonumber(info.hp) or 0) / maxHp)
 			local downed = info.downed == true
 			local ghost = info.ghost == true
 			row.bar.frame.Visible = not downed and not ghost
 			row.state.frame.Visible = downed or ghost
-			UITheme.paint(row.avatar, "BackgroundColor3", if ghost then "Ghost" else "MapAlly")
+			if row.rim then
+				row.rim.Color = UIKit.tone(if ghost then "Plum" elseif downed then "Tomato" else "Royal")
+			end
+			row.portrait.ImageTransparency = if ghost then 0.5 else 0
 			if ghost then
 				row.state.setTone("PanelLight")
 				UITheme.setText(row.state.label, S.Ghost)
@@ -816,27 +633,28 @@ local function fillSlots(slots: { Slot }, entries: any, count: number, configNam
 	for i, slot in slots do
 		local entry = if type(entries) == "table" then entries[i] else nil
 		slot.frame.Visible = i <= shown
-		-- lihfolk-ignore: findfirstchild-chain -- fwjelaa-ignore: findfirstchild-chain (nil-checked below)
-		local ink = slot.frame:FindFirstChild("Ink") :: UIStroke?
 		if type(entry) == "table" and type(entry.id) == "string" then
-			UITheme.setIcon(slot.icon, UITheme.format(UITheme.nameOf(configName, entry.id)))
-			slot.icon.Visible = true
+			-- Icône en briques (shared/Config/UIAssets) ; sinon les initiales du nom en secours.
+			local img = UIKit.icon(entry.id)
+			slot.icon.Image = img
+			slot.icon.Visible = img ~= ""
+			if slot.initials then
+				local name = UITheme.format(UITheme.nameOf(configName, entry.id))
+				local initials = string.upper(string.sub(name, 1, 2))
+				slot.initials.Text = initials
+				slot.initials.Visible = img == ""
+			end
 			slot.level.frame.Visible = true
-			slot.level.label.Text = tostring(entry.level or 1)
-			UITheme.back(slot.frame, 0.05)
-			if ink then
-				UITheme.paint(ink, "Color", "Outline")
-				ink.Transparency = 0
-			end
+			slot.level.label.Text = "Lv" .. tostring(entry.level or 1)
+			UIKit.tint(slot.frame, "Cream")
 		else
-			-- Empty slot: faint frame (shape says "free", not only the colour).
+			-- Emplacement libre : brique prune vide (la forme dit « libre », pas seulement la couleur).
 			slot.icon.Visible = false
-			slot.level.frame.Visible = false
-			UITheme.back(slot.frame, 0.7)
-			if ink then
-				UITheme.paint(ink, "Color", "TextMuted")
-				ink.Transparency = 0.45
+			if slot.initials then
+				slot.initials.Visible = false
 			end
+			slot.level.frame.Visible = false
+			UIKit.tint(slot.frame, "Plum")
 		end
 	end
 end
@@ -973,15 +791,21 @@ local function nextAnnounce()
 	end
 	local a = table.remove(queue, 1)
 	if not a then
-		announceSlab.root.Visible = false
+		announceBanner.Visible = false
 		return
 	end
 	announcing = true
 	local kind = tostring(a.kind or "")
-	announceSlab.setRole(if DANGER_KINDS[kind] then "Danger" elseif GOLD_KINDS[kind] then "Premium" else "Info")
+	UIKit.tint(announceBanner, if DANGER_KINDS[kind] then "Tomato" elseif GOLD_KINDS[kind] then "Gold" elseif kind == "Boss" then "Grape" else "Sky")
 	UITheme.setText(announceText, a.text or "")
-	announceSlab.root.Visible = true
-	UITheme.pop(announceSlab.root, 0.9)
+	if announceLine then
+		announceLine.Visible = a.line ~= nil
+		if a.line ~= nil then
+			UITheme.setText(announceLine, a.line)
+		end
+	end
+	announceBanner.Visible = true
+	UITheme.pop(announceBanner, 0.9)
 	local d = math.clamp(tonumber(a.duration) or 3, Config.Hud.AnnounceMin, Config.Hud.AnnounceMax)
 	task.delay(d, function()
 		announcing = false
@@ -1003,8 +827,6 @@ end
 local function refreshVisibility()
 	local inRun = UITheme.inRun()
 	hudGui.Enabled = inRun
-	topGui.Enabled = inRun
-	announceGui.Enabled = inRun
 	if not inRun then
 		downedGui.Enabled = false
 		vignetteGui.Enabled = false
@@ -1015,29 +837,10 @@ end
 ---------------------------------------------------------------------------- lifecycle
 
 function HUD.start()
-	hudGui = UITheme.screen("COHUE_HUD", 10)
-	-- Timer, KO and boss info sit in the Roblox bar row (right of Roblox's buttons): device insets only.
-	topGui = UITheme.screen("COHUE_HUDTop", 10, Enum.ScreenInsets.DeviceSafeInsets)
-	leftZone = UITheme.zone(hudGui, "TopLeft", Vector2.zero, UDim2.fromOffset(M, M), UDim2.fromOffset(VITALS_W + 8, 360))
-	list(leftZone, false, 8).VerticalAlignment = Enum.VerticalAlignment.Top
-	buildVitals(leftZone)
-	companionText = UITheme.label(leftZone, {
-		name = "Companion",
-		size = UDim2.fromOffset(VITALS_W, 16),
-		role = "LabelS",
-		align = Enum.TextXAlignment.Left,
-		outline = true,
-	})
-	companionText.LayoutOrder = 2
-	companionText.Visible = false
-	buildTeam(leftZone)
-	buildFeed(leftZone)
-	bottomLeft = UITheme.zone(hudGui, "BottomLeft", Vector2.new(0, 1), UDim2.new(0, M, 1, -M), UDim2.fromOffset(VITALS_W + 8, 96))
-	buildBox = buildBuild()
-	buildTimer(topGui)
-	buildKo(topGui)
-	buildDowned()
-	buildAnnounce()
+	if not bind() then
+		warn("[HUD] gabarits v3 absents : lancer tools/ui/build-ui-v3.luau dans Studio (place COHUE). HUD inactif.")
+		return
+	end
 	VictoryBanner.start()
 	CaptureUI.start()
 	layout()
