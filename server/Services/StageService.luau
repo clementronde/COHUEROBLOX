@@ -16,6 +16,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Worlds = require(Config:WaitForChild("Worlds"))
 local Heightmap = require(Shared:WaitForChild("Heightmap"))
+local Tiles = require(Config:WaitForChild("Tiles"))
+-- A02 : mondes en tuiles faites main (docs/dossier/21-tuiles-assemblage.md).
+local WorldBuilder = require(script.Parent:WaitForChild("WorldBuilder"))
 
 local PART_BUDGET = 900
 
@@ -271,7 +274,9 @@ end
 -- Builds the stage and publishes its key. Returns the layout.
 function StageService.buildStage(worldId: string, stage: number, seed: number, bossId: string): Heightmap.Layout?
 	StageService.clear()
-	local key = Heightmap.makeKey(worldId, stage, seed, bossId)
+	-- A02-01 : disposition tirée parmi les tuiles du monde (nil = pas de tuiles pour ce monde).
+	local tiles = WorldBuilder.plan(worldId, seed, bossId)
+	local key = Heightmap.makeKey(worldId, stage, seed, bossId, tiles)
 	local layout = Heightmap.load(key)
 	if not layout then
 		warn("[StageService] bad stage key", key)
@@ -283,12 +288,19 @@ function StageService.buildStage(worldId: string, stage: number, seed: number, b
 	f.Name = "Stage"
 	folder = f
 	partCount = 0
-	buildGround(layout, world)
-	buildTerrain(layout, world)
-	buildArena(layout, world)
-	buildDecor(layout, world)
-	if partCount > PART_BUDGET then
-		warn(`[StageService] {partCount} parts, over the {PART_BUDGET} budget`)
+	if tiles then
+		partCount = WorldBuilder.build(tiles, layout.worldId, f)
+	elseif Tiles.LegacyFallback then
+		warn(`[StageService] {worldId} : pas de tuiles, ancienne carte en Parts (Tiles.LegacyFallback)`)
+		buildGround(layout, world)
+		buildTerrain(layout, world)
+		buildArena(layout, world)
+		buildDecor(layout, world)
+		if partCount > PART_BUDGET then
+			warn(`[StageService] {partCount} parts, over the {PART_BUDGET} budget`)
+		end
+	else
+		warn(`[StageService] {worldId} : aucune tuile dans ReplicatedStorage.Assets.Worlds.{worldId}, monde vide`)
 	end
 	-- A Studio baseplate above the generated ground hides enemies and intercepts feet checks.
 	local baseplate = Workspace:FindFirstChild("Baseplate")
