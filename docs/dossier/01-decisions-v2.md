@@ -114,3 +114,51 @@ Skins d'équipement de classe, personnalisation des compagnons, effets de KO, tr
 | `Config/Weapons`, `Grimoires`, `Enemies`, `Worlds`, `Bosses`, `Cosmetics`, `Products` | Réécrire le contenu | Nouveaux thèmes, textes en anglais |
 | `client/Controllers/UI/*` | Garder la logique, refaire le look | Style glossy cartoon d'après les maquettes Figma |
 | `assets/creatures/*` | Garder au cas par cas | Grand Chêne et faune de la forêt réutilisables ; les anciens compagnons Braise / Marée / Ronce sortent du jeu, sauf si l'agent DA les juge bons comme capturables de la forêt |
+
+## 12. Rien n'est construit par script (4 et 5 nov. 2026)
+
+Le 4 nov., Clément a posé la règle pour la 3D. Le 5 nov., il l'a étendue à l'UI et aux effets (« Oui, tout »). Tout ce que le joueur voit existe comme objet dans la place COHUE, visible et modifiable dans Studio. Les scripts clonent ces modèles et les pilotent ; ils n'en fabriquent plus.
+
+**Le code peut :**
+- cloner un modèle, le parenter, le détruire ;
+- changer ses propriétés : texte, couleur, position, taille, transparence, visibilité, CFrame ;
+- l'animer avec des tweens.
+
+Une liste répétée (cartes, lignes du classement, emplacements) se fait avec un modèle de ligne posé une fois et cloné N fois.
+
+**Le code crée encore les objets invisibles :**
+- les RemoteEvent et dossiers de `Net` ;
+- les BindableEvent et BindableFunction ;
+- les Attachment et contraintes physiques du mouvement ;
+- InputContext, InputAction et InputBinding ;
+- TeleportOptions ;
+- les dossiers de rangement vides et la Camera d'un ViewportFrame.
+
+**Où vivent les modèles :**
+
+| Quoi | Où |
+| --- | --- |
+| Écrans (HUD, menus, fin de run) | `StarterGui` : un ScreenGui par écran, `ResetOnSpawn = false`, désactivé sauf le HUD |
+| Pièces d'UI réutilisées (carte, bouton, ligne, pastille) | `ReplicatedStorage.Assets.UI` |
+| Effets (armes, autels, attaques ennemies, pop d'équipement, onde d'atterrissage) | `ReplicatedStorage.Assets.FX` |
+| Créatures, boss, compagnons | `ReplicatedStorage.Assets.Creatures` (mailles A01) |
+| Équipement de classe | `ReplicatedStorage.Assets.Equipment` |
+| Butin, autels, marqueurs de ping | `ReplicatedStorage.Assets.Props` |
+| Sons | `ReplicatedStorage.Assets.Sounds` |
+| Mondes de run | modèles posés dans COHUE (Workspace ou ServerStorage, choix de A02) |
+| Lobby | `Workspace.HubbubVillage` (fait par A01) |
+
+**À convertir** (relevé du 5 nov. dans `main` : les `Instance.new` qui fabriquent du visible) :
+
+| Module | Ce qu'il fabrique aujourd'hui | Agent |
+| --- | --- | --- |
+| `UI/UITheme` et les écrans qui l'appellent : HUD, CardUI, CaptureUI, EndScreen, LoadoutUI, Minimap, MobileButtons, PingUI, SettingsUI, ShrineUI, VictoryBanner | toute l'UI (ScreenGui, cadres, textes, boutons) | A08 (A09 pour les menus) |
+| `EnemyRenderer`, `BossRenderer` | ennemis et boss en Parts | A03, avec les mailles A01 |
+| `CompanionRenderer` | compagnons en Parts | A05, avec les mailles A01 |
+| `server/Services/TraitService` | équipement de classe (Accessory, Part, Fire, Smoke, Sparkles, lumière, particules) | A04, avec les modèles A01 |
+| `server/Services/StageService` | le monde de run (sol, rampes, lumières, panneaux) | A02 |
+| `WeaponFX`, `EnemyAttackFX`, `ShrineFX`, onde d'atterrissage de `MovementController` | effets | A07 |
+| `LootRenderer` | butin (Part, ProximityPrompt) et sa fenêtre (BillboardGui) | A04 pour le butin, A08 pour la fenêtre |
+| `DebugHud` | texte de debug | A08, en dernier |
+
+Chaque agent convertit ses modules à son tour, un seul agent à la fois. Un module pas encore converti continue de marcher tel quel. Une fois converti, il ne fabrique plus rien : si un modèle manque, il le signale dans la sortie au lieu de le recréer.

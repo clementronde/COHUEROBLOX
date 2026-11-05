@@ -1,0 +1,92 @@
+{
+ "className": "MeshPart",
+ "properties": {
+  "MeshId": "rbxassetid://135835703924289",
+  "Size": [
+   1.25,
+   5.75,
+   1.0
+  ],
+  "InitialSize": [
+   1.25,
+   5.75,
+   1.0
+  ],
+  "Color": [
+   1,
+   1,
+   1
+  ],
+  "Anchored": true,
+  "CanCollide": false,
+  "CanQuery": false,
+  "CanTouch": false,
+  "CastShadow": false
+ },
+ "attributes": {
+  "GripOffset": {
+   "Vector3": [
+    0.125,
+    -0.875,
+    -0.0
+   ]
+  }
+ },
+ "children": [
+  {
+   "name": "NeonCore",
+   "className": "Part",
+   "properties": {
+    "Size": [
+     0.5,
+     0.5,
+     0.5
+    ],
+    "Material": "Neon",
+    "Color": [
+     1.0,
+     0.47843137254901963,
+     0.10196078431372549
+    ],
+    "Anchored": false,
+    "CanCollide": false,
+    "CanQuery": false,
+    "CanTouch": false,
+    "Massless": true,
+    "CastShadow": false
+   },
+   "children": [
+    {
+     "name": "Weld",
+     "className": "Weld",
+     "properties": {
+      "C0": {
+       "position": [
+        0.125,
+        2.125,
+        -0.0
+       ],
+       "orientation": [
+        [
+         1.0,
+         0.0,
+         0.0
+        ],
+        [
+         0.0,
+         1.0,
+         0.0
+        ],
+        [
+         0.0,
+         0.0,
+         1.0
+        ]
+       ]
+      }
+     }
+    }
+   ]
+  }
+ ]
+}
