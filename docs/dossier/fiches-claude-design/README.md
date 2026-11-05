@@ -15,16 +15,28 @@ A03 y lit les fichiers directement : plus besoin de les envoyer. Les versions co
 
 ## Zone des mobs dans COHUE
 
-`Workspace.A03_ZoneMobs` (x 398 à 464, z 762 à 788, à côté du kit d'A01) aligne les modèles de Clément déjà installés, chacun sur un socle avec son nom :
+`Workspace.A03_ZoneMobs`, à côté du kit d'A01, aligne les modèles de Clément déjà installés. Tous regardent vers −Z, le côté libre du sol.
+
+**Rangée des mobs** (sol `Sol`, x 398 à 486, z 762 à 788) : un socle tous les 12 studs, avec le nom sur le devant :
 - Gobelin ;
 - Zombie ;
 - Chauve-souris ;
 - Squelette ;
-- Fantôme.
+- Fantôme ;
+- Gobelin cavalier ;
+- Sorcière.
 
-Ils regardent vers −Z, c'est-à-dire vers le côté libre du sol. Les socles sont espacés de 12 studs. Pour un nouveau modèle, ajouter un socle 12 studs plus loin en x (466) et allonger le sol.
+Les attaques à longue portée doivent tomber sur le sol, pas dans le vide :
+- le gobelin cavalier a un socle plus profond (10 studs) ;
+- le sol de la sorcière est celui de la zone, et elle vole au-dessus de son socle.
 
-Dans la zone, `Damage` vaut 0 sur chaque mob, pour pouvoir les regarder de près en Play. Remettre la valeur de la fiche pour tester les dégâts.
+**Coin des boss** (sol `Sol_Boss`, x 486 à 584, z 724 à 836) :
+- l'Ogre est en x 500 ;
+- l'Araignée géante est en x 548.
+
+Ils sont posés directement sur le sol, sans socle, avec une plaque à leur nom devant eux. Le sol opaque sert au trou de la sortie du sol de l'ogre ; les toiles et l'empalement de l'araignée tombent jusqu'à 70 studs devant elle.
+
+Pour un nouveau modèle, ajouter un socle à la suite et allonger le sol. Dans la zone, les dégâts sont à 0 sur chaque mob (`Damage`, et `Knockback`, `PoisonDps`, `PoolDps`, `WebDamage`, `SpiderlingDamage` quand ils existent), pour pouvoir les regarder de près en Play. Pour tester les dégâts, remettre les valeurs de la fiche.
 
 ## Conventions communes (celles du fantôme)
 
