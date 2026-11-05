@@ -27,6 +27,16 @@ local Balance = {
 	HpPerExtraPlayer = 0.6, -- doc 5.2
 	SwarmShare = 0.8, -- share of spawns that are the basic swarm kind (doc 9.1)
 
+	-- Au-delà de MaxEnemies (A03-02, décisions v2 §2 « aucun ennemi max ») : k = densité voulue /
+	-- plafond (>= 1, EnemyService.getOverflowMult). La force monte au lieu du nombre, sans plafond :
+	--   PV x k (si Run.Overtime.OverflowToHp), dégâts x (1 + (k - 1) * DamageShare),
+	--   part d'élites + (k - 1) * ElitePointsPerK, bornée à EliteShareMax (sinon tout devient élite).
+	Overflow = {
+		DamageShare = 0.5,
+		ElitePointsPerK = 0.10,
+		EliteShareMax = 0.6,
+	},
+
 	-- Network (doc 12.2 ; PERF-01, A03-v3) : chaque client reçoit à chaque tick ses SnapshotNearCount
 	-- ennemis les plus proches (et ceux qui agissent : préparation, saut, état qui change, boss), le
 	-- reste à moins de InterestRadiusNear un tick sur NearRestEveryNTicks, et jusqu'à

@@ -8,7 +8,8 @@
 -- Bosses are entities here too (so weapons hit them) but BossService drives them ("external").
 -- Run v2 (A04-02) : la force vient de Config/Run.WorldScaling (index du monde = director.stage) et
 -- du directeur réglé par RunManager (Overtime : densité, PV, dégâts, part d'élites).
--- Au-delà du plafond technique Balance.MaxEnemies, l'excès de densité devient des PV (Run.Overtime.OverflowToHp).
+-- A03-02 : au-delà du plafond technique Balance.MaxEnemies, l'excès de densité k devient de la force
+-- (PV, dégâts, part d'élites : Balance.Overflow), jamais du nombre. Le joueur ne voit pas de plafond.
 -- Débit (A03-v3, PERF-01) : chaque client reçoit à chaque tick ses ennemis les plus proches et ceux
 -- qui agissent, le reste à cadence réduite (voir send), plus la liste des ennemis retirés.
 -- Pas d'allocation par tick dans les boucles chaudes (PERF-04) : grille, cibles et tampons réutilisés.
@@ -240,7 +241,19 @@ local function scaledHp(): number
 end
 
 local function scaledDamage(): number
-	return worldScale().damage * director.damageMult
+	local k = director.overflowMult
+	local overflow = if k > 1 then 1 + (k - 1) * Balance.Overflow.DamageShare else 1
+	return worldScale().damage * director.damageMult * overflow
+end
+
+-- Part d'élites, avec l'excès de densité au plafond (A03-02).
+local function eliteShareNow(): number
+	local k = director.overflowMult
+	if k <= 1 then
+		return director.eliteShare
+	end
+	local O = Balance.Overflow
+	return math.max(director.eliteShare, math.min(director.eliteShare + (k - 1) * O.ElitePointsPerK, O.EliteShareMax))
 end
 
 local function clampToMap(x: number, z: number): (number, number)
@@ -962,7 +975,7 @@ local function spawnTick(targets: { Target }, now: number)
 		if now >= director.nextEliteAt and underCap then
 			elite = true
 			director.nextEliteAt = now + Run.EliteEvery
-		elseif elapsed >= Run.EliteFirstAt and math.random() < director.eliteShare and underCap then
+		elseif elapsed >= Run.EliteFirstAt and math.random() < eliteShareNow() and underCap then
 			elite = true
 		end
 		local kind = pickKind(elapsed)
