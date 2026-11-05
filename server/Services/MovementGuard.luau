@@ -521,7 +521,10 @@ local function sample(player: Player, dt: number)
 	-- Ralentis (à terre, choix de carte) appliqués aussi par le serveur (S-14).
 	local slowMult = player:GetAttribute("SlowMult")
 	local slowUntil = player:GetAttribute("SlowUntil")
-	if type(slowMult) == "number" and type(slowUntil) == "number" and Workspace:GetServerTimeNow() < slowUntil then
+	if player:GetAttribute("Frozen") then
+		-- Gel du passage de niveau : le client s'arrête net ; le plancher 0,05 couvre l'élan pendant la latence.
+		vlim *= 0.05
+	elseif type(slowMult) == "number" and type(slowUntil) == "number" and Workspace:GetServerTimeNow() < slowUntil then
 		vlim *= math.clamp(slowMult, 0.05, 1)
 	end
 	if Workspace:GetAttribute("CohueHazard") == "Sandstorm" then
