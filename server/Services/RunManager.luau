@@ -849,10 +849,17 @@ local function buildSummary(r: PlayerRun, victory: boolean, cashedOut: boolean):
 		end
 	end
 	local companionStage = 1
+	local captured: { string } = {}
 	if companion then
 		local ok, cs = safe(companion.getState, player)
 		if ok and type(cs) == "table" and type(cs.stage) == "number" then
 			companionStage = cs.stage
+		end
+		if companion.getRunCaptures then
+			local okCap, list = safe(companion.getRunCaptures, player)
+			if okCap and type(list) == "table" then
+				captured = list
+			end
 		end
 	end
 	return {
@@ -871,6 +878,7 @@ local function buildSummary(r: PlayerRun, victory: boolean, cashedOut: boolean):
 		companionId = r.companionId,
 		companionStage = companionStage,
 		level = level,
+		captured = captured,
 		-- Champs v2 en plus du contrat Types.RunSummary (contract request A04)
 		worldsCleared = (if state.victory then worldCount() else state.stage - 1) :: any,
 		cashedOut = cashedOut :: any,
