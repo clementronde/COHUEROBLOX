@@ -235,6 +235,20 @@ Objets à poser (proposition, en suivant le contrat d'attributs d'A14 : `S`, `Ba
   - plus de 150 studs : imposteur.
 - Les clés de `EnemyMotion.profiles` et du remote `EnemyAttackVisual` (le nom de l'ennemi) suivent les nouveaux noms.
 
+**Ce que Codex a changé dans `main` (commit `aa4ce33`, 5 nov.), et dont je pars à l'étape 4 :**
+- `ArtLibrary.find` cherche un modèle dans cet ordre :
+  1. `ReplicatedStorage.EnemyVisualRigs.Enemy_<nom>` ;
+  2. `ReplicatedStorage.Assets` ;
+  3. `ReplicatedStorage.EnemyVisualMeshes.<nom>`.
+- `EnemyRenderer` utilise un modèle riggé (avec des os) à toutes les distances, et fige une pose de repos à mi-distance.
+
+Je garde ce comportement pour les modèles riggés. Les nouveaux ennemis sont des mailles fusionnées rigides : `EnemyMotion` les anime en entier, sans os.
+
+**Proposition pour Clément** (via le coordinateur) : un seul endroit pour les modèles, `ReplicatedStorage.Assets.Creatures`, comme le prévoit la section 12 des décisions v2.
+- Les modèles de `EnemyVisualRigs` et `EnemyVisualMeshes` qu'on garde y seraient déplacés.
+- Les deux dossiers seraient retirés, puis `ArtLibrary.find` simplifié.
+- Tant que Clément n'a pas tranché, je ne touche ni à ces dossiers ni à l'ordre de recherche. Les nouveaux modèles portent des noms qui n'existent pas encore (champ `asset`), donc aucun conflit.
+
 ---
 
 ## 7. Budget (horde de 300 sur téléphone)
