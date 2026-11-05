@@ -7,10 +7,10 @@
 --
 -- Template: StarterGui.COHUE_LevelUp + COHUE_Freeze, ReplicatedStorage.Assets.UI.LevelUpFreeze
 -- (tools/ui/build-ui-v3.luau). This module finds, fills and animates them; it builds nothing.
--- Listens: CardOffer, Build, PlayerProgress, optional LevelUpPause (A04). Sends: CardChoice.
+-- Listens: CardOffer, Build, PlayerProgress, optional LevelUpPause (Ironix). Sends: CardChoice.
 -- Input: hover (mouse) or focus (gamepad) selects, click / A picks; touch: tap selects, tap again
 -- picks; Card1-3 actions (UIInput) pick at once; keys R / X / B on PC. Cards ignore input 0.4 s
--- after they appear. The real global pause belongs to A04 (contract request LevelUpPause): until
+-- after they appear. The real global pause belongs to Ironix (contract request LevelUpPause): until
 -- it exists the server keeps its 8 s offer and the countdown shows in the title bar.
 
 local GuiService = game:GetService("GuiService")
@@ -1178,7 +1178,7 @@ function CardUI.start()
 		end
 	end)
 
-	-- Optional remote (A04): hooked if it exists or appears later; nothing waits on it.
+	-- Optional remote (Ironix): hooked if it exists or appears later; nothing waits on it.
 	local function hook(r: Instance)
 		if r.Name == C.PauseRemote and r:IsA("RemoteEvent") then
 			r.OnClientEvent:Connect(onPause)
