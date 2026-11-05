@@ -113,9 +113,9 @@ def goblin_grunt():
     v.box(-8, -5, -1, 0, 4, 5, "Lime")             # bras tendu sur le côté
     v.box(-10, -9, -2, -1, 3, 6, "Lime.d")         # main
     v.box(-12, -11, -2, -1, 2, 12, "Steel.d")      # manche droit
-    v.ell(-11.5, -1.5, 15.0, 3.2, 3.2, 2.6, "Steel.l", zmin=13, zmax=16)  # cuilleron rond de 6 x 6
-    v.carve(-14, -9, -4, 1, 16, 16)                # creux
-    v.box(-14, -9, -4, 1, 15, 15, "Steel.dd")
+    v.ell(-11.5, -1.5, 16.0, 3.2, 3.2, 3.0, "Steel.l", zmin=13, zmax=15)  # cuilleron en demi-sphère, ouvert en haut
+    v.ell(-11.5, -1.5, 16.0, 2.2, 2.2, 2.0, "Steel.dd", zmin=14, zmax=15)  # creux sombre
+    v.carve(-13, -10, -3, 0, 15, 15)
     return v, "bottom", {"kind": "enemy", "cell": 0.25, "eyes": GOBLIN_EYES, "label": "Goblin Grunt",
                          "role": "Mêlée · monde 1"}
 
