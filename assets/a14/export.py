@@ -110,6 +110,97 @@ def do_glb(outdir):
         json.dump(manifest, f, indent=1, ensure_ascii=False)
 
 
+def fx_shape(name, r_in, r_out, segments=96, dashes=0, fill=0.6, height=0.04):
+    """Forme lisse pour les effets (anneau, anneau en pointillé, disque) : rayon extérieur 1 stud, centrée,
+    plate et épaisse de `height`. La couleur, le Neon et la transparence sont posés dans Studio."""
+    import bmesh
+
+    bm = bmesh.new()
+    steps = []
+    if dashes:
+        per = segments // dashes
+        for d in range(dashes):
+            a0 = d * per
+            steps.append([a0 + k for k in range(int(per * fill) + 1)])
+    else:
+        steps.append(list(range(segments + 1)))
+    for run in steps:
+        top_in, top_out, bot_in, bot_out = [], [], [], []
+        for k in run:
+            a = 2 * math.pi * k / segments
+            c, s_ = math.cos(a), math.sin(a)
+            for lst, r, z in ((top_out, r_out, height / 2), (top_in, r_in, height / 2),
+                              (bot_out, r_out, -height / 2), (bot_in, r_in, -height / 2)):
+                lst.append(bm.verts.new((c * r, s_ * r, z)))
+        for i in range(len(run) - 1):
+            if r_in > 0:
+                bm.faces.new((top_in[i], top_out[i], top_out[i + 1], top_in[i + 1]))
+                bm.faces.new((bot_in[i + 1], bot_out[i + 1], bot_out[i], bot_in[i]))
+                bm.faces.new((top_in[i + 1], bot_in[i + 1], bot_in[i], top_in[i]))
+            else:
+                bm.faces.new((top_in[i], top_out[i], top_out[i + 1]))
+                bm.faces.new((bot_in[i], bot_out[i + 1], bot_out[i]))
+            bm.faces.new((top_out[i], bot_out[i], bot_out[i + 1], top_out[i + 1]))
+        if dashes and r_in > 0:                                   # bouts des tirets
+            bm.faces.new((top_in[0], bot_in[0], bot_out[0], top_out[0]))
+            bm.faces.new((top_out[-1], bot_out[-1], bot_in[-1], top_in[-1]))
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-6)
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    for p in me.polygons:
+        p.use_smooth = False
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    return ob
+
+
+ARC_SEGMENTS = 9          # croissant de 180° en segments de 20° (on en montre 7 pour 140°)
+
+
+def arc_segment(name, i, layer):
+    """Segment i (0..8) du croissant du coup de taille, rayon extérieur 1. layer : « Halo » (bande entière)
+    ou « Core » (bande fine sur le bord extérieur). Origine au centre de la boîte du segment ; rend
+    (objet, centre en axes Roblox)."""
+    import bmesh
+
+    seg_deg = 180.0 / ARC_SEGMENTS
+    steps = 8
+    bm = bmesh.new()
+    top, bot = [], []
+    for k in range(steps + 1):
+        g = (i * steps + k) / (ARC_SEGMENTS * steps)               # 0..1 sur tout le croissant
+        a = math.radians(-90 + seg_deg * i + seg_deg * k / steps)
+        thick = 0.1 + 0.36 * math.sin(math.pi * g) ** 0.8
+        r_in = 1.0 - (thick if layer == "Halo" else thick * 0.4)
+        r_out = 1.0
+        d_out = Vector((math.sin(a), -math.cos(a), 0))             # centré sur -Y Blender = avant Roblox
+        top.append((bm.verts.new(d_out * r_out + Vector((0, 0, 0.02))), bm.verts.new(d_out * r_in + Vector((0, 0, 0.02)))))
+        bot.append((bm.verts.new(d_out * r_out - Vector((0, 0, 0.02))), bm.verts.new(d_out * r_in - Vector((0, 0, 0.02)))))
+    for k in range(steps):
+        (to0, ti0), (to1, ti1) = top[k], top[k + 1]
+        (bo0, bi0), (bo1, bi1) = bot[k], bot[k + 1]
+        bm.faces.new((ti0, to0, to1, ti1))
+        bm.faces.new((bi1, bo1, bo0, bi0))
+        bm.faces.new((to0, bo0, bo1, to1))
+        bm.faces.new((ti1, bi1, bi0, ti0))
+    bm.faces.new((top[0][1], bot[0][1], bot[0][0], top[0][0]))
+    bm.faces.new((top[-1][0], bot[-1][0], bot[-1][1], top[-1][1]))
+    me = bpy.data.meshes.new(name)
+    bm.to_mesh(me)
+    bm.free()
+    ctr = sum((v.co for v in me.vertices), Vector()) / len(me.vertices)
+    for v in me.vertices:
+        v.co -= ctr                                               # origine au centre du segment
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    return ob, [round(-ctr.x, 4), round(ctr.z, 4), round(ctr.y, 4)]
+
+
+FX_SHAPES = [("FX_Ring", 0.93, 1.0, 0), ("FX_RingThick", 0.72, 1.0, 0), ("FX_RingDashed", 0.9, 1.0, 16),
+             ("FX_Disc", 0.0, 1.0, 0)]
+
+
 def do_pack(outdir):
     """Un seul GLB pour l'Import 3D de Studio : toutes les armes, fusions et pièces, chaque maille nommée
     <Nom> (corps) ou <Nom>_Neon, origine à la prise (réglage « Use Imported Pivot »)."""
@@ -121,6 +212,16 @@ def do_pack(outdir):
             ob.name = name if ob.name.startswith("Body") else name + "_Neon"
             ob.data.name = ob.name
             obs.append(ob)
+    for name, r_in, r_out, dashes in FX_SHAPES:                   # formes lisses des effets
+        obs.append(fx_shape(name, r_in, r_out, dashes=dashes))
+    arcs = {}
+    for layer in ("Halo", "Core"):                                 # croissant du coup de taille
+        for i in range(ARC_SEGMENTS):
+            ob, ctr = arc_segment(f"FX_Arc{layer}{i + 1}", i, layer)
+            obs.append(ob)
+            arcs[ob.name] = ctr
+    with open(os.path.join(outdir, "fx_shapes.json"), "w", encoding="utf-8") as f:
+        json.dump({"arc_segments": ARC_SEGMENTS, "arc_centers": arcs}, f, indent=1)
     export_glb(obs, os.path.join(outdir, "A14_Weapons.glb"))
     print("pack :", len(obs), "mailles")
 

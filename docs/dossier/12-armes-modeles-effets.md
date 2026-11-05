@@ -552,3 +552,37 @@ Commités :
    `AssetService:CreateAssetAsync` n'est pas ouvert (A01, 4 nov.), d'où l'Import 3D.
 3. Lancer `assets/a14/install/A14_weapons_install.luau` (par `execute_luau`). Il range chaque modèle dans `ReplicatedStorage.Assets.Weapons.<Nom>` : `Body` et `Neon` (matériau Neon), pivot au point de prise, attributs `Kind`, `WeaponId`, `Dominant`, `A14`. Il affiche les MeshId et signale ce qui manque. Les anciens `Weapon_*` de A01 ne sont pas touchés.
 4. Ctrl+S par Clément.
+
+## 14. Étape 4 : effets et WeaponFX (5 nov. 2026, en cours)
+
+**Préparé sans Studio** (à tester en Play dès que COHUE est libre) :
+- `A14_Weapons.glb` contient aussi les formes lisses des effets : `FX_Ring`, `FX_RingThick`, `FX_RingDashed`, `FX_Disc`, et le croissant du coup de taille en 9 segments de 20° (`FX_ArcHalo1..9`, `FX_ArcCore1..9`), toutes à un rayon de 1 stud.
+- `assets/a14/install/A14_fx_install.luau`, à lancer **après** `A14_weapons_install.luau`, construit les modèles d'effets :
+  - `Assets.FX.Weapons.<Arme>.<Rôle>` ;
+  - `Assets.FX.Special.<Nom>.<Rôle>` (passifs et objets) ;
+  - `Assets.FX.Shared.Telegraph` ;
+  - `Assets.FX.Shapes`.
+
+  Les rôles sont Projectile, Impact, Area, Cone, Segment, Aura, Orbit, Turret et Fall.
+
+  Briques utilisées :
+  - formes Neon ;
+  - ParticleEmitter à textures intégrées à Roblox (`rbxasset://textures/particles/...` : lueur, feu, fumée, étincelles, onde de choc), donc rien à téléverser de plus ;
+  - Trail ;
+  - Beam (éclairs) ;
+  - PointLight, en qualité Haute seulement ;
+  - les pièces en pixel art soudées.
+
+  Le contrat des attributs est en tête du script.
+- `client/Controllers/WeaponFX.luau` est réécrit : il ne fabrique plus rien de visible.
+  - Il clone ces modèles en pool, les place, règle leur taille selon le rayon et leur transparence au fil de la vie, et appelle `:Emit()`.
+  - Un modèle manquant est signalé une fois dans la sortie, sans repli en Parts.
+  - Il accroche aussi l'arme de départ de la classe (attribut `ClassId`) à la main de chaque joueur, 1,4 fois plus grande. L'arc se tient à gauche. L'orientation est réglable par l'attribut `HoldCFrame` du modèle.
+
+**Reste** :
+- import, installation et Play dans COHUE ;
+- réglage des orientations (pièces en vol, arme en main) ;
+- fusions et paliers (contract request A04 pour les ids visuels et les niveaux) ;
+- effets des ennemis et des boss (conversion de `EnemyAttackFX`, et de `EnemyRenderer` et `BossRenderer` avec A03) ;
+- contrôle qualité.
+
