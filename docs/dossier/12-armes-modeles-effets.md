@@ -444,7 +444,7 @@ Le 5 nov., Clément a changé la DA des armes et des effets (« oui a tous ») :
 - épaissi de 2 à 6 px, la garde, la poignée et les objets ronds plus épais ;
 - 1 px = 0,125 stud, soit 32 px = 4 studs ;
 - une seule maille fusionnée par arme (maille gloutonne étanche de A01, couleur par sommet), plus une MeshPart Neon séparée ;
-- 400 à 1 400 triangles mesurés sur les 6 modèles de la planche, plafond fixé à 1 500 ;
+- 1 500 triangles visés, 2 500 au plus (budget arme du vault fwjelaa) ; mesuré à l'étape 3 : 236 à 2 434 triangles (manifeste `assets/a14/out/manifest.json`) ;
 - pas de tenons ;
 - à téléverser : pas d'EditableMesh, qui ne s'enregistre pas ;
 - la prise est l'origine du modèle, l'arme pointe vers +Y, attribut `GripOffset` (convention A01) ;
@@ -521,3 +521,24 @@ Planche : `assets/a14/09-armes-effets-concept.jpg`, dans la DA du 5 nov. (2e ver
 Une première version « tout en tenons » a été abandonnée après le changement de DA. Ses relectures à l'aveugle ont laissé des règles qu'on garde : un sens par couleur et par forme au sol, des effets plus grands que nécessaire sur téléphone, le danger ennemi testé dans la horde.
 
 **Validée par Clément le 5 nov. 2026** (« Oui, valide »). Suite : étape 3, les 16 armes, leurs 16 fusions et les pièces en jeu dans ce style.
+
+## 13. Étape 3 : les 32 modèles (5 nov. 2026)
+
+Planche : `assets/a14/10-armes-et-fusions.jpg`. Sources : `assets/a14/pixelweapons.py` (les sprites, sans Blender), `assets/a14/export.py` (Blender 5.2).
+
+Sorties dans `assets/a14/out/`, à régénérer, non commitées :
+- `glb/<Nom>.glb` : objets `Body` et `Neon` ;
+- `manifest.json` : triangles, taille en axes Roblox, prise depuis le centre, couleur dominante ;
+- `icons/`.
+
+Commités :
+- les sprites natifs, dans `assets/a14/sprites/` ;
+- les icônes pour A08, dans `docs/dossier/ui-assets/icons/weapons/`.
+
+| Type | Modèles |
+| --- | --- |
+| Armes (16) | Broadsword, Longbow, FireStaff, QuakeHammer, ThrowingDaggers, HolyAura (clochette), SpinningAxes, BeastWhip, LightningChain (paratonnerre), FrostNova (boule à neige), Boomerang, BombBag, SpearThrow, MeteorRain (météore), OrbitingBlades (lame de scie), CrossbowTurret |
+| Fusions (16) | RoyalGreatsword, StormBow, SunStaff, MountainMaul, DaggerFlurry, GrandChime, AxeTornado, RingmasterLash, ThunderWeb, BlizzardGlobe, ComebackRang, ClusterSack, CometJavelin, StarShower, BuzzsawHalo, SiegeBallista |
+| Pièces (3 en plus) | Bomb, Arrow, Bolt ; la dague, la hache, le boomerang, la lance, le météore et la lame reprennent le modèle de leur arme |
+
+Reste pour finir l'étape 3 : importer les GLB dans COHUE (`ReplicatedStorage.Assets.Weapons`), ce qui demande le téléversement des mailles avec l'accord de Clément et un passage dans Studio annoncé au coordinateur.
