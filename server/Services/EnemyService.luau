@@ -1810,7 +1810,11 @@ function EnemyService.start()
 		simTick += 1
 		cachedPlayers = countRunPlayers()
 		local targets, viewers = gatherTargets()
-		step(targets, os.clock())
+		-- Gel coop du passage de niveau (RunManager) : la horde s'arrête, les clients reçoivent toujours les positions.
+		-- shortcut: les délais en os.clock continuent pendant le gel (attaques prêtes à la reprise), à figer si ça se voit en jeu.
+		if not Workspace:GetAttribute("RunFrozen") then
+			step(targets, os.clock())
+		end
 		send(viewers)
 	end)
 end
