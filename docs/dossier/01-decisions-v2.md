@@ -49,7 +49,7 @@ Les classes ne sont **jamais vendues** en Robux. Les chiffres sont des points de
 - **14 Runes** (les « grimoires » de la v1, renommés) : Damage, Attack Speed, Projectiles, Area, Duration, Cooldown, Crit, Luck, Wisdom (XP), Magnet, Vitality, Armor, Agility, Cursed (plus de difficulté contre plus de butin). 4 emplacements, jusqu'à 6 en méta.
 - **40 objets** en 4 raretés (Common, Rare, Epic, Legendary), trouvés dans les coffres.
 - **Fusion** (proposée, à confirmer) : une arme au niveau 8 + une Rune précise au niveau 5 se transforme en version ultime. Exemple : Longbow + Rune Attack Speed → Storm Bow.
-- **Cartes de niveau** : 3 choix, rareté visible. En coop, pas de pause : 8 s pour choisir, joueur ralenti et invulnérable. Bannir / Passer / Relancer limités par run.
+- **Cartes de niveau** : 3 choix, rareté visible. **En coop, toute l'équipe se fige** pendant qu'un joueur choisit (réponse de Clément à A08 le 5 nov. : « Tout le monde » ; remplace l'ancienne règle « pas de pause, joueur ralenti et invulnérable »). Celui qui choisit voit un compte à rebours, les autres voient qui choisit. Délai proposé par A08 : 15 s, puis l'offre sélectionnée est prise (à valider par Clément). Plusieurs joueurs qui montent en même temps choisissent en parallèle. En solo, le jeu attend le choix. Pause côté serveur : A04 (demande dans `60-ui-ux.md`, section 0.0 bis). Bannir / Passer / Relancer limités par run.
 - **Autels** : on garde ceux de `00-vision.md` section 8.4.
 
 ## 5. Compagnons : on les bat, on les capture
@@ -77,7 +77,11 @@ Pas d'évolution. Un compagnon se gagne en le **battant puis en le capturant** p
 
 ## 7. Direction artistique
 
-- **Voxel**, **palette vive et saturée**, humour absurde.
+- ~~Voxel~~ → **tout en tenons, formes naturelles** (piste B, choix de Clément du 5 nov.) : un seul matériau, le plastique à tenons ; décor en gros blocs, objets interactifs et personnages en briques fines. **Palette vive et saturée**, humour absurde. Guide complet : `80-direction-artistique.md`.
+- **Armes en pixel art extrudé** (Clément, 5 nov.) : chaque arme est un sprite de 24 à 32 px dessiné à plat puis épaissi de 1 à 2 cubes, avec un contour sombre et beaucoup de détails dans les pixels. Pas de tenons sur les armes. Le même sprite sert d'icône dans l'UI. Agent : A14.
+- **Effets lisses et lumineux, jamais en pixels** (Clément, 5 nov.) : particules douces, traînées, faisceaux, anneaux en Neon avec bloom. Règle : des blocs pour ce qui existe, de la lumière pour ce qui se passe. Le rouge reste réservé aux ennemis.
+- **Lobby piloté par l'UI** (Clément, 5 nov.) : un gros bouton **Play** ouvre le choix Solo / Friends / Public (plus de marche jusqu'au portail et aux pads). Une **barre de boutons en bas** ouvre les menus (Upgrades, Inventory, Class, Shop, Quests, Pass, Companions : liste finale A08 et A09). Le village reste du décor, un bâtiment par menu avec son nom en grandes lettres de briques. Clément construit les maps lui-même avec le kit d'A01.
+- Référence ajoutée par Clément le 5 nov. : un jeu Roblox du même genre (map enneigée tout en tenons, armes en pixel, effets lumineux, lobby à bouton Play). On en retient les principes : un seul matériau, forêt ou falaises comme bordure, arène ouverte et claire, décor en couleurs froides et jeu en couleurs chaudes. On n'en copie ni les visuels, ni les noms, ni le HUD.
 - Références de Clément : Megabonk (silhouettes trapues, lisibilité de la horde), Octopath Traveler (effet diorama, profondeur de champ, bloom, lumière chaude), Steal an Egg (Roblox, ton joyeux). Synthèse : **un diorama voxel bien éclairé**. On s'inspire de l'ambiance, on ne copie aucun visuel.
 - Caméra **3e personne** derrière le joueur (remplace la vue de dessus actuelle), dézoomée pour lire la horde, jouable au pouce.
 - **UI glossy cartoon** : maquettes Figma validées par Clément avant toute intégration.
@@ -157,7 +161,8 @@ Une liste répétée (cartes, lignes du classement, emplacements) se fait avec u
 | `CompanionRenderer` | compagnons en Parts | A05, avec les mailles A01 |
 | `server/Services/TraitService` | équipement de classe (Accessory, Part, Fire, Smoke, Sparkles, lumière, particules) | A04, avec les modèles A01 |
 | `server/Services/StageService` | le monde de run (sol, rampes, lumières, panneaux) | A02 |
-| `WeaponFX`, `EnemyAttackFX`, `ShrineFX`, onde d'atterrissage de `MovementController` | effets | A07 |
+| `WeaponFX`, `EnemyAttackFX` et les attaques visibles de `BossRenderer` | effets des armes, des ennemis et des boss (Clément, porte 1 de A14, 5 nov.) | A14 |
+| `ShrineFX`, onde d'atterrissage de `MovementController` | effets | A07 |
 | `LootRenderer` | butin (Part, ProximityPrompt) et sa fenêtre (BillboardGui) | A04 pour le butin, A08 pour la fenêtre |
 | `DebugHud` | texte de debug | A08, en dernier |
 

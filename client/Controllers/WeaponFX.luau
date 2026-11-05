@@ -1,8 +1,12 @@
 --!strict
 -- Draws weapon visuals from WeaponFx events (WeaponFxCodec). Cosmetic only (dossier 10, section 10).
--- Pooled anchored Parts per style, one BulkMoveTo per frame, quality tiers with hard caps:
--- phones get the Low tier (fewer pieces, no fades, SmoothPlastic). Meteor/bomb telegraphs are
--- gameplay information and are always drawn (vault: VFX Performance Budgets and Culling).
+-- A14 (dossier 12, section 9) : rien n'est construit ici. Chaque effet est un modèle posé dans la place
+-- (ReplicatedStorage.Assets.FX, armes en pixel art dans Assets.Weapons) ; ce module les clone (en pool),
+-- les place, change leur taille et leur transparence, et déclenche leurs particules. Un modèle manquant est
+-- signalé une fois dans la sortie, puis ignoré : on ne le remplace jamais par une Part.
+-- Qualité : téléphone = Basse (moins de pièces, pas de traînées ni de lumières, moitié des particules).
+-- Les télégraphes (zones de gameplay) ne sont jamais coupés (vault : VFX Performance Budgets and Culling).
+-- Il accroche aussi l'arme de départ de la classe dans la main de chaque joueur (décision du 5 nov.).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,96 +17,73 @@ local Workspace = game:GetService("Workspace")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Weapons = require(Config:WaitForChild("Weapons"))
+local Classes = require(Config:WaitForChild("Classes"))
 local Codec = require(Shared:WaitForChild("WeaponFxCodec"))
 local Heightmap = require(Shared:WaitForChild("Heightmap"))
 local Net = require(Shared:WaitForChild("Net"))
 
 local HIDDEN = CFrame.new(0, -10000, 0)
 local KIND = Codec.Kind
-local VIS = Codec.Visual
 local PROJ_HEIGHT = 2.5
+local FALL_HEIGHT = 18
+local HELD_SCALE = 1.4 -- l'arme tenue un peu surdimensionnée reste lisible à la caméra dézoomée
+-- Dans la poignée R15, +Y pointe vers l'avant et +Z vers le haut : 70° autour de X dressent l'arme
+-- (lame vers le haut, un peu en avant) et tournent sa face de sprite vers l'arrière, côté caméra.
+local DEFAULT_HOLD = CFrame.Angles(math.rad(70), 0, 0)
 
-type Tier = { maxProj: number, maxAreas: number, maxSegments: number, maxAttach: number, fade: boolean, material: Enum.Material }
+type Tier = {
+	maxProj: number,
+	maxAreas: number,
+	maxSegments: number,
+	maxAttach: number,
+	particles: number, -- facteur sur les rafales
+	trails: boolean,
+	lights: boolean,
+	fade: boolean,
+}
 
 local TIERS: { [string]: Tier } = {
-	Low = { maxProj = 60, maxAreas = 12, maxSegments = 16, maxAttach = 24, fade = false, material = Enum.Material.SmoothPlastic },
-	Medium = { maxProj = 150, maxAreas = 28, maxSegments = 40, maxAttach = 48, fade = true, material = Enum.Material.Neon },
-	High = { maxProj = 300, maxAreas = 56, maxSegments = 80, maxAttach = 96, fade = true, material = Enum.Material.Neon },
+	Low = { maxProj = 60, maxAreas = 12, maxSegments = 16, maxAttach = 24, particles = 0.5, trails = false, lights = false, fade = false },
+	Medium = { maxProj = 150, maxAreas = 28, maxSegments = 40, maxAttach = 48, particles = 0.8, trails = true, lights = false, fade = true },
+	High = { maxProj = 300, maxAreas = 56, maxSegments = 80, maxAttach = 96, particles = 1, trails = true, lights = true, fade = true },
 }
 
--- Styles visuels : forme + couleur + taille de base (studs). Les 16 armes lisent leur style dans
--- Config/Weapons (champ `fx`, pièces provisoires en attendant les vrais VFX de la vague 2) ; les
--- visuels spéciaux (passifs, objets) sont ici.
-type Style = {
-	shape: Enum.PartType,
-	color: Color3,
-	size: Vector3,
-	projDiv: number, -- rayon de touche qui donne la taille de base
-	spin: boolean,
-	rolls: boolean,
-	boomerang: boolean,
-	outRatio: number, -- boomerang : part du temps de vol avant le retour (outTime / life)
-	orbit: boolean,
-	aura: boolean,
-	beamHeight: number,
+-- Informations lues une fois sur chaque clone (attributs posés par assets/a14/install/A14_fx_install.luau)
+type ShapeInfo = {
+	part: BasePart,
+	base: Vector3,
+	s: number,
+	c: Vector3,
+	grow: number,
+	fade0: number,
+	fade1: number,
+	seg: number,
+	spin: number,
+	life: number,
+	fill: boolean,
+	pulse: number,
 }
-
-local SHAPES: { [string]: Enum.PartType } = {
-	Block = Enum.PartType.Block,
-	Ball = Enum.PartType.Ball,
-	Cylinder = Enum.PartType.Cylinder,
+type FxInst = {
+	model: Model,
+	template: Model,
+	anchor: BasePart,
+	kind: string,
+	life: number,
+	height: number,
+	spin: number,
+	shapes: { ShapeInfo },
+	zones: { { part: BasePart, s: number, life: number } },
+	bursts: { { e: ParticleEmitter, n: number, perRadius: boolean } },
+	continuous: { ParticleEmitter },
+	lights: { PointLight },
+	trails: { Trail },
+	piece: Model?,
+	pieceOffset: CFrame,
+	attachments: { [string]: Attachment },
 }
-
-local function style(shape: Enum.PartType, color: Color3, size: Vector3): Style
-	return {
-		shape = shape,
-		color = color,
-		size = size,
-		projDiv = 1,
-		spin = false,
-		rolls = false,
-		boomerang = false,
-		outRatio = 0,
-		orbit = false,
-		aura = false,
-		beamHeight = PROJ_HEIGHT,
-	}
-end
-
-local RING = Enum.PartType.Cylinder
-local STYLES: { [number]: Style } = {
-	[VIS.Parry] = style(RING, Color3.fromRGB(255, 240, 150), Vector3.new(0.3, 1, 1)),
-	[VIS.Blessing] = style(RING, Color3.fromRGB(255, 230, 120), Vector3.new(0.2, 1, 1)),
-	[VIS.Ghost] = style(Enum.PartType.Ball, Color3.fromRGB(235, 235, 255), Vector3.new(1.4, 1.6, 1.4)),
-	[VIS.Whistle] = style(RING, Color3.fromRGB(255, 255, 255), Vector3.new(0.2, 1, 1)),
-	[VIS.Megaphone] = style(RING, Color3.fromRGB(255, 220, 80), Vector3.new(0.2, 1, 1)),
-	[VIS.Thorns] = style(RING, Color3.fromRGB(140, 120, 100), Vector3.new(0.2, 1, 1)),
-	[VIS.Shadowstep] = style(RING, Color3.fromRGB(90, 70, 140), Vector3.new(0.2, 1, 1)),
-	[VIS.ChainBolt] = style(Enum.PartType.Block, Color3.fromRGB(255, 255, 140), Vector3.new(0.3, 0.3, 1)),
-	[VIS.MiniBomb] = style(RING, Color3.fromRGB(255, 180, 240), Vector3.new(0.3, 1, 1)),
-}
-for _, def in Weapons.List do
-	local fx = def.fx
-	local st = style(SHAPES[fx.shape] or Enum.PartType.Block, fx.color, fx.size)
-	st.projDiv = fx.projDiv or def.base.radius or 1
-	st.spin = fx.spin == true
-	st.rolls = fx.rolls == true
-	st.boomerang = fx.boomerang == true
-	-- Le serveur multiplie outTime et life par la même Durée : le rapport suffit au client.
-	local life = def.base.life or 0
-	st.outRatio = if life > 0 then (def.base.outTime or 0) / life else 0
-	st.orbit = fx.orbit == true
-	st.aura = fx.aura == true
-	st.beamHeight = fx.beamHeight or PROJ_HEIGHT
-	STYLES[def.index] = st
-end
-local coneStyles: { [number]: Style } = {} -- cônes : une pièce plate par visuel, créée une fois
-local DEFAULT_STYLE: Style = style(Enum.PartType.Block, Color3.new(1, 1, 1), Vector3.new(1, 1, 1))
-local TELEGRAPH_STYLE: Style = style(RING, Color3.fromRGB(255, 40, 40), Vector3.new(0.15, 1, 1))
 
 type ProjEntry = {
-	part: BasePart,
-	key: string,
+	fx: FxInst,
 	visual: number,
 	x0: number,
 	z0: number,
@@ -115,14 +96,15 @@ type ProjEntry = {
 	outTime: number,
 	x: number,
 	z: number,
-	returning: boolean,
 	last: number,
+	trailOn: boolean,
 }
 
 type AreaEntry = {
-	part: BasePart,
-	key: string,
-	telegraph: BasePart?,
+	fx: FxInst?,
+	tele: FxInst?,
+	fall: FxInst?,
+	visual: number,
 	x: number,
 	z: number,
 	radius: number,
@@ -130,17 +112,18 @@ type AreaEntry = {
 	half: number,
 	t0: number,
 	delay: number,
-	life: number,
+	started: boolean,
+	flip: boolean,
 }
 
-type SegEntry = { part: BasePart, key: string, t0: number, life: number }
+type SegEntry = { fx: FxInst, t0: number, life: number }
 
 type AttachEntry = {
-	parts: { BasePart },
-	key: string,
+	fxs: { FxInst },
 	visual: number,
 	slot: number,
 	fixed: boolean,
+	mode: string, -- "orbit" | "aura" | "turret"
 	x: number,
 	z: number,
 	radius: number,
@@ -154,7 +137,9 @@ local WeaponFX = {}
 
 local tier: Tier = TIERS.Medium
 local container: Folder
-local pools: { [string]: { BasePart } } = {}
+local fxRoot: Instance?
+local weaponsRoot: Instance?
+local pools: { [Model]: { FxInst } } = {}
 local projs: { [number]: ProjEntry } = {}
 local projCount = 0
 local areas: { AreaEntry } = {}
@@ -162,11 +147,21 @@ local segs: { SegEntry } = {}
 local attaches: { AttachEntry } = {}
 local slotCache: { [number]: Player } = {}
 local latestTick = 0
+local warned: { [string]: boolean } = {}
+local rng = Random.new()
 
 local moveParts: { BasePart } = {}
 local moveCFrames: { CFrame } = {}
+local moveN = 0
+local pendingBursts: { { fx: FxInst, radius: number } } = {} -- rafales après le placement de l'image
 
--- Quality ---------------------------------------------------------------------------------------
+-- Noms des visuels spéciaux (Codec.Visual -> dossier Assets.FX.Special.<Nom>)
+local SPECIAL: { [number]: string } = {}
+for name, id in Codec.Visual do
+	SPECIAL[id] = name
+end
+
+-- Qualité ----------------------------------------------------------------------------------------
 
 local function detectTier(): Tier
 	-- Heuristic (vault: Mobile and Low-End Optimization): touch without keyboard = phone/tablet.
@@ -189,46 +184,216 @@ local function detectTier(): Tier
 	return TIERS.High
 end
 
--- Pools -----------------------------------------------------------------------------------------
+-- Modèles ----------------------------------------------------------------------------------------
 
-local function makePart(style: Style): BasePart
-	local part = Instance.new("Part")
-	part.Anchored = true
-	part.CanCollide = false
-	part.CanQuery = false
-	part.CanTouch = false
-	part.CastShadow = false
-	part.Shape = style.shape
-	part.Material = tier.material
-	part.Color = style.color
-	part.Size = style.size
-	part.CFrame = HIDDEN
-	part.Parent = container
-	return part
-end
-
-local function acquire(key: string, style: Style): BasePart
-	local pool = pools[key]
-	local part = pool and table.remove(pool)
-	if part then
-		part.Transparency = 0
-		return part
+local function warnOnce(key: string, msg: string)
+	if not warned[key] then
+		warned[key] = true
+		warn("[WeaponFX] " .. msg)
 	end
-	return makePart(style)
 end
 
-local function release(key: string, part: BasePart)
-	part.CFrame = HIDDEN
-	local pool = pools[key]
+local function folderFor(visual: number): Instance?
+	local root = fxRoot
+	if not root then
+		return nil
+	end
+	local def = Weapons.ByIndex[visual]
+	if def then
+		local w = root:FindFirstChild("Weapons")
+		return w and w:FindFirstChild(def.id)
+	end
+	local name = SPECIAL[visual]
+	local sp = root:FindFirstChild("Special")
+	return name and sp and sp:FindFirstChild(name) or nil
+end
+
+local function templateFor(visual: number, role: string, quiet: boolean?): Model?
+	local f = folderFor(visual)
+	local m = f and f:FindFirstChild(role)
+	if not m and role == "Telegraph" and fxRoot then
+		local shared = (fxRoot :: Instance):FindFirstChild("Shared")
+		m = shared and shared:FindFirstChild("Telegraph")
+	end
+	if m and m:IsA("Model") then
+		return m
+	end
+	if not quiet then
+		warnOnce(visual .. role, `modèle manquant : Assets.FX pour le visuel {visual}, rôle {role}`)
+	end
+	return nil
+end
+
+local function num(i: Instance, name: string, default: number): number
+	local v = i:GetAttribute(name)
+	return if type(v) == "number" then v else default
+end
+
+local function describe(model: Model, template: Model): FxInst
+	local anchor = (model.PrimaryPart or model:FindFirstChild("Anchor")) :: BasePart
+	local fx: FxInst = {
+		model = model,
+		template = template,
+		anchor = anchor,
+		kind = tostring(template:GetAttribute("Kind") or ""),
+		life = num(template, "Life", 0.4),
+		height = num(template, "Height", 0.08),
+		spin = num(template, "Spin", 0),
+		shapes = {},
+		zones = {},
+		bursts = {},
+		continuous = {},
+		lights = {},
+		trails = {},
+		piece = nil,
+		pieceOffset = CFrame.new(),
+		attachments = {},
+	}
+	for _, child in model:GetChildren() do
+		if child:IsA("BasePart") and child ~= anchor then
+			if child.Name == "Zone" or child.Name == "Burn" then
+				table.insert(fx.zones, { part = child, s = num(child, "S", 1), life = num(child, "Life", 0) })
+			else
+				local base = child:GetAttribute("Base")
+				local c = child:GetAttribute("C")
+				table.insert(fx.shapes, {
+					part = child,
+					base = if typeof(base) == "Vector3" then base else child.Size,
+					s = num(child, "S", 1),
+					c = if typeof(c) == "Vector3" then c else Vector3.zero,
+					grow = num(child, "Grow", 1),
+					fade0 = num(child, "Fade0", child.Transparency),
+					fade1 = num(child, "Fade1", child.Transparency),
+					seg = num(child, "Seg", 0),
+					spin = num(child, "Spin", 0),
+					life = num(child, "Life", 0),
+					fill = child:GetAttribute("Fill") == true,
+					pulse = num(child, "Pulse", 0),
+				})
+			end
+		elseif child:IsA("Model") and child:GetAttribute("Piece") then
+			fx.piece = child
+			local off = child:GetAttribute("Offset")
+			fx.pieceOffset = if typeof(off) == "CFrame" then off else CFrame.new()
+		end
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("ParticleEmitter") then
+			if d:GetAttribute("Continuous") == true then
+				table.insert(fx.continuous, d)
+			end
+			local n = num(d, "Burst", 0)
+			if n > 0 then
+				table.insert(fx.bursts, { e = d, n = n, perRadius = d:GetAttribute("PerRadius") == true })
+			end
+		elseif d:IsA("PointLight") then
+			table.insert(fx.lights, d)
+		elseif d:IsA("Trail") then
+			table.insert(fx.trails, d)
+		elseif d:IsA("Attachment") then
+			fx.attachments[d.Name] = d
+		end
+	end
+	return fx
+end
+
+local function acquire(template: Model): FxInst
+	local pool = pools[template]
+	local fx = pool and table.remove(pool)
+	if fx then
+		return fx
+	end
+	local model = template:Clone()
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.CanCollide = false
+			d.CanQuery = false
+			d.CanTouch = false
+		end
+	end
+	model:PivotTo(HIDDEN)
+	model.Parent = container
+	return describe(model, template)
+end
+
+local function setActive(fx: FxInst, on: boolean)
+	for _, e in fx.continuous do
+		e.Enabled = on
+	end
+	for _, l in fx.lights do
+		l.Enabled = on and tier.lights
+	end
+	for _, t in fx.trails do
+		t.Enabled = false
+		t:Clear()
+	end
+end
+
+local function release(fx: FxInst?)
+	if not fx then
+		return
+	end
+	setActive(fx, false)
+	fx.anchor.CFrame = HIDDEN
+	for _, sh in fx.shapes do
+		sh.part.CFrame = HIDDEN
+	end
+	for _, z in fx.zones do
+		z.part.CFrame = HIDDEN
+	end
+	local pool = pools[fx.template]
 	if not pool then
 		pool = {}
-		pools[key] = pool
+		pools[fx.template] = pool
 	end
-	table.insert(pool, part)
+	table.insert(pool, fx)
 end
 
-local function styleOf(visual: number): Style
-	return STYLES[visual] or DEFAULT_STYLE
+local function burst(fx: FxInst, radius: number)
+	for _, b in fx.bursts do
+		local k = if b.perRadius then math.clamp(radius / 5, 0.5, 3) else 1
+		local n = math.max(1, math.floor(b.n * k * tier.particles + 0.5))
+		b.e:Emit(n)
+	end
+end
+
+local function queue(part: BasePart, cf: CFrame)
+	moveN += 1
+	moveParts[moveN] = part
+	moveCFrames[moveN] = cf
+end
+
+-- Pose un effet « au sol » : formes à l'échelle du rayon, zones, transparences selon u (0..1)
+local function placeArea(fx: FxInst, base: CFrame, radius: number, u: number, progress: number?)
+	local e = 1 - (1 - math.clamp(u, 0, 1)) ^ 2
+	for _, sh in fx.shapes do
+		local life = if sh.life > 0 then sh.life / math.max(fx.life, 0.01) else 1
+		local v = math.clamp(u / life, 0, 1)
+		local k = if sh.fill and progress then math.max(progress, 0.05) else (if sh.grow < 1 then sh.grow + (1 - sh.grow) * e else 1)
+		local r = radius * sh.s * k
+		sh.part.Size = Vector3.new(sh.base.X * r, sh.base.Y, sh.base.Z * r)
+		local cf = base * CFrame.new(sh.c * r)
+		if sh.spin ~= 0 then
+			cf *= CFrame.Angles(0, os.clock() * sh.spin, 0)
+		end
+		queue(sh.part, cf)
+		local tr = sh.fade0 + (sh.fade1 - sh.fade0) * (if tier.fade then v else 0)
+		if sh.pulse > 0 then
+			tr = math.clamp(tr + 0.25 * math.sin(os.clock() * math.pi * 2 / sh.pulse), 0, 1)
+		end
+		sh.part.Transparency = if v >= 1 and sh.life > 0 then 1 else tr
+	end
+	for _, z in fx.zones do
+		z.part.Size = Vector3.new(2 * radius * z.s, 0.2, 2 * radius * z.s)
+		queue(z.part, base)
+		if z.life > 0 and u * fx.life >= z.life then
+			for _, em in z.part:GetChildren() do
+				if em:IsA("ParticleEmitter") then
+					em.Enabled = false
+				end
+			end
+		end
+	end
 end
 
 local function groundY(x: number, z: number): number
@@ -260,126 +425,148 @@ local function ownerPosition(slot: number): (number?, number?)
 	return nil, nil
 end
 
--- Event handlers -------------------------------------------------------------------------------
+-- Évènements -------------------------------------------------------------------------------------
 
-local function removeProj(id: number)
+local function removeProj(id: number, impact: boolean)
 	local e = projs[id]
-	if e then
-		release(e.key, e.part)
-		projs[id] = nil
-		projCount -= 1
+	if not e then
+		return
 	end
+	if impact then
+		local tpl = templateFor(e.visual, "Impact", true)
+		if tpl then
+			local fx = acquire(tpl)
+			fx.anchor.CFrame = CFrame.new(e.x, groundY(e.x, e.z) + fx.height, e.z)
+			burst(fx, 1)
+			table.insert(segs, { fx = fx, t0 = os.clock(), life = math.max(fx.life, 0.3) })
+		end
+	end
+	release(e.fx)
+	projs[id] = nil
+	projCount -= 1
 end
 
-local function onProjectile(scale: number, visual: number, id: number, x: number, z: number, p1: number, p2: number, p3: number, p4: number)
+local function onProjectile(_scale: number, visual: number, id: number, x: number, z: number, p1: number, p2: number, p3: number, p4: number)
 	if projs[id] then
-		removeProj(id)
+		removeProj(id, false)
 	end
 	if projCount >= tier.maxProj then
 		return
 	end
-	local style = styleOf(visual)
-	local key = `p{visual}`
-	local part = acquire(key, style)
-	part.Size = style.size * scale / math.max(style.projDiv, 0.1)
-	local boomerang = style.boomerang
-	local outTime = (p3 / 10) * style.outRatio
+	local tpl = templateFor(visual, "Projectile")
+	if not tpl then
+		return
+	end
+	local def = Weapons.ByIndex[visual]
+	local boomerang = def ~= nil and def.fx.boomerang == true
+	local life = p3 / 10
+	local outRatio = 0
+	if def and (def.base.life or 0) > 0 then
+		outRatio = (def.base.outTime or 0) / def.base.life
+	end
+	local fx = acquire(tpl)
+	setActive(fx, true)
 	projs[id] = {
-		part = part,
-		key = key,
+		fx = fx,
 		visual = visual,
 		x0 = x,
 		z0 = z,
 		vx = p1 / Codec.Scale,
 		vz = p2 / Codec.Scale,
 		t0 = os.clock(),
-		life = p3 / 10,
+		life = life,
 		slot = p4,
 		boomerang = boomerang,
-		outTime = outTime,
+		outTime = life * outRatio,
 		x = x,
 		z = z,
-		returning = false,
 		last = os.clock(),
+		trailOn = false,
 	}
 	projCount += 1
 end
 
-local function onArea(scale: number, visual: number, x: number, z: number, p1: number, p2: number, p3: number, p4: number)
+local function onArea(_scale: number, visual: number, x: number, z: number, p1: number, p2: number, p3: number, p4: number)
 	local delay = p4 / 10
 	if #areas >= tier.maxAreas and delay <= 0 then
 		return
 	end
-	local _ = scale
-	local st = styleOf(visual)
-	local half = p3
-	local key = if half > 0 and half < 180 then `c{visual}` else `a{visual}`
-	local coneStyle = st
-	if half > 0 and half < 180 then
-		coneStyle = coneStyles[visual] or style(Enum.PartType.Block, st.color, Vector3.one)
-		coneStyles[visual] = coneStyle
-	end
-	local part = acquire(key, coneStyle)
-	local telegraph: BasePart? = nil
-	if delay > 0 then
-		telegraph = acquire("tele", TELEGRAPH_STYLE)
-	end
-	table.insert(areas, {
-		part = part,
-		key = key,
-		telegraph = telegraph,
+	local entry: AreaEntry = {
+		fx = nil,
+		tele = nil,
+		fall = nil,
+		visual = visual,
 		x = x,
 		z = z,
 		radius = p1 / Codec.Scale,
 		dir = p2 / 100,
-		half = half,
+		half = p3,
 		t0 = os.clock(),
 		delay = delay,
-		life = 0.3,
-	})
+		started = false,
+		flip = rng:NextNumber() < 0.5,
+	}
+	if delay > 0 then
+		local t = templateFor(visual, "Telegraph")
+		entry.tele = if t then acquire(t) else nil
+		local f = templateFor(visual, "Fall", true)
+		if f then
+			entry.fall = acquire(f)
+			setActive(entry.fall :: FxInst, true)
+		end
+	end
+	table.insert(areas, entry)
 end
 
 local function onSegment(visual: number, x: number, z: number, p1: number, p2: number)
 	if #segs >= tier.maxSegments then
 		return
 	end
+	local tpl = templateFor(visual, "Segment")
+	if not tpl then
+		return
+	end
+	local fx = acquire(tpl)
 	local x2, z2 = p1 / Codec.Scale, p2 / Codec.Scale
-	local style = styleOf(visual)
-	local key = `s{visual}`
-	local part = acquire(key, style)
-	local dx, dz = x2 - x, z2 - z
-	local len = math.max(0.1, math.sqrt(dx * dx + dz * dz))
-	local y1 = groundY(x, z) + style.beamHeight
-	local y2 = groundY(x2, z2) + 1.5
-	local a = Vector3.new(x, y1, z)
-	local b = Vector3.new(x2, y2, z2)
-	part.Size = Vector3.new(style.size.X, style.size.Y, (b - a).Magnitude)
-	part.CFrame = CFrame.lookAt((a + b) * 0.5, b)
-	local _ = len
-	table.insert(segs, { part = part, key = key, t0 = os.clock(), life = if style.beamHeight > PROJ_HEIGHT then 0.27 else 0.15 })
+	local a = Vector3.new(x, groundY(x, z) + PROJ_HEIGHT, z)
+	local b = Vector3.new(x2, groundY(x2, z2) + 1.5, z2)
+	fx.anchor.CFrame = CFrame.new(a)
+	local side = (b - a):Cross(Vector3.yAxis)
+	side = if side.Magnitude > 0.01 then side.Unit else Vector3.xAxis
+	local pts = { a, a:Lerp(b, 0.33) + side * rng:NextNumber(-0.9, 0.9), a:Lerp(b, 0.66) + side * rng:NextNumber(-0.9, 0.9), b }
+	for i = 0, 3 do
+		local at = fx.attachments["P" .. i]
+		if at then
+			at.WorldPosition = pts[i + 1]
+		end
+	end
+	local tip = fx.attachments.Tip
+	if tip then
+		tip.WorldPosition = b
+	end
+	burst(fx, 1)
+	table.insert(segs, { fx = fx, t0 = os.clock(), life = fx.life })
 end
 
 local function releaseAttach(e: AttachEntry)
-	for _, part in e.parts do
-		release(e.key, part)
+	for _, fx in e.fxs do
+		release(fx)
 	end
-	table.clear(e.parts)
+	table.clear(e.fxs)
 end
 
 local function onAttach(visual: number, slot: number, x: number, z: number, p1: number, p2: number, p3: number, p4: number)
 	local fixed = p3 >= 128
 	local count = math.max(1, p3 % 128)
+	local def = Weapons.ByIndex[visual]
+	local mode = if fixed then "turret" elseif def and def.fx.orbit then "orbit" else "aura"
+	local wanted = if mode == "orbit" then count else 1
 	if not fixed then
 		for i, e in attaches do
 			if e.slot == slot and e.visual == visual and not e.fixed then
-				local radius = p1 / Codec.Scale
-				local st = styleOf(visual)
-				if #e.parts == (if st.orbit then count else 1) then
+				if #e.fxs == wanted then
 					-- Rafraîchissement d'une zone permanente : on garde l'angle (pas de saut)
-					e.radius, e.count, e.spin = radius, count, p4 / 20
-					if st.aura then
-						e.parts[1].Size = Vector3.new(0.4, radius * 2, radius * 2)
-					end
+					e.radius, e.count, e.spin = p1 / Codec.Scale, count, p4 / 20
 					e.life = (os.clock() - e.t0) + p2 / 100
 					return
 				end
@@ -392,28 +579,31 @@ local function onAttach(visual: number, slot: number, x: number, z: number, p1: 
 	if #attaches >= tier.maxAttach then
 		return
 	end
-	local style = styleOf(visual)
-	local key = `t{visual}`
-	-- auras et tourelles : une pièce ; orbites : une pièce par élément
-	local pieces = if style.orbit then count else 1
-	local parts = table.create(pieces)
-	for k = 1, pieces do
-		parts[k] = acquire(key, style)
+	local role = if mode == "orbit" then "Orbit" elseif mode == "turret" then "Turret" else "Aura"
+	local tpl = templateFor(visual, role)
+	if not tpl then
+		return
 	end
-	local radius = p1 / Codec.Scale
-	if style.aura then
-		parts[1].Size = Vector3.new(0.4, radius * 2, radius * 2)
-		parts[1].Transparency = if tier.fade then 0.55 else 0.4
+	local fxs = table.create(wanted)
+	for k = 1, wanted do
+		local fx = acquire(tpl)
+		setActive(fx, true)
+		fxs[k] = fx
+	end
+	if mode == "turret" then
+		local fx = fxs[1]
+		fx.anchor.CFrame = CFrame.new(x, groundY(x, z) + fx.height, z)
+		burst(fx, 1)
 	end
 	table.insert(attaches, {
-		parts = parts,
-		key = key,
+		fxs = fxs,
 		visual = visual,
 		slot = slot,
 		fixed = fixed,
+		mode = mode,
 		x = x,
 		z = z,
-		radius = radius,
+		radius = p1 / Codec.Scale,
 		count = count,
 		spin = p4 / 20,
 		t0 = os.clock(),
@@ -439,7 +629,7 @@ local function onPacket(payload: unknown)
 		if kind == KIND.Projectile then
 			onProjectile(scale, visual, a, x, z, p1, p2, p3, p4)
 		elseif kind == KIND.End then
-			removeProj(a)
+			removeProj(a, true)
 		elseif kind == KIND.Area then
 			onArea(scale, visual, x, z, p1, p2, p3, p4)
 		elseif kind == KIND.Segment then
@@ -450,24 +640,112 @@ local function onPacket(payload: unknown)
 	end)
 end
 
--- Frame update ----------------------------------------------------------------------------------
+-- Image par image --------------------------------------------------------------------------------
 
-local function queue(n: number, part: BasePart, cf: CFrame): number
-	n += 1
-	moveParts[n] = part
-	moveCFrames[n] = cf
-	return n
+local function stepCone(e: AreaEntry, fx: FxInst, base: CFrame, u: number)
+	-- croissant : on montre les segments du milieu selon l'angle ; la fin du geste s'efface en dernier
+	local total = 0
+	for _, sh in fx.shapes do
+		total = math.max(total, sh.seg)
+	end
+	local n = math.clamp(math.floor(2 * e.half / 20 + 0.5), 1, total)
+	local first = math.floor((total - n) / 2) + 1
+	for _, sh in fx.shapes do
+		local k = sh.seg - first
+		local r = e.radius * sh.s
+		sh.part.Size = Vector3.new(sh.base.X * r, sh.base.Y, sh.base.Z * r)
+		queue(sh.part, base * CFrame.new(sh.c * r))
+		if k < 0 or k >= n then
+			sh.part.Transparency = 1
+		else
+			local order = if e.flip then (n - 1 - k) else k -- 0 = début du geste
+			local lag = if n > 1 then (1 - order / (n - 1)) * 0.6 else 0
+			local v = math.clamp(u * 1.4 + lag - 0.2, 0, 1)
+			sh.part.Transparency = if tier.fade then sh.fade0 + (1 - sh.fade0) * v else sh.fade0
+		end
+	end
+	for _, z in fx.zones do
+		z.part.Size = Vector3.new(2 * e.radius * z.s, 0.2, 2 * e.radius * z.s)
+		queue(z.part, base * CFrame.new(0, 0, -e.radius * 0.7))
+	end
+end
+
+local function stepAreas(now: number)
+	for i = #areas, 1, -1 do
+		local e = areas[i]
+		local t = now - e.t0
+		local y = groundY(e.x, e.z)
+		if t < e.delay then
+			local u = t / e.delay
+			local tele = e.tele
+			if tele then
+				placeArea(tele, CFrame.new(e.x, y + tele.height, e.z), e.radius, u, u)
+			end
+			local fall = e.fall
+			if fall then
+				local h = FALL_HEIGHT * (1 - u)
+				local cam = Workspace.CurrentCamera
+				local p = Vector3.new(e.x + 4 * (1 - u), y + 0.8 + h, e.z + 4 * (1 - u))
+				local yaw = 0
+				if cam then
+					local d = cam.CFrame.Position - p
+					yaw = math.atan2(d.X, d.Z)
+				end
+				queue(fall.anchor, CFrame.new(p) * CFrame.Angles(0, yaw, 0))
+				if not fall.trails[1] or fall.trails[1].Enabled ~= tier.trails then
+					for _, tr in fall.trails do
+						tr.Enabled = tier.trails
+					end
+				end
+			end
+			continue
+		end
+		if not e.started then
+			e.started = true
+			release(e.tele)
+			e.tele = nil
+			release(e.fall)
+			e.fall = nil
+			local cone = e.half > 0 and e.half < 180
+			local tpl = templateFor(e.visual, if cone then "Cone" else "Area")
+			if tpl then
+				local fx = acquire(tpl)
+				setActive(fx, true)
+				e.fx = fx
+				table.insert(pendingBursts, { fx = fx, radius = e.radius })
+			end
+		end
+		local fx = e.fx
+		if not fx then
+			table.remove(areas, i)
+			continue
+		end
+		local u = (t - e.delay) / math.max(fx.life, 0.05)
+		if u >= 1 then
+			release(fx)
+			table.remove(areas, i)
+			continue
+		end
+		local base = CFrame.new(e.x, y + fx.height, e.z)
+		if e.half > 0 and e.half < 180 then
+			local dx, dz = math.cos(e.dir), math.sin(e.dir)
+			base = CFrame.lookAt(base.Position, base.Position + Vector3.new(dx, 0, dz))
+			stepCone(e, fx, base, u)
+		else
+			placeArea(fx, base, e.radius, u)
+		end
+	end
 end
 
 local function onFrame()
 	local now = os.clock()
-	local n = 0
+	moveN = 0
 
 	-- Projectiles
 	for id, e in projs do
 		local t = now - e.t0
 		if t >= e.life then
-			removeProj(id)
+			removeProj(id, false)
 			continue
 		end
 		local dt = now - e.last
@@ -478,7 +756,7 @@ local function onFrame()
 				local dx, dz = ox - e.x, oz - e.z
 				local d = math.sqrt(dx * dx + dz * dz)
 				if d < 2 then
-					removeProj(id)
+					removeProj(id, false)
 					continue
 				end
 				local sp = math.sqrt(e.vx * e.vx + e.vz * e.vz) * 1.2
@@ -489,76 +767,35 @@ local function onFrame()
 			e.x = e.x0 + e.vx * t
 			e.z = e.z0 + e.vz * t
 		end
-		local st = styleOf(e.visual)
-		local y = groundY(e.x, e.z) + (if st.rolls then e.part.Size.Y * 0.5 else PROJ_HEIGHT)
-		local cf = CFrame.new(e.x, y, e.z)
-		if e.boomerang or st.spin then
-			cf *= CFrame.Angles(0, t * 20, 0)
-		elseif e.vx ~= 0 or e.vz ~= 0 then
-			cf = CFrame.lookAt(cf.Position, cf.Position + Vector3.new(e.vx, 0, e.vz))
+		local fx = e.fx
+		local pos = Vector3.new(e.x, groundY(e.x, e.z) + fx.height, e.z)
+		local cf = if e.vx ~= 0 or e.vz ~= 0 then CFrame.lookAt(pos, pos + Vector3.new(e.vx, 0, e.vz)) else CFrame.new(pos)
+		if fx.spin ~= 0 then
+			cf = CFrame.new(pos) * CFrame.Angles(0, t * fx.spin, 0)
 		end
-		n = queue(n, e.part, cf)
-	end
-
-	-- Areas
-	for i = #areas, 1, -1 do
-		local e = areas[i]
-		local t = now - e.t0
-		local y = groundY(e.x, e.z) + 0.3
-		if t < e.delay then
-			local tele = e.telegraph
-			if tele then
-				local d = e.radius * 2
-				tele.Size = Vector3.new(0.15, d, d)
-				n = queue(n, tele, CFrame.new(e.x, y, e.z) * CFrame.Angles(0, 0, math.pi / 2))
-				if tier.fade then
-					tele.Transparency = 0.6 - 0.4 * (t / e.delay)
-				end
+		queue(fx.anchor, cf)
+		if not e.trailOn and tier.trails then
+			e.trailOn = true -- la traînée s'allume une image après le placement (pas de trait depuis la cachette)
+			for _, tr in fx.trails do
+				task.defer(function()
+					tr.Enabled = true
+				end)
 			end
-			continue
-		end
-		local u = (t - e.delay) / e.life
-		if u >= 1 then
-			release(e.key, e.part)
-			local tele = e.telegraph
-			if tele then
-				release("tele", tele)
-			end
-			table.remove(areas, i)
-			continue
-		end
-		if e.telegraph then
-			release("tele", e.telegraph :: BasePart)
-			e.telegraph = nil
-		end
-		local grow = if tier.fade then 0.4 + 0.6 * math.min(1, u * 2) else 1
-		if e.half > 0 and e.half < 180 then
-			local r = e.radius * grow
-			local width = math.max(1, 2 * r * math.sin(math.rad(math.min(e.half, 89))))
-			e.part.Size = Vector3.new(width, 0.3, r)
-			local dx, dz = math.cos(e.dir), math.sin(e.dir)
-			local center = Vector3.new(e.x + dx * r * 0.5, y + 1, e.z + dz * r * 0.5)
-			n = queue(n, e.part, CFrame.lookAt(center, center + Vector3.new(dx, 0, dz)))
-		else
-			local d = e.radius * 2 * grow
-			e.part.Size = Vector3.new(0.3, d, d)
-			n = queue(n, e.part, CFrame.new(e.x, y, e.z) * CFrame.Angles(0, 0, math.pi / 2))
-		end
-		if tier.fade then
-			e.part.Transparency = 0.2 + 0.8 * u
 		end
 	end
 
-	-- Segments (already placed; just expire)
+	stepAreas(now)
+
+	-- Segments et impacts (déjà placés : on les laisse vivre)
 	for i = #segs, 1, -1 do
 		local e = segs[i]
 		if now - e.t0 >= e.life then
-			release(e.key, e.part)
+			release(e.fx)
 			table.remove(segs, i)
 		end
 	end
 
-	-- Attached effects
+	-- Effets attachés
 	for i = #attaches, 1, -1 do
 		local e = attaches[i]
 		local t = now - e.t0
@@ -575,37 +812,130 @@ local function onFrame()
 			end
 		end
 		local y = groundY(cx, cz)
-		local st = styleOf(e.visual)
-		if st.orbit then
-			local count = #e.parts
-			for k, part in e.parts do
-				local a = t * e.spin + (k - 1) / count * math.pi * 2
-				local sx, sz = cx + math.cos(a) * e.radius, cz + math.sin(a) * e.radius
-				n = queue(n, part, CFrame.new(sx, y + 2, sz) * CFrame.Angles(0, t * 15, math.pi / 2))
+		if e.mode == "orbit" then
+			local n = #e.fxs
+			for k, fx in e.fxs do
+				local a = t * e.spin + (k - 1) / n * math.pi * 2
+				local p = Vector3.new(cx + math.cos(a) * e.radius, y + fx.height, cz + math.sin(a) * e.radius)
+				queue(fx.anchor, CFrame.new(p) * CFrame.Angles(0, -a - t * 12, 0))
+				if tier.trails and fx.trails[1] and not fx.trails[1].Enabled then
+					for _, tr in fx.trails do
+						tr.Enabled = true
+					end
+				end
 			end
-		elseif st.aura then
-			n = queue(n, e.parts[1], CFrame.new(cx, y + 0.4, cz) * CFrame.Angles(0, 0, math.pi / 2))
+		elseif e.mode == "aura" then
+			local fx = e.fxs[1]
+			placeArea(fx, CFrame.new(cx, y + fx.height, cz), e.radius, 0)
 		else
-			n = queue(n, e.parts[1], CFrame.new(cx, y + 1.1, cz))
+			local fx = e.fxs[1]
+			local cam = Workspace.CurrentCamera
+			local yaw = 0
+			if cam then
+				local d = cam.CFrame.Position - Vector3.new(cx, y, cz)
+				yaw = math.atan2(d.X, d.Z)
+			end
+			queue(fx.anchor, CFrame.new(cx, y + fx.height, cz) * CFrame.Angles(0, yaw, 0))
 		end
 	end
 
-	if n > 0 then
-		for k = n + 1, #moveParts do
+	if moveN > 0 then
+		for k = moveN + 1, #moveParts do
 			moveParts[k] = nil :: any
 			moveCFrames[k] = nil :: any
 		end
 		Workspace:BulkMoveTo(moveParts, moveCFrames, Enum.BulkMoveMode.FireCFrameChanged)
 	end
+	for k, b in pendingBursts do
+		burst(b.fx, b.radius)
+		pendingBursts[k] = nil
+	end
 end
 
--- Lifecycle -------------------------------------------------------------------------------------
+-- Arme tenue en main -----------------------------------------------------------------------------
+
+local held: { [Player]: Model } = {}
+
+local function dropHeld(player: Player)
+	local m = held[player]
+	if m then
+		m:Destroy()
+		held[player] = nil
+	end
+end
+
+local function equipHeld(player: Player)
+	dropHeld(player)
+	local character = player.Character
+	local classId = player:GetAttribute("ClassId")
+	local root = weaponsRoot
+	if not character or type(classId) ~= "string" or not root then
+		return
+	end
+	local class = Classes[classId]
+	if not class then
+		return
+	end
+	local src = root:FindFirstChild(class.startWeapon)
+	if not src or not src:IsA("Model") then
+		warnOnce("held" .. class.startWeapon, `modèle manquant : Assets.Weapons.{class.startWeapon}`)
+		return
+	end
+	local left = class.startWeapon == "Longbow" -- l'arc se tient à gauche
+	local hand = character:FindFirstChild(if left then "LeftHand" else "RightHand")
+	local grip = hand and hand:FindFirstChild(if left then "LeftGripAttachment" else "RightGripAttachment")
+	if not hand or not hand:IsA("BasePart") or not grip or not grip:IsA("Attachment") then
+		return
+	end
+	local m = src:Clone()
+	m:ScaleTo(HELD_SCALE)
+	local hold = src:GetAttribute("HoldCFrame")
+	local offset = if typeof(hold) == "CFrame" then hold else DEFAULT_HOLD
+	m:PivotTo(grip.WorldCFrame * offset)
+	for _, d in m:GetDescendants() do
+		if d:IsA("BasePart") then
+			d.Anchored = false
+			d.Massless = true
+			d.CanCollide = false
+			d.CanQuery = false
+			d.CanTouch = false
+			local w = Instance.new("WeldConstraint")
+			w.Part0 = hand
+			w.Part1 = d
+			w.Parent = d
+		end
+	end
+	m.Name = "HeldWeapon"
+	m.Parent = character
+	held[player] = m
+end
+
+local function watchPlayer(player: Player)
+	player.CharacterAdded:Connect(function(character)
+		character:WaitForChild("RightHand", 10)
+		equipHeld(player)
+	end)
+	player:GetAttributeChangedSignal("ClassId"):Connect(function()
+		equipHeld(player)
+	end)
+	if player.Character then
+		task.spawn(equipHeld, player)
+	end
+end
+
+-- Cycle de vie -----------------------------------------------------------------------------------
 
 function WeaponFX.init()
 	tier = detectTier()
-	container = Instance.new("Folder")
+	container = Instance.new("Folder") -- dossier de rangement vide : invisible
 	container.Name = "WeaponFX"
 	container.Parent = Workspace
+	local assets = ReplicatedStorage:WaitForChild("Assets", 10)
+	fxRoot = assets and assets:FindFirstChild("FX")
+	weaponsRoot = assets and assets:FindFirstChild("Weapons")
+	if not fxRoot then
+		warn("[WeaponFX] ReplicatedStorage.Assets.FX introuvable : aucun effet d'arme ne sera dessiné")
+	end
 end
 
 function WeaponFX.start()
@@ -616,7 +946,12 @@ function WeaponFX.start()
 				slotCache[slot] = nil
 			end
 		end
+		dropHeld(player)
 	end)
+	for _, p in Players:GetPlayers() do
+		watchPlayer(p)
+	end
+	Players.PlayerAdded:Connect(watchPlayer)
 	RunService.RenderStepped:Connect(onFrame)
 end
 
