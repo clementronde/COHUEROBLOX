@@ -29,6 +29,7 @@ local Enemies = require(Config:WaitForChild("Enemies"))
 local Heightmap = require(Shared:WaitForChild("Heightmap"))
 local Net = require(Shared:WaitForChild("Net"))
 local ArtLibrary = require(Shared:WaitForChild("ArtLibrary"))
+local FXLibrary = require(script.Parent:WaitForChild("FXLibrary"))
 
 local NET = Companions.Net
 local R = Companions.Render
@@ -47,7 +48,7 @@ type Visual = {
 }
 
 -- Personnalisation (A05-05) : chapeau et aura clonés, posés avec le corps.
-type Dress = { hat: Visual?, aura: Visual? }
+type Dress = { hat: Visual?, aura: Visual?, auraFx: FXLibrary.TrackedHandle? }
 
 type Entry = {
 	key: number,
@@ -200,8 +201,9 @@ local function tint(body: Visual, color: Color3)
 	end
 end
 
--- Habille un corps fraîchement cloné selon une valeur CompanionLook ("" = rien).
-local function dress(body: Visual?, look: string): Dress?
+-- Habille un corps fraîchement cloné selon une valeur CompanionLook ("" = rien). `mine` : compagnon du
+-- joueur local (aura en priorité Normal ; celles des autres en Ambient, coupées d'abord par FXLibrary).
+local function dress(body: Visual?, look: string, mine: boolean): Dress?
 	if not body or look == "" then
 		return nil
 	end
@@ -213,14 +215,17 @@ local function dress(body: Visual?, look: string): Dress?
 	local scale = math.clamp(body.height / R.HatRefHeight, R.HatScaleMin, R.HatScaleMax)
 	local hatT = if hatId then lookTemplate("Cosmetics", LOOK.HatFolder, hatId) else nil
 	local auraT = if auraId then lookTemplate("FX", LOOK.AuraFolder, auraId) else nil
+	local aura = if auraT then cloneDressPart(auraT, scale) else nil
 	return {
 		hat = if hatT then cloneDressPart(hatT, scale) else nil,
-		aura = if auraT then cloneDressPart(auraT, scale) else nil,
+		aura = aura,
+		auraFx = if aura then FXLibrary.track(aura.parts, if mine then "Normal" else "Ambient") else nil,
 	}
 end
 
 local function undress(d: Dress?)
 	if d then
+		FXLibrary.untrack(d.auraFx)
 		destroyVisual(d.hat)
 		destroyVisual(d.aura)
 	end
@@ -283,7 +288,7 @@ local function applyLook(e: Entry, look: string)
 		destroyVisual(e.body)
 		e.body = bodyFor(e.kind)
 	end
-	e.dress = dress(e.body, look)
+	e.dress = dress(e.body, look, e.key // 4 == Players.LocalPlayer.UserId)
 end
 
 local function spawnHit(x: number, z: number)
@@ -507,7 +512,7 @@ local function newPet(species: string, slot: number?, pos: Vector3): LobbyPet?
 	return {
 		species = species,
 		body = body,
-		dress = dress(body, look),
+		dress = dress(body, look, true),
 		slot = slot,
 		flying = override ~= nil and override.flying == true,
 		pos = pos,
@@ -755,6 +760,7 @@ end
 function CompanionRenderer.requestUltimate() end
 
 function CompanionRenderer.start()
+	FXLibrary.start()
 	container = Instance.new("Folder")
 	container.Name = "COHUE_Companions"
 	container.Parent = Workspace

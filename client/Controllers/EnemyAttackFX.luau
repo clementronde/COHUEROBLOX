@@ -4,11 +4,15 @@
 -- ReplicatedStorage.Assets.FX.Enemies (Sweep, Burst, Shot, Land, Boss) ; ce module les clone en pool, les
 -- place, les met à l'échelle du rayon, les teinte à la couleur du profil de l'ennemi et appelle :Emit().
 -- Un modèle manquant est signalé une fois dans la sortie, puis ignoré.
+-- Budget (A07-01) : FXLibrary. En qualité Auto, rendu d'avant (18 effets, toutes les particules) tant que le
+-- budget global n'est pas atteint ; les attaques de boss passent en priorité Telegraph (jamais coupées),
+-- les autres en Normal (les lointains coupés d'abord). Un palier choisi par le joueur baisse plafond et rafales.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Motion = require(script.Parent.EnemyMotion)
+local FXLibrary = require(script.Parent:WaitForChild("FXLibrary"))
 local ArtLibrary = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("ArtLibrary"))
 type Profile = Motion.Profile
 
@@ -54,6 +58,7 @@ end
 local function acquire(t: Model): Inst
 	local pool = pools[t]
 	local fx = pool and table.remove(pool)
+	FXLibrary.addActive(1)
 	if fx then
 		return fx
 	end
@@ -98,6 +103,7 @@ end
 
 local function release(effect: Effect)
 	local fx = effect.fx
+	FXLibrary.addActive(-1)
 	fx.anchor.CFrame = HIDDEN
 	for _, sh in fx.shapes do
 		sh.part.CFrame = HIDDEN
@@ -134,7 +140,13 @@ function Effects.emit(profile: Profile, origin: Vector3, facing: Vector3, mode: 
 	if not root then
 		return
 	end
-	if #active >= LIMIT then
+	local prio: FXLibrary.Priority = if mode == "boss" then "Telegraph" else "Normal"
+	if not FXLibrary.canSpawn(prio, origin) then
+		return
+	end
+	local dom = FXLibrary.domain("Enemy")
+	local limit = dom.limit or LIMIT
+	while #active >= limit do
 		release(table.remove(active, 1) :: Effect)
 	end
 	local shoot = mode == "shot"
@@ -162,7 +174,7 @@ function Effects.emit(profile: Profile, origin: Vector3, facing: Vector3, mode: 
 		em.e.Color = ColorSequence.new(light, profile.color)
 		local k = if em.perRadius then math.clamp(r / 3, 0.5, 3) else 1
 		if em.n > 0 then
-			em.e:Emit(math.max(1, math.floor(em.n * k + 0.5)))
+			FXLibrary.emit(em.e, math.max(1, math.floor(em.n * k * dom.particles + 0.5)), prio, origin)
 		end
 	end
 	table.insert(active, effect)
@@ -309,6 +321,7 @@ function Effects.init()
 		return
 	end
 	initialized = true
+	FXLibrary.start()
 	ensureContainer()
 	local assets = ReplicatedStorage:WaitForChild("Assets", 10)
 	local fx = assets and assets:FindFirstChild("FX")

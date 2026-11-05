@@ -407,7 +407,7 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 
 | ID | Tâche | Livrable | Dépend de | Priorité | Statut |
 | --- | --- | --- | --- | --- | --- |
-| A07-01 | Bibliothèque VFX voxel avec budget de particules mobile et réglage de qualité | Module + note | A01-01 | P0 — bloquant | À faire |
+| A07-01 | Bibliothèque VFX voxel avec budget de particules mobile et réglage de qualité | Module + note : partie code faite, `client/Controllers/FXLibrary.luau`, dossier 12 §15 (WeaponFX, EnemyAttackFX, auras de compagnon branchés) | A01-01 | P0 — bloquant | Code à valider (branche claude/a05-a07-v4 ; clé fxQuality et curseur : contract requests ; pas testé en Play) |
 | A07-02 | Effets des 8 armes de départ | WeaponFX | A04-05 | P0 — bloquant | À faire |
 | A07-03 | KO en cubes voxel, XP, montée de niveau | Effets | A07-01 | P0 — bloquant | À faire |
 | A07-04 | Capture, télégraphes de boss, Overtime, portails | Effets | A05-02, A03-06 | P1 — lancement | À faire |
