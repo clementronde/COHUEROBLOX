@@ -77,7 +77,7 @@ Le guide DA donne quatre rôles par famille, lisibles à la couleur du dessus de
 | Rôle | Couleur | Comportement serveur | Existe ? |
 | --- | --- | --- | --- |
 | Mêlée / essaim | Tomato | `Swarm` : fonce droit sur le joueur | Oui |
-| Sauteur | (couleur de la famille) | `Jumper` : prépare 0,4 s, bondit 0,8 s vers la position verrouillée | Oui |
+| Sauteur | Tomato (il frappe au contact, comme la mêlée ; relecture du 5 nov.) | `Jumper` : prépare 0,4 s, bondit 0,8 s vers la position verrouillée | Oui |
 | Tireur | Leaf.d / Leather | `Shooter` : reste à 26 studs, vise 0,6 s, tir lent toutes les 3,2 s | Oui |
 | Blindé | Steel / Ember | `Armored` : lent, armure 30 à 40 %, pousse les autres | Oui |
 | Soutien | Grape | **`Support`** (proposé) : toutes les 6 s, protège ou accélère ses voisins à moins de 12 studs ; anneau violet au sol | **Non** |
@@ -125,12 +125,12 @@ Retirés du monde 1 : la **Bogue blindée** (déjà retirée par le guide DA §1
 
 Nom de travail à donner par A02 et Clément. Je propose **Soggy Graves** (« Tombes trempées »).
 
-Peau des zombies : **Sky.d** (bleu-vert mat). Silhouette en **Γ** : bras tendus devant, dos voûté, tête basse en avant. Haillons Plum.
+Peau des zombies : **Sky.dd** (bleu-vert mat, plus sombre que le Sky.d du guide : en Sky.d, le zombie de la planche concept passait pour un monstre bleu mignon). Silhouette en **Γ** : bras tendus devant, dos voûté, tête basse en avant. Haillons Plum.
 
 | Ennemi | Rôle · comportement | Silhouette et gag | Taille | Attaque | Existe |
 | --- | --- | --- | --- | --- | --- |
 | **Shambler** | Mêlée · Swarm | Γ ; chemise Tomato en lambeaux ; une chaussette sur deux | 3,75 | Contact | Ébauche voxel (planche 2) ; maille riggée Codex « Zombie » (hors DA) |
-| **Runner** | Sauteur · Jumper | Γ maigre ; **tutu Grape.l** de danseuse ; il bondit en grand jeté | 3,9 | Grand jeté sur la position verrouillée | Ébauche voxel (planche 2) |
+| **Runner** | Sauteur · Jumper | Γ maigre ; **tutu Grape.l** de danseuse, chaussons, noeud Tomato sur le chignon ; un oeil grand ouvert, l'autre mi-clos ; il bondit en grand jeté | 4,25 | Grand jeté sur la position verrouillée | Ébauche voxel (planche 2) |
 | **Gravedigger** | Tireur · Shooter | Γ ; haut-de-forme ; pelle plus grande que lui | 4,25 | Motte de terre lancée en cloche, lente | Ébauche voxel (planche 2) |
 | **Bloater** | Kamikaze lourd · Kamikaze (provisoire : Jumper) | Gros ventre rond orange citrouille ; toute petite tête | 4,5 | Lent, beaucoup de PV ; au contact ou à sa mort, il éclate (cercle rouge de rayon 5, 0,8 s) | Ébauche voxel (planche 2) |
 | **Mini-boss : Zombie Ogre** | Mini-boss | Ogre zombie énorme ; traîne une pierre tombale comme un doudou | 9,5 | Contact, plus « Tombstone Slam » : cercle rouge de rayon 7, 1 s (proposé) | **Rien** |
@@ -143,7 +143,7 @@ Corps des fantômes : **Cream** (jamais cyan : c'est la couleur de l'XP). Silhou
 | Ennemi | Rôle · comportement | Silhouette et gag | Taille | Attaque | Existe |
 | --- | --- | --- | --- | --- | --- |
 | **Wisp** | Mêlée · Swarm | Petit dôme ; casquette d'écolier Tomato | 3,5 | Contact | Ébauche voxel (planche 2) |
-| **Poltergeist** | Tireur · Shooter | Dôme à petits bras ; une chaise d'école au-dessus de la tête | 4 | Lance une gomme géante, lente | Ébauche voxel (planche 2) |
+| **Poltergeist** | Tireur · Shooter | Dôme plein, corps en cloche, bas ondulé ; yeux ovales Ink ; pile de livres de classe levée d'une main | 3,75 + 1 de vol | Lance un livre, lent | Ébauche voxel (planche 2) |
 | **Banshee** | Soutien · Support (provisoire : Shooter) | Dôme sous un long voile Plum à capuche ; bouche ronde ouverte | 4,25 | Cri : les fantômes à moins de 12 studs vont 1,3 fois plus vite pendant 3 s (onde violette) | Ébauche voxel (planche 2) ; **comportement absent** |
 | **Haunted Armor** | Blindé · Armored | Armure Steel vide ; deux yeux qui flottent dans le heaume ; pointeur de tableau en guise de lance | 5 | Contact ; armure 40 % ; pousse les autres | Ébauche voxel (planche 2) |
 | **Mini-boss : The Spectral Proctor** | Mini-boss | Surveillant fantôme géant ; sifflet ; brassard jaune de surveillant | 9 | Contact, plus « Whistle Blast » : anneau de 4 à 14 studs, 1 s (proposé) | Parts (kind 15) ; maille riggée Codex « SurveillantFantome » (hors DA) |
@@ -215,7 +215,7 @@ Objets à poser (proposition, en suivant le contrat d'attributs d'A14 : `S`, `Ba
 | --- | --- | --- |
 | Télégraphes ennemis : `TelegraphCircle`, `TelegraphRing` (avec zone sûre), `TelegraphLine` | `Assets.FX.Enemies.Telegraphs` | Lumière lisse : bord Tomato, remplissage qui grandit jusqu'à l'impact. Variantes de couleur posées par le code (Grape pour une invocation, Gold pour un point faible) |
 | Projectile générique | `Assets.FX.Enemies.Projectiles.Default` | Boule Tomato mate à contour Ink, sans Neon |
-| Projectiles d'ennemis | `Assets.FX.Enemies.Projectiles.<Nom>` | Objets en briques (« des blocs pour ce qui existe ») : Arrow (flèche de l'Archer), Feather (plume du Hibou), DirtClod (motte du Gravedigger), Eraser (gomme du Poltergeist) |
+| Projectiles d'ennemis | `Assets.FX.Enemies.Projectiles.<Nom>` | Objets en briques (« des blocs pour ce qui existe ») : Arrow (flèche de l'Archer), Feather (plume du Hibou), DirtClod (motte du Gravedigger), Book (livre du Poltergeist) |
 | Projectiles et chutes de boss | `Assets.FX.Bosses.<Boss>.<Attaque>` | Acorn (gland qui tombe), Bone (os), PaperPlane (avion en papier) |
 | Élite | `Assets.FX.Enemies.EliteRing`, `EliteCrown` | Neon or, comme aujourd'hui |
 | Point faible et Arche | `Assets.FX.Bosses.WeakPoint`, `ArcheBeam` | Neon or, Neon violet |
@@ -279,3 +279,33 @@ Je modifie moi-même, dans mon domaine :
 - le décodage des projectiles dans `EnemyCodec`.
 
 Les ids d'ennemis utilisés par le serveur (`Worlds.roster`, `Bosses.kind`, `summonKind`, `Worlds.miniBoss`) changent avec le roster : je le coordonne avec A04 et A02 au moment de la bascule, sans casser la run du monde 1.
+
+---
+
+## 10. Étape 2 : planche concept (en cours, porte 2 pas encore présentée)
+
+Planche : `assets/a03/01-ennemis-boss-concept.jpg`. Sources : `assets/a03/creatures.py` (modèles sur grille), `assets/a03/concept.py` (rendus Blender 5.2 en ligne de commande), `assets/a03/board.py` (montage).
+
+Modélisés : Goblin Grunt, Archer, Shaman, Bomber (v2), Zombie Runner, Poltergeist, The Hungry Coffin. La horde est rendue en maille fusionnée du jeu (technique B) : 694 à 760 triangles par ennemi, plus les yeux. En briques chanfreinées, un ennemi en coûte environ 3 500 à 4 200.
+
+**Relectures à l'aveugle** (2 relecteurs par tour, seuil 8,5) :
+- tour 1 : 7,2 et 6 ;
+- tour 2 : 7,1 et 7,0.
+
+**À corriger au tour 3** (convergence des relecteurs du tour 2) :
+1. **Ressemblances avec des licences** :
+   - chapeau-champignon à pois du Shaman (un personnage Nintendo connu) : le remplacer par une théière violette, dans la lignée de la cocotte du Grunt ;
+   - tête brune du boss à sourcils noirs (idem) ;
+   - zombie bleu aux yeux globuleux (« Blue » de Rainbow Friends, un jeu Roblox connu) : peau vert éteint Leaf.d (à valider par Clément, le guide dit Sky.d), rendu de trois-quarts pour montrer le Γ.
+2. **Boss** : cercueil en bois clair (tons de Leather), hexagonal à sommet plat, liseré Leather.dd. Le haut du couvercle est soulevé : dans le noir, deux gros yeux blancs, des dents sur les bords, une langue Tomato. Pas de sourcils, poignées Steel, pas de Gold, serviette Cream à carreaux Tomato 2 × 2, mains Leaf.d. 5 couleurs principales au plus.
+3. **Grunt** :
+   - cocotte haute de 4 briques, bouton 2 × 2, anses à mi-hauteur collées aux parois ;
+   - louche en bois avec un cuilleron rond 4 × 4 : plus d'acier qui scintille comme de l'XP ;
+   - bouche ouverte sur 2 rangées, intérieur Plum.dd et dents : plus de moustache sous le nez.
+4. **Archer** : capuche Leaf.d (guide §6), pointe qui tombe dans le dos. Le brun se confondait avec l'orange du Bomber.
+5. **Bomber** : retirer le sac d'XP, qui se lit comme un cupcake.
+6. **Poltergeist** : pile de 3 livres décalés d'une brique, tranches Cream, dos visibles ; bouche Ink.
+7. **Test de horde** :
+   - sol calme (Leaf.d à ±4 %, sans dalles claires) ;
+   - horde plus serrée autour du joueur ;
+   - quelques XP, 2 tirs Tomato, 1 capturable, 2 élites.
