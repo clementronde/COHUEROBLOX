@@ -167,11 +167,11 @@ Pas de marche obligatoire, pas de choix obligatoire, pas de texte à lire. Les c
 
 ## 6. Les écrans de menu
 
-Maquettes Figma : **[COHUE — Menus & Lobby (A09)](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b)**. Pages : `00 · Read me`, `01 · Hub plan` (plan du 4 nov., remplacé), `02 · Screens (phone 844×390)`, `03 · Wireframe kit` (composants propres au lobby, liés aux variables A08). Les écrans utilisent la bibliothèque de A08 (« COHUE — UI Design System & Run Screens ») : boutons, couleurs, styles de texte, ombres, et les en-têtes reliés aux variables `zone/<zone>/face` et `zone/<zone>/lip`.
+Maquettes Figma : **[COHUE — Menus & Lobby (A09)](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b)**. Pages : `00 · Read me`, `01 · Hub plan` (plan du 4 nov., remplacé), **`02 · Screens v3 (briques)`** (14 écrans), `03 · Wireframe kit`, `05 · Archive v2 (4 nov.)` (anciens écrans glossy, à ne plus suivre).
 
-Planche des 8 écrans habillés (4 nov.) : [img/65-maquettes-v2.png](img/65-maquettes-v2.png).
+Planche des 14 écrans v3 (5 nov.) : [img/65-menus-v3.png](img/65-menus-v3.png).
 
-**Style UI : v3 « briques » de A08** (validé par Clément le 5 nov. pour le lobby ; la v2 glossy puis « studs » a été jugée AI slop). Les 8 écrans du 4 nov. sont encore en v2. **Un menu concept en v3 est fait : Classes** (cadre « 2 · Classes — concept v3 » de la page 02, composants `Window` Plum, `Tile`, `Tag`, `Button`, `BrickIcon/*` de A08). Capture : [img/65-classes-v3.png](img/65-classes-v3.png). Il est à valider par Clément avant de passer les 7 autres menus et de maquetter les 3 nouveaux (§6.9 à 6.11). Relecture à l'aveugle (5 nov.) : HUD 6,7 / 10, Classes 6,3 / 10 plafonné à 5 parce que les boutons taille M de A08 font 40 px ; corrigé (boutons taille L de 48 px, aperçu d'avatar garni, une ligne de texte en moins). Reste noté : les animations ne sont pas spécifiées (U4 = 0). Archer n'a pas encore d'icône d'arc (sprite d'arme attendu d'A14).
+**Style UI : v3 « briques » de A08**, validé par Clément le 5 nov. (lobby, puis le concept Classes). Tous les écrans sont refaits avec la bibliothèque v3 de A08 : `Window` (en-tête recoloré par la variable de zone du menu, en attendant la propriété Zone de A08), `Button` (taille L de 48 px), `Tile`, `Tag`, `Portrait`, `Lobby/*`, icônes `BrickIcon/*`. Texte en Fredoka One, très peu de phrases. Icônes provisoires : Archer « ! » (arc d'A14 attendu) et compagnons « cage » (portraits d'A05 attendus). Relecture à l'aveugle du concept Classes : 6,3 / 10, plafonné à 5 par des boutons de 40 px ; corrigé. Les animations ne sont pas spécifiées (U4 = 0).
 
 Règles communes :
 
