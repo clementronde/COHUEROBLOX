@@ -37,6 +37,34 @@ Côté Roblox (montage en dur, après validation) : la tuile est envoyée sur le
 
 Captures v2 studs : planches L01-L11, P01-P11, C01-C11 et règles, envoyées à Clément le 5 nov. 2026.
 
+### 0.0 bis Concept v3.1 « vraies briques » (5 nov. 2026, après le refus de la v2)
+
+Clément a jugé la v2 studs « encore trop AI slop » : c'était la v1 repeinte, avec une texture collée partout. Le concept v3.1 repart de ses 9 références et du monde en tenons d'A01. Il ne couvre pour l'instant que le HUD et Victory en téléphone paysage, page Figma **Concept v3 — briques**.
+
+| Élément | Règle v3.1 |
+| --- | --- |
+| Police | **Fredoka One** partout (titres, chiffres, libellés), blanc, contour Ink épais (≈ 13 % de la taille) et ombre portée dure de 2 px. 15 px au minimum. |
+| Chiffres du HUD | Posés **directement sur le monde**, sans pastille : chrono, KO, record, Silver. |
+| Briques | Contour Ink 3 px, rayon 6 (8 pour les grands blocs), lèvre basse en ton `.dd`, biseau haut en ton `.l`. Tenons seulement sur les boutons principaux, les barres de titre, la barre de vie et la mini-carte, en tenons entiers (pas de 12 px), opacité 0,22 à 0,45. |
+| Icônes | **Montées en vraies briques** avec les outils d'A01, rendues dans Blender, contour Ink : `docs/dossier/ui-assets/icons/`. Elles débordent du cadre (trophée, coffre, flamme). |
+| Fenêtres | Barre de titre dorée à tenons et reflets en biais, titre centré de 40 px. Corps brun foncé (`Bark.dd`) cerclé d'or. Choix présentés en **cartes de couleur** qui disent l'enjeu (« End the run, keep all loot », « Loot is safe. More KO! »). La pastille rouge de compte à rebours prend la place d'une croix. |
+| Cases d'inventaire | Claires (Cream), contour Ink, étiquette de niveau dorée « Lv4 ». |
+| Boutons tactiles | Tuiles carrées à tenons, grosse icône claire, libellé à cheval sur le bord bas. Capture en Bubblegum avec une cage crème. |
+| Marges | 44 px de chaque côté en paysage (encoche des deux côtés selon le sens du téléphone). |
+| Animations | « Clic de brique » : la brique s'enfonce de sa lèvre et remonte avec un rebond, les fenêtres tombent et s'écrasent de 4 % en se posant, les tampons claquent avec des tenons qui jaillissent. Recettes TweenService et aperçu jouable : `docs/dossier/ui-assets/concept/preview/` (page « Clic de brique »). Réglage « animations réduites » : fondu de 0,12 s, sans secousse, sans particules, sans pulsation. |
+
+Fond des maquettes : `docs/dossier/ui-assets/concept/run_scene.py`, une arène en tenons avec une horde de gobelins d'A01, rendue dans Blender. Ce n'est pas un décor du jeu.
+
+**v3.2 (même jour)** : corrections de la relecture à l'aveugle (3 relecteurs sur la v3.1 : médiane 6,7/10, plafonnée à 5,0 par 3 px de marge manquants à droite ; « encore du modèle ? » 1/2 pour les trois) et nouvel écran de passage de niveau demandé par Clément. Captures : `docs/dossier/ui-assets/concept/captures/`.
+
+| Écran | v3.2 |
+| --- | --- |
+| HUD | Marges de 44 px des deux côtés, libellés au-dessus de la barre du bas de l'écran. Une seule plaque de vitals (niveau, vie, XP, Silver). Équipiers en portraits (en jeu : vignette Roblox du joueur dans un cadre à sa couleur), sous la plaque, loin du joystick. Barre d'armes en bas au centre, case verrouillée avec un cadenas. KO (34 px) plus gros que le chrono (28 px). Réglages en brique grise à tenons. Cage de capture avec un gobelin dedans. |
+| Victory | L'enjeu est écrit : « Your loot is safe. Pick one: », « Leave now with your loot », « Overtime: more KO! ». Plus de pastille dans le coin (elle ressemblait à une croix) : une barre « AUTO CASH OUT IN 12s » se vide en bas, Cash out par défaut à 0 (proposition, à valider). Le joueur peut changer d'avis tant que la barre n'est pas vide. Portraits des équipiers sur la carte choisie. |
+| **Niveau gagné** (nouveau) | Le jeu se fige et pâlit, des rayons tournent derrière. Fenêtre au centre « LEVEL 13! » : 3 offres en cartes de rareté (icône, nom, effet, étiquette NEW! ou Lv 2 → 4, rareté écrite), Reroll / Skip / Banish avec leurs compteurs. Inventaire à gauche (armes, Runes, objets, avec leur niveau), stats à droite : la stat que l'offre sélectionnée change s'allume en vert avec sa future valeur. Choisir une offre fait voler son icône dans la case d'inventaire, puis le jeu reprend. |
+
+**Contract request (A04, serveur)** : le passage de niveau doit mettre le jeu en pause (décision de Clément du 5 nov. 2026). En solo, c'est une pause complète. En coop, la règle reste à choisir (question posée à Clément) : tout le monde figé pendant le choix d'un joueur, ou seulement le joueur qui choisit, figé et invulnérable. Cela remplace « cartes sans pause, 8 s » de la section 4.
+
 ### 0.1 Le style (v1 vernie, remplacé par 0.0 pour la brillance et les reflets)
 
 Chaque élément pressable ou important ressemble à un **bloc de jouet verni** :

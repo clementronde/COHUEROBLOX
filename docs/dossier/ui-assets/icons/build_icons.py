@@ -54,29 +54,45 @@ ICONS: dict[str, tuple[int, list[str]]] = {
         "......r......",
     ]),
     "coin": (2, [
-        "....tttt....",
-        "..ttUUUUtt..",
-        ".tUUTTTTUUt.",
-        ".tUTTTCTTTt.",
-        "tUTTTCCCTTTt",
-        "tUTCCCCCCCTt",
-        "tUTTCCCCCTTt",
-        "tUTTCCTCCTTt",
-        ".tTTCTTTCTt.",
-        ".tUTTTTTTUt.",
-        "..ttUUUUtt..",
-        "....tttt....",
+        ".....tttttt.....",
+        "...ttUUUUUUtt...",
+        "..tUUTTTTTTUUt..",
+        ".tUTTTTTTTTTTUt.",
+        ".tUTTTTCCTTTTUt.",
+        "tUTTTTCCCCTTTTUt",
+        "tUTTCCCCCCCCTTUt",
+        "tUTTTCCCCCCTTTUt",
+        "tUTTTTCCCCTTTTUt",
+        "tUTTTCCTTCCTTTUt",
+        ".tUTTCTTTTCTTUt.",
+        ".tUTTTTTTTTTTUt.",
+        "..tUUTTTTTTUUt..",
+        "...ttUUUUUUtt...",
+        ".....tttttt.....",
+    ]),
+    "lock": (3, [
+        "...SSSS...",
+        "..SS..SS..",
+        "..S....S..",
+        "..S....S..",
+        "GGGGGGGGGG",
+        "GYYGGGGGGg",
+        "GYGGKKGGGg",
+        "GGGGKKGGGg",
+        "GGGGKKGGGg",
+        "GGGGGGGGGg",
+        ".gggggggg.",
     ]),
     "capture_light": (3, [
         ".....CC.....",
         "....C..C....",
         "..CCCCCCCC..",
         ".CC.C..C.CC.",
-        ".C..C..C..C.",
-        ".C..C..C..C.",
-        ".C..C..C..C.",
-        ".C..C..C..C.",
-        ".C..C..C..C.",
+        ".CMMCMMCMMC.",
+        ".CMMCMMCMMC.",
+        ".CKMCMMCMKC.",
+        ".CMMCMMCMMC.",
+        ".CmmCmmCmmC.",
         ".CCCCCCCCCC.",
         "cccccccccccc",
     ]),
@@ -233,6 +249,82 @@ ICONS: dict[str, tuple[int, list[str]]] = {
         "..CC.CC.CC..",
         ".....CC.....",
     ]),
+    "rune_speed": (2, [
+        "..SSSSSSS..",
+        ".SZZZZZZZs.",
+        "SZSSSSSSSSs",
+        "SZSEESSSSSs",
+        "SZSSEESSSSs",
+        "SZSSSEESSSs",
+        "SZSSSSEESSs",
+        "SZSSSEESSSs",
+        "SZSSEESSSSs",
+        "SZSEESSSSSs",
+        "SZSSSSSSSSs",
+        ".sSSSSSSSs.",
+        "..sssssss..",
+    ]),
+    "rune_damage": (2, [
+        "..SSSSSSS..",
+        ".SZZZZZZZs.",
+        "SZSSSSSSSSs",
+        "SZSRRSSRRSs",
+        "SZSSRRRRSSs",
+        "SZSSSRRSSSs",
+        "SZSSRRRRSSs",
+        "SZSRRSSRRSs",
+        "SZSSSSSSSSs",
+        ".sSSSSSSSs.",
+        "..sssssss..",
+    ]),
+    "rune_area": (2, [
+        "..SSSSSSS..",
+        ".SZZZZZZZs.",
+        "SZSSSSSSSSs",
+        "SZSSQQQSSSs",
+        "SZSQSSSQSSs",
+        "SZSQSSSQSSs",
+        "SZSQSSSQSSs",
+        "SZSSQQQSSSs",
+        "SZSSSSSSSSs",
+        ".sSSSSSSSs.",
+        "..sssssss..",
+    ]),
+    "sock": (3, [
+        "...RRRR...",
+        "...CCCC...",
+        "...RRRR...",
+        "...CCCC...",
+        "...RRRR...",
+        "...RRRR...",
+        "..RRRRR...",
+        ".RRRRRR...",
+        "RRRRRRRRR.",
+        "RRRRRRRRRR",
+        ".rrrrrrrr.",
+    ]),
+    "lunchbox": (4, [
+        "...cccc...",
+        "...c..c...",
+        ".OOOOOOOO.",
+        "OOOOOOOOOO",
+        "OCCCCCCCCo",
+        "OOOOOOOOOo",
+        "OOOOOOOOOo",
+        "OOOOOOOOOo",
+        ".oooooooo.",
+    ]),
+    "chalk": (2, [
+        ".......QQ",
+        "......QCC",
+        ".....CCCc",
+        "....CCCc.",
+        "...CCCc..",
+        "..CCCc...",
+        ".CCCc....",
+        "CCCc.....",
+        "cc.......",
+    ]),
     "trophy": (3, [
         ".GGGGGGGGGG.",
         "GGYYGGGGGGgG",
@@ -317,9 +409,15 @@ def reset_scene():
     return sc
 
 
-def render_icon(name: str, depth: int, rows: list[str], out_dir: str):
+# Icônes tirées directement des modèles d'A01 (assets/voxel/models.py) : (fonction, inclinaison en degrés)
+MODELS = {"capture_cage": ("capture_icon", 0.0), "axes": ("weapon_spinningaxe", -35.0)}
+
+
+def render_icon(name: str, depth: int, rows: list[str], out_dir: str, vox=None, tilt=0.0):
     sc = reset_scene()
-    ob = brick.to_blender(make_vox(name, depth, rows), origin="center", name=name)
+    ob = brick.to_blender(vox or make_vox(name, depth, rows), origin="center", name=name)
+    if tilt:
+        ob.rotation_euler = (0.0, math.radians(tilt), 0.0)
     bpy.context.view_layer.update()
     pts = [ob.matrix_world @ Vector(c) for c in ob.bound_box]
     center = sum(pts, Vector()) / 8
@@ -342,9 +440,15 @@ def render_icon(name: str, depth: int, rows: list[str], out_dir: str):
 def main():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     out_dir = os.path.abspath(argv[0] if argv else os.path.join(HERE, "render"))
-    names = argv[1:] or list(ICONS)
+    names = argv[1:] or (list(ICONS) + list(MODELS))
     os.makedirs(out_dir, exist_ok=True)
     for n in names:
+        if n in MODELS:
+            import models
+            fn, tilt = MODELS[n]
+            vox = getattr(models, fn)()[0]
+            render_icon(n, 0, [], out_dir, vox=vox, tilt=tilt)
+            continue
         depth, rows = ICONS[n]
         render_icon(n, depth, rows, out_dir)
 

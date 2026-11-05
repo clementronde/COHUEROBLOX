@@ -27,7 +27,7 @@ for path in sorted(glob.glob(os.path.join(src, "*.png"))):
     canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
     canvas.alpha_composite(im, ((side - w) // 2, (side - h) // 2))
     alpha = canvas.getchannel("A").point(lambda a: 255 if a > 40 else 0)
-    radius = max(3, side // 40)
+    radius = max(3, round(side * 0.05))   # ≈ 2,5 px de contour à 40 px d'affichage
     grown = alpha.filter(ImageFilter.MaxFilter(radius * 2 + 1))
     ink = Image.new("RGBA", canvas.size, INK + (0,))
     ink.putalpha(grown)
