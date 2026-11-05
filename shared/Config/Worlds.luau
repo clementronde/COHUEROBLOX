@@ -96,11 +96,11 @@ local Worlds: { [string]: World } = {
 		id = "DunesCroustillantes",
 		name = { en = "Crunchy Dunes", fr = "Crunchy Dunes" },
 		size = 640,
-		-- Monde 2 v2 : zombies (dossier 13 §3.2). Le reste de ce monde (nom, carte, aléa, mini-boss, boss)
-		-- est encore celui du désert v1 : A02 (monde) et A03-05/06 (mini-boss, boss).
+		-- Monde 2 v2 : zombies (dossier 13 §3.2), mini-boss Zombie Ogre (14), boss The Hungry Coffin.
+		-- Le reste de ce monde (id, nom, carte, aléa) est encore celui du désert v1 : A02.
 		roster = { Swarm = 5, Jumper = 6, Shooter = 7, Kamikaze = 8 },
 		miniBoss = 14,
-		boss = "PharaonGrillePain",
+		boss = "CercueilAffame",
 		finalBoss = "GrandBrouhaha",
 		hazard = {
 			id = "Sandstorm",
