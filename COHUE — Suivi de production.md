@@ -270,7 +270,7 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 | A00-02 | Écrire les décisions v2 | `docs/dossier/01-decisions-v2.md` |  | P0 — bloquant | Fait |
 | A00-03 | Créer ce doc de suivi | Ce doc |  | P0 — bloquant | Fait |
 | A00-04 | Lancer les 6 conversations de la vague 1 | Liens dans L'équipe d'agents | A00-02 | P0 — bloquant | Fait |
-| A00-05 | Mettre `ARCHITECTURE.md` à jour avec les ids v2 | Contrat v2 | A04-01 | P0 — bloquant | À faire |
+| A00-05 | Mettre `ARCHITECTURE.md` à jour avec les ids v2 | Contrat v2 | A04-01 | P0 — bloquant | À valider |
 | A00-06 | Fusionner les branches de la vague 1 dans main et dans la place partagée | main + `COHUE-test.rbxlx` | Fin de vague 1, A11-05 | P0 — bloquant | En cours |
 | A00-07 | Porte de vague 1 : démo jouable pour Clément | Session de test | A00-06 | P0 — bloquant | À faire |
 | A00-08 | Lancer les conversations de la vague 2 | 5 conversations | A00-07 | P0 — bloquant | À faire |

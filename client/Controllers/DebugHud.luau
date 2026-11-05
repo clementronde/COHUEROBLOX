@@ -1,5 +1,7 @@
 --!strict
--- Phase 0 perf gate readout: FPS and drawn enemy count (toggle with Balance.Debug.ShowStats).
+-- Phase 0 perf gate readout: FPS and drawn enemy count (toggle with Balance.Debug.ShowStats,
+-- Studio seulement). Coin bas gauche, sous tout le reste (DisplayOrder -10) : ne passe plus sur
+-- le chrono du HUD (dossier 60, demande à Ironix).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,16 +22,17 @@ function DebugHud.start()
 	gui.Name = "DebugHud"
 	gui.ResetOnSpawn = false
 	gui.IgnoreGuiInset = true
+	gui.DisplayOrder = -10
 
 	local label = Instance.new("TextLabel")
-	label.AnchorPoint = Vector2.new(0.5, 0)
-	label.Position = UDim2.new(0.5, 0, 0, 4)
-	label.Size = UDim2.fromOffset(220, 24)
-	label.BackgroundTransparency = 0.4
+	label.AnchorPoint = Vector2.new(0, 1)
+	label.Position = UDim2.new(0, 4, 1, -4)
+	label.Size = UDim2.fromOffset(150, 18)
+	label.BackgroundTransparency = 0.5
 	label.BackgroundColor3 = Color3.new(0, 0, 0)
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.Font = Enum.Font.GothamMedium
-	label.TextSize = 14
+	label.TextSize = 12
 	label.Text = "..."
 	label.Parent = gui
 	gui.Parent = playerGui
