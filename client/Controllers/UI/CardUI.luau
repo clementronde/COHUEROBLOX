@@ -200,7 +200,10 @@ local function cardTexts(card: any): (any, any)
 			if type(def.name) == "table" or type(def.name) == "string" then
 				title = def.name
 			end
-			if (desc == nil or desc == "") and (type(def.desc) == "table" or type(def.desc) == "string") then
+			-- Upgrades keep the server text (it says what changes); the others take the translated
+			-- config text (the companion server sends its French text for new techs).
+			local isUp = string.sub(tostring(card.kind), -2) == "Up"
+			if (not isUp or desc == nil or desc == "") and (type(def.desc) == "table" or type(def.desc) == "string") then
 				desc = def.desc
 			end
 		end

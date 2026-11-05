@@ -167,10 +167,14 @@ Relance : l'outil ne pose que ce qui manque, un écran absent de StarterGui ou u
 | --- | --- | --- | --- |
 | HUD (vitals, chrono, KO, record, armes, équipiers, boss, annonces) | `StarterGui.COHUE_HUD` | `HUD.luau` | Monté et testé en jeu le 5 nov. (5e150b8) |
 | À terre, fantôme | `COHUE_Downed`, `COHUE_Vignette` | `HUD.luau` | Monté le 5 nov. |
-| **Niveau gagné** (L04, L04b, L04c) | `COHUE_LevelUp`, `COHUE_Freeze`, `Assets.UI.LevelUpFreeze` | `CardUI.luau` | Prêt dans la branche, **à monter** |
+| **Niveau gagné** (L04, L04b, L04c) | `COHUE_LevelUp`, `COHUE_Freeze`, `Assets.UI.LevelUpFreeze` | `CardUI.luau` | Monté et testé en jeu le 5 nov. (captures `studio-niveau-v3-*.jpg`). L'attente coop (L04c) attend `LevelUpPause` d'A04 |
 | Boutons tactiles, mini-carte, réglages, fin de run, capture, Victory, pings, autel | — | v2 faite par script | À convertir |
 
-Images : `shared/Config/UIAssets.luau` (tuile de tenons, 37 icônes, 4 armes d'A14). Les rayons derrière la fenêtre de niveau (`ui-assets/rays_512.png`, script `make_rays.py`) restent à téléverser au montage ; sans eux, la fenêtre marche, sans rayons.
+Images : `shared/Config/UIAssets.luau` (tuile de tenons, 37 icônes, 4 armes d'A14). Les rayons derrière la fenêtre de niveau : `ui-assets/rays_512.png` (script `make_rays.py`), `rbxassetid://101399456269039`.
+
+Note de montage : un `require` déjà fait dans la session Studio garde l'ancienne version d'un module (ici `UIAssets`) ; une image ajoutée au module juste avant de lancer l'outil peut donc sortir vide. Vérifier les images posées après chaque montage.
+
+**À reprendre hors UI** (vu au test du 5 nov.) : `CompanionService` envoie ses textes de cartes en français (`def.desc.fr`, « Dégâts a → b »). La fenêtre prend le texte anglais de la config pour une nouvelle technique, mais pas pour une montée de niveau. La barre de debug « fps | enemies » (`DebugHud`) passe sur le chrono.
 
 **Fenêtre de niveau, comportement en jeu** :
 - Le monde pâlit (voile crème, désaturation par un `ColorCorrectionEffect` cloné dans la caméra) et les rayons tournent lentement. En « animations réduites » : fondus courts, rayons fixes, pas de rebond.

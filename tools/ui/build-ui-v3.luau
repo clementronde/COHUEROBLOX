@@ -592,7 +592,8 @@ local function actionButton(parent: Instance, name: string, label: string, color
 	count.AnchorPoint = Vector2.new(1, 0)
 	count.Position = UDim2.new(1, 8, 0, -12)
 	count.ZIndex = 4
-	keycap(b, key)
+	-- Touche en bas à gauche : en haut, elle touchait le compteur du bouton voisin.
+	keycap(b, key).Position = UDim2.new(0, -8, 1, -18)
 	hit(b)
 	return b
 end
