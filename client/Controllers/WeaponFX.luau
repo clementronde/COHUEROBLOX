@@ -4,14 +4,15 @@
 -- (ReplicatedStorage.Assets.FX, armes en pixel art dans Assets.Weapons) ; ce module les clone (en pool),
 -- les place, change leur taille et leur transparence, et déclenche leurs particules. Un modèle manquant est
 -- signalé une fois dans la sortie, puis ignoré : on ne le remplace jamais par une Part.
--- Qualité : téléphone = Basse (moins de pièces, pas de traînées ni de lumières, moitié des particules).
+-- Qualité : palier de FXLibrary (A07-01 : Auto = téléphone en Basse, réglage joueur sinon) ; Basse = moins de
+-- pièces, pas de traînées ni de lumières, moitié des particules. Les rafales passent par le budget global de
+-- FXLibrary (priorité : effets du joueur local, puis les autres, les lointains coupés d'abord).
 -- Les télégraphes (zones de gameplay) ne sont jamais coupés (vault : VFX Performance Budgets and Culling).
 -- Il accroche aussi l'arme de départ de la classe dans la main de chaque joueur (décision du 5 nov.).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -21,6 +22,7 @@ local Classes = require(Config:WaitForChild("Classes"))
 local Codec = require(Shared:WaitForChild("WeaponFxCodec"))
 local Heightmap = require(Shared:WaitForChild("Heightmap"))
 local Net = require(Shared:WaitForChild("Net"))
+local FXLibrary = require(script.Parent:WaitForChild("FXLibrary"))
 
 local HIDDEN = CFrame.new(0, -10000, 0)
 local KIND = Codec.Kind
@@ -153,7 +155,7 @@ local rng = Random.new()
 local moveParts: { BasePart } = {}
 local moveCFrames: { CFrame } = {}
 local moveN = 0
-local pendingBursts: { { fx: FxInst, radius: number } } = {} -- rafales après le placement de l'image
+local pendingBursts: { { fx: FxInst, radius: number, x: number, z: number } } = {} -- rafales après le placement de l'image
 
 -- Noms des visuels spéciaux (Codec.Visual -> dossier Assets.FX.Special.<Nom>)
 local SPECIAL: { [number]: string } = {}
@@ -163,25 +165,17 @@ end
 
 -- Qualité ----------------------------------------------------------------------------------------
 
-local function detectTier(): Tier
-	-- Heuristic (vault: Mobile and Low-End Optimization): touch without keyboard = phone/tablet.
-	local camera = Workspace.CurrentCamera
-	if UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
-		local short = if camera then math.min(camera.ViewportSize.X, camera.ViewportSize.Y) else 400
-		return if short < 500 then TIERS.Low else TIERS.Medium
+-- Palier de FXLibrary (détection d'origine de WeaponFX, déplacée dans FXLibrary.start).
+local function tierFor(q: string): Tier
+	return TIERS[q] or TIERS.Medium
+end
+
+-- Priorité d'un effet rattaché à un joueur (slot FxSlot) : le joueur local passe en premier.
+local function prioFor(slot: number?): FXLibrary.Priority
+	if slot and Players.LocalPlayer:GetAttribute("FxSlot") == slot then
+		return "Local"
 	end
-	local ok, level = pcall(function()
-		return UserSettings():GetService("UserGameSettings").SavedQualityLevel
-	end)
-	if ok and level ~= Enum.SavedQualitySetting.Automatic then
-		local v = (level :: Enum.SavedQualitySetting).Value
-		if v <= 4 then
-			return TIERS.Low
-		elseif v <= 7 then
-			return TIERS.Medium
-		end
-	end
-	return TIERS.High
+	return "Normal"
 end
 
 -- Modèles ----------------------------------------------------------------------------------------
@@ -300,6 +294,7 @@ end
 local function acquire(template: Model): FxInst
 	local pool = pools[template]
 	local fx = pool and table.remove(pool)
+	FXLibrary.addActive(1) -- effet actif jusqu'à release (budget global de pièces)
 	if fx then
 		return fx
 	end
@@ -333,6 +328,7 @@ local function release(fx: FxInst?)
 	if not fx then
 		return
 	end
+	FXLibrary.addActive(-1)
 	setActive(fx, false)
 	fx.anchor.CFrame = HIDDEN
 	for _, sh in fx.shapes do
@@ -349,11 +345,13 @@ local function release(fx: FxInst?)
 	table.insert(pool, fx)
 end
 
-local function burst(fx: FxInst, radius: number)
+-- Même nombre de particules qu'avant A07-01 ; FXLibrary n'en retire que si le budget global est atteint.
+local function burst(fx: FxInst, radius: number, prio: FXLibrary.Priority, x: number, z: number)
+	local pos = Vector3.new(x, 0, z)
 	for _, b in fx.bursts do
 		local k = if b.perRadius then math.clamp(radius / 5, 0.5, 3) else 1
 		local n = math.max(1, math.floor(b.n * k * tier.particles + 0.5))
-		b.e:Emit(n)
+		FXLibrary.emit(b.e, n, prio, pos)
 	end
 end
 
@@ -434,10 +432,10 @@ local function removeProj(id: number, impact: boolean)
 	end
 	if impact then
 		local tpl = templateFor(e.visual, "Impact", true)
-		if tpl then
+		if tpl and FXLibrary.canSpawn(prioFor(e.slot), Vector3.new(e.x, 0, e.z)) then
 			local fx = acquire(tpl)
 			fx.anchor.CFrame = CFrame.new(e.x, groundY(e.x, e.z) + fx.height, e.z)
-			burst(fx, 1)
+			burst(fx, 1, prioFor(e.slot), e.x, e.z)
 			table.insert(segs, { fx = fx, t0 = os.clock(), life = math.max(fx.life, 0.3) })
 		end
 	end
@@ -450,7 +448,7 @@ local function onProjectile(_scale: number, visual: number, id: number, x: numbe
 	if projs[id] then
 		removeProj(id, false)
 	end
-	if projCount >= tier.maxProj then
+	if projCount >= tier.maxProj or not FXLibrary.canSpawn(prioFor(p4), Vector3.new(x, 0, z)) then
 		return
 	end
 	local tpl = templateFor(visual, "Projectile")
@@ -488,7 +486,8 @@ end
 
 local function onArea(_scale: number, visual: number, x: number, z: number, p1: number, p2: number, p3: number, p4: number)
 	local delay = p4 / 10
-	if #areas >= tier.maxAreas and delay <= 0 then
+	-- Les télégraphes (delay > 0) ne sont jamais coupés.
+	if delay <= 0 and (#areas >= tier.maxAreas or not FXLibrary.canSpawn("Normal", Vector3.new(x, 0, z))) then
 		return
 	end
 	local entry: AreaEntry = {
@@ -519,7 +518,7 @@ local function onArea(_scale: number, visual: number, x: number, z: number, p1: 
 end
 
 local function onSegment(visual: number, x: number, z: number, p1: number, p2: number)
-	if #segs >= tier.maxSegments then
+	if #segs >= tier.maxSegments or not FXLibrary.canSpawn("Normal", Vector3.new(x, 0, z)) then
 		return
 	end
 	local tpl = templateFor(visual, "Segment")
@@ -544,7 +543,7 @@ local function onSegment(visual: number, x: number, z: number, p1: number, p2: n
 	if tip then
 		tip.WorldPosition = b
 	end
-	burst(fx, 1)
+	burst(fx, 1, "Normal", x, z)
 	table.insert(segs, { fx = fx, t0 = os.clock(), life = fx.life })
 end
 
@@ -576,7 +575,7 @@ local function onAttach(visual: number, slot: number, x: number, z: number, p1: 
 			end
 		end
 	end
-	if #attaches >= tier.maxAttach then
+	if #attaches >= tier.maxAttach or not FXLibrary.canSpawn(prioFor(slot), Vector3.new(x, 0, z)) then
 		return
 	end
 	local role = if mode == "orbit" then "Orbit" elseif mode == "turret" then "Turret" else "Aura"
@@ -593,7 +592,7 @@ local function onAttach(visual: number, slot: number, x: number, z: number, p1: 
 	if mode == "turret" then
 		local fx = fxs[1]
 		fx.anchor.CFrame = CFrame.new(x, groundY(x, z) + fx.height, z)
-		burst(fx, 1)
+		burst(fx, 1, prioFor(slot), x, z)
 	end
 	table.insert(attaches, {
 		fxs = fxs,
@@ -712,7 +711,7 @@ local function stepAreas(now: number)
 				local fx = acquire(tpl)
 				setActive(fx, true)
 				e.fx = fx
-				table.insert(pendingBursts, { fx = fx, radius = e.radius })
+				table.insert(pendingBursts, { fx = fx, radius = e.radius, x = e.x, z = e.z })
 			end
 		end
 		local fx = e.fx
@@ -847,7 +846,7 @@ local function onFrame()
 		Workspace:BulkMoveTo(moveParts, moveCFrames, Enum.BulkMoveMode.FireCFrameChanged)
 	end
 	for k, b in pendingBursts do
-		burst(b.fx, b.radius)
+		burst(b.fx, b.radius, "Normal", b.x, b.z)
 		pendingBursts[k] = nil
 	end
 end
@@ -926,7 +925,11 @@ end
 -- Cycle de vie -----------------------------------------------------------------------------------
 
 function WeaponFX.init()
-	tier = detectTier()
+	FXLibrary.start() -- idempotent ; fixe le palier Auto (même détection qu'avant)
+	tier = tierFor(FXLibrary.getQuality())
+	FXLibrary.onQualityChanged(function(q)
+		tier = tierFor(q)
+	end)
 	container = Instance.new("Folder") -- dossier de rangement vide : invisible
 	container.Name = "WeaponFX"
 	container.Parent = Workspace
@@ -955,12 +958,9 @@ function WeaponFX.start()
 	RunService.RenderStepped:Connect(onFrame)
 end
 
--- Debug / settings hook: "Low" | "Medium" | "High"
+-- Gardé pour les appels existants : "Auto" | "Low" | "Medium" | "High", relayé à FXLibrary (tous les effets).
 function WeaponFX.setQuality(name: string)
-	local t = TIERS[name]
-	if t then
-		tier = t
-	end
+	FXLibrary.setQuality(name)
 end
 
 return WeaponFX

@@ -8,6 +8,7 @@
 --   "Pose:<classId>"  pose de victoire ; def.classId nil = toutes les classes
 --   "Title", "Emote", "Footstep", "Trail", "KoEffect"
 --   "CompanionHat", "CompanionColor", "Aura"  (appliqués à tous les compagnons équipés)
+--   "CompanionHat:<espèce>", "CompanionColor:<espèce>", "Aura:<espèce>"  (un compagnon ; voir la fin)
 --   "CompanionTint:<line>", "CompanionPose:<line>"  (récompenses de Lien v1, gardées jusqu'à A12-01)
 --   "StartTech:<line>" prend un id de technique, pas un cosmétique.
 -- Le rendu (A01 modèles, A07 effets, A05 compagnons) clone un modèle nommé d'après l'id
@@ -268,5 +269,11 @@ end
 for id, def in Cosmetics do
 	assert(def.source ~= "Season" or def.season ~= nil, `season cosmetic {id} is in no season`)
 end
+
+-- Personnalisation des compagnons (A05-05, dossier 40 §8.2) : trois emplacements par compagnon de la
+-- collection, "CompanionHat:<espèce>", "CompanionColor:<espèce>", "Aura:<espèce>" (repli : l'emplacement
+-- global du même nom, pour tous les compagnons). Ids ci-dessus (slot = CompanionHat / CompanionColor /
+-- Aura), prix dans Products. Lecture et encodage : Config/Companions.Look ; rendu : CompanionRenderer
+-- (Assets.Cosmetics.CompanionHats.<id>, def.color, Assets.FX.CompanionAuras.<id>).
 
 return Cosmetics

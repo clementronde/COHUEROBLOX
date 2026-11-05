@@ -604,3 +604,27 @@ Commités :
 - effets des ennemis : `EnemyAttackFX` est converti. Il clone `Assets.FX.Enemies.Sweep`, `Burst`, `Shot`, `Land` et `Boss`, posés par `A14_fx_install.luau`. Ces effets sont mats, à la couleur du profil de l'ennemi, avec la même interface pour `EnemyRenderer`. Restent les tirs ennemis (`EnemyRenderer`) et les télégraphes des boss (`BossRenderer`), dans des fichiers de A03, à convertir avec lui ;
 - contrôle qualité (`fwjelaa:quality-score`, seuil 8,5, relecteurs à l'aveugle).
 
+
+## 15. Code : bibliothèque d'effets `FXLibrary` (A07-01, 5 nov. 2026)
+
+Module client simple `client/Controllers/FXLibrary.luau` (pas dans la liste de `client/Main` : `WeaponFX`, `EnemyAttackFX` et `CompanionRenderer` le requièrent et appellent `start()`, sans effet la 2e fois). Rien n'y est construit : il clone et met en pool les objets de `ReplicatedStorage.Assets.FX`.
+
+**Qualité** : `Auto` (défaut), `Low`, `Medium`, `High`. `Auto` reprend la détection d'origine de `WeaponFX` (tactile sans clavier : `Low` si le petit côté de l'écran < 500, sinon `Medium` ; sinon le niveau graphique Roblox). Réglage lu dans `Profile.settings.fxQuality`, changeable tout de suite par `FXLibrary.setQuality(nom)` (`WeaponFX.setQuality` y renvoie).
+
+| Palier | Facteur de rafale (armes) | Particules vivantes max | Effets actifs max |
+| --- | --- | --- | --- |
+| Low | 0,5 | 600 (`budgets-perf.md` §7) | 200 |
+| Medium | 0,8 | 1 000 [hypothèse] | 340 [hypothèse] |
+| High | 1 | 1 600 [hypothèse] | 600 [hypothèse] |
+
+Les plafonds par domaine restent ceux de `WeaponFX` (projectiles, zones, segments, attaches) et d'`EnemyAttackFX` (18 ; un palier choisi par le joueur : `Low` 12 effets et rafales × 0,6). En `Auto`, `EnemyAttackFX` garde son rendu d'avant.
+
+**Priorité** (la plus basse est coupée d'abord, part du budget utilisable) : `Telegraph` (jamais coupé : télégraphes d'armes, attaques de boss) · `Local` (effets du joueur local, 100 %) · `Normal` (85 %) · `Far` (un `Normal` à plus de 120 studs du joueur local, 60 %) · `Ambient` (auras des compagnons des autres joueurs, 50 %). **Sous le budget, rien ne change** : une rafale demandée est émise en entier, un effet demandé est posé.
+
+**Comptage** : rafales (`emit` : nombre × `Lifetime.Max`, seaux de 0,1 s), émetteurs continus suivis (`track` : `Rate × Lifetime.Max`, coupés au-dessus de leur part, rallumés sous 80 %, revus 4 fois par seconde) et effets actifs (`addActive`, pris +1, rendus −1). Mesure en jeu : `FXLibrary.stats()` ; le vrai nombre de particules se lit en Shift+Ctrl+F1 à F5.
+
+**API** : `start` · `getQuality` · `isAuto` · `setQuality` · `onQualityChanged(fn)` · `tier()` · `domain("Enemy")` · `emit(emitter, n, priorité, position?) -> émis` · `canSpawn(priorité, position?)` · `addActive(delta)` · `track(parts, priorité)` / `untrack` / `setTrackedPosition` · `take(chemin)` / `give(model)` · `play(chemin, cframe, priorité?, rayon?)` (rafales `Burst` / `PerRadius` comme dans `WeaponFX`, rendu au pool après l'attribut `Life`, 1 s par défaut) · `stats()`.
+
+**Branchements** : `WeaponFX` (rafales, effets pris et rendus, priorité `Local` pour l'emplacement `FxSlot` du joueur local) · `EnemyAttackFX` (boss en `Telegraph`, le reste en `Normal`) · `CompanionRenderer` (auras `Assets.FX.CompanionAuras.<id>`, dossier 40 §8.2). Pas encore : les émetteurs continus des projectiles d'armes (comptés comme effets, pas comme particules), les télégraphes de `BossRenderer` (A03), les KO (A07-03).
+
+Contract requests : (1) `ProgressionService.onUpdateSettings` accepte `fxQuality` ∈ `Auto`, `Low`, `Medium`, `High` (aujourd'hui une clé inconnue fait rejeter toute la requête) et `DataService` le met à `Auto` par défaut (A12) ; (2) curseur « Effects quality » dans `SettingsUI` (Clément) : appelle `FXLibrary.setQuality` tout de suite et envoie `UpdateSettings({ fxQuality = ... })` ; (3) `ARCHITECTURE.md` §4 : `FXLibrary` dans les modules simples (lead).

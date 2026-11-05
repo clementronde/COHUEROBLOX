@@ -11,7 +11,7 @@ Fichiers du domaine : `server/Services/CompanionService.luau`, `shared/Config/Co
 3. Un joueur qui reste **2 s dans la cage sans être touché** capture la créature, **à 100 %**. Pas de hasard, pas d'objet, rien de payant. Le Tamer capture **50 % plus vite** (2 s ÷ 1,5 ≈ 1,33 s).
 4. La créature rejoint la **collection** du joueur, sauvée dans son profil (**A12**).
 5. Avant une run, le joueur **équipe 1 compagnon** de sa collection (**2 pour le Tamer**). En run, le compagnon suit son joueur et attaque seul.
-6. Pas d'évolution, pas de renommage. Chaque espèce a son attaque et 2 ou 3 cartes de technique (§5.2) ; la personnalisation (chapeaux, couleurs, auras, Robux, purement visuelle) avec A05-05.
+6. Pas d'évolution, pas de renommage. Chaque espèce a son attaque et 2 ou 3 cartes de technique (§5.2) ; la personnalisation (chapeaux, couleurs, auras, Robux, purement visuelle) : A05-05, §8.2.
 
 ## 1. Espèces
 
@@ -238,6 +238,31 @@ Hors run, `CompanionRenderer` affiche la collection du joueur local, sans rien d
 - **En run ou pas** : l'attribut joueur `InRun` s'il existe (contract request de `65-lobby.md` §10 n° 4), sinon la phase de `RunState` (`Capture.Phases`), et dans tous les cas « en run » dès que le snapshot serveur contient un compagnon du joueur local. En run, les créatures du lobby sont détruites.
 - Mêmes gabarits qu'en run (`Companion_<espèce>`, repli `Enemy_<espèce>`) ; rien n'est construit.
 
+### 8.2 Personnalisation : chapeau, couleur, aura (A05-05, fait le 5 nov.)
+
+100 % visuelle, aucune stat. Les objets se paient en Robux (pass `CompanionHats`, `CompanionColors`, `CompanionAuras` de `Config/Products`), se gagnent par la saison, les jetons ou les quêtes ; les ids sont ceux de `Config/Cosmetics` (`slot` = `CompanionHat`, `CompanionColor` ou `Aura`).
+
+**Emplacements** (profil `equipped`, remote `EquipCosmetic(slot, id?)`) :
+
+| Emplacement | Vaut pour | Repli |
+| --- | --- | --- |
+| `CompanionHat:<espèce>`, `CompanionColor:<espèce>`, `Aura:<espèce>` | ce compagnon de la collection | l'emplacement global |
+| `CompanionHat`, `CompanionColor`, `Aura` | tous les compagnons équipés sans réglage propre | rien |
+
+Les créatures de l'enclos (non équipées) ne prennent que leur emplacement propre. Lecture : `Companions.Look.resolve(equipped, base, espèce, ownOnly?)`, `encode`, `decode`, `color` (`shared/Config/Companions.luau`).
+
+**Serveur** : `ProgressionService.onEquipCosmetic` vérifie l'emplacement et la possession. Les emplacements globaux marchent déjà ; les emplacements par espèce attendent la contract request n° 1 (section 10). Quand un compagnon est posé en run, `CompanionService` lit `DataService.peek(player).equipped`, revérifie la possession si `ProgressionService.ownsCosmetic` existe, et publie l'aspect sur le joueur : attribut `CompanionLook1` / `CompanionLook2` = `"<chapeau>|<couleur>|<aura>"` (vide = rien), effacé quand le compagnon est retiré. `CompanionService.refreshLook(player)` le republie (après un `EquipCosmetic` pendant que les compagnons sont posés).
+
+**Client** (`CompanionRenderer`) : en run, l'aspect vient de l'attribut du propriétaire (tous les joueurs voient les chapeaux de tous) ; au lobby, de `Profile.equipped`. Un changement d'aspect reclone le corps (couleurs d'origine) puis l'habille.
+
+| Objet (nom exact, posé par Clément) | Rangé dans | Contrat | Si absent |
+| --- | --- | --- | --- |
+| `<id>` (ex. `CompanionHat_Crown`) | `ReplicatedStorage.Assets.Cosmetics.CompanionHats` | Model ou Part, **pivot au bas du chapeau**, avant vers -Z, taille pour un compagnon de 3 studs (le code met à l'échelle `hauteur / 3`, entre 0,6 et 2). Posé à 90 % de la hauteur du corps (`Render.HatSink`) | pas de chapeau + avertissement une fois |
+| `<id>` (ex. `Aura_Aurore`) | `ReplicatedStorage.Assets.FX.CompanionAuras` | Model, **pivot aux pieds**, pièces invisibles qui portent des `ParticleEmitter` (en continu) ; même échelle que le chapeau. Taux d'émission réglés par `FXLibrary` (qualité, budget) | pas d'aura + avertissement une fois |
+| (couleur) | modèle `Companion_<espèce>` | les pièces marquées par l'attribut `Tint = true` prennent `def.color` ; sans pièce marquée, toutes les pièces. Une MeshPart texturée (TextureID, SurfaceAppearance) ne montre pas la couleur : marquer les pièces unies | couleur ignorée |
+
+Ids actuels : chapeaux `CompanionHat_Crown`, `_Party`, `_Pirate`, `_Flower` (pass), `_S1_Mushroom`, `_S1_Acorn` (saison), `_Token_Leaf` (jetons) ; couleurs `CompanionColor_Gold`, `_Candy`, `_Mint`, `_Midnight` (pass), `_S1_Autumn` (saison) ; auras `Aura_Aurore`, `Aura_Ombre` (pass), `Aura_S1_Spores` (saison), `Aura_Lucioles`, `Aura_Bulles` (jetons), `Aura_Flammeche` (quête).
+
 ## 9. Clés de quêtes
 
 `ProgressionService.recordStat(player, key, n)` : `CompanionsCaptured` (1 par capture), `CompanionNewSpecies` (1 par nouvelle espèce), `CompanionKills` (n), `CompanionTreats` (1). `CompanionTechsLearned` (1 par technique apprise, §5.2). Les clés v1 `CompanionEvolved`, `CompanionStage3`, `UltimatesUsed` ne sont plus envoyées.
@@ -254,6 +279,11 @@ Hors run, `CompanionRenderer` affiche la collection du joueur local, sans rien d
 | A08 (`Minimap`) | Les cages via le remote `CageState` ou `CompanionService.getCages` |
 | Ironix (combat, `RunManager`) | `RunSummary.captured = CompanionService.getRunCaptures(player)` (demandé par `60-ui-ux.md`) |
 | Lead (`ARCHITECTURE.md` §3, §4, §6) | Remplacer les lignées par « espèce = `Enemies[].name` », ajouter les APIs de 6.1 et 6.2 et les remotes de la section 7 |
+| A12 (`ProgressionService.onEquipCosmetic`), A05-05 n° 1 | Accepter les emplacements `CompanionHat:<espèce>`, `CompanionColor:<espèce>`, `Aura:<espèce>` : `arg` = espèce possédée (`hasCompanion`), `def.slot == base`, possession comme aujourd'hui (§8.2) |
+| A12, A05-05 n° 2 | Exposer `ProgressionService.ownsCosmetic(player, id) -> boolean` (la fonction locale existe) : CompanionService revérifie la possession au moment de poser un compagnon (pass remboursé) |
+| A12, A05-05 n° 3 | Après un `EquipCosmetic` réussi sur un emplacement de compagnon, appeler `CompanionService.refreshLook(player)` (`Registry.find`, `pcall`) |
+| Lead (`ARCHITECTURE.md` §6), A05-05 n° 4 | Ajouter `CompanionService.refreshLook(player)` et l'attribut joueur `CompanionLook<slot>` |
+| Clément (UI boutique / collection), A05-05 n° 5 | Écran d'équipement par compagnon : envoie `EquipCosmetic("CompanionHat:<espèce>", id)` (ou `nil` pour retirer) ; l'emplacement global reste pour « tous » |
 
 ## 11. Questions pour Clément
 

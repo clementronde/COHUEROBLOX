@@ -355,7 +355,83 @@ Companions.Render = {
 	StaleSeconds = 1.5, -- compagnon plus reçu depuis ce délai : retiré
 	HopHeight = 0.35,
 	HopHz = 3,
+	-- Personnalisation (A05-05) : chapeau posé sur le haut du corps, mis à l'échelle de la hauteur dessinée.
+	HatRefHeight = 3, -- hauteur de compagnon (studs) pour laquelle le chapeau est à l'échelle 1
+	HatScaleMin = 0.6,
+	HatScaleMax = 2,
+	HatSink = 0.1, -- le chapeau s'enfonce de cette part de la hauteur du corps (il ne flotte pas)
 }
+
+-- Personnalisation des compagnons (A05-05, dossier 40 §8.2), 100 % visuelle ---------------------------
+-- Emplacements par espèce "CompanionHat:<espèce>", "CompanionColor:<espèce>", "Aura:<espèce>", repli sur
+-- l'emplacement global du même nom. Le serveur (CompanionService) publie le résultat sur le joueur
+-- (attribut CompanionLook<emplacement> = "<chapeau>|<couleur>|<aura>") pour que tous les clients le voient.
+local Cosmetics = require(script.Parent:WaitForChild("Cosmetics"))
+
+local Look = {
+	Slots = { "CompanionHat", "CompanionColor", "Aura" },
+	Separator = "|",
+	AttributePrefix = "CompanionLook", -- + numéro d'emplacement (1, 2)
+	MaxSlots = 2,
+	HatFolder = "CompanionHats", -- ReplicatedStorage.Assets.Cosmetics.CompanionHats.<id>
+	AuraFolder = "CompanionAuras", -- ReplicatedStorage.Assets.FX.CompanionAuras.<id>
+	TintAttribute = "Tint", -- pièces du modèle de compagnon marquées Tint = true : seules teintes (sinon toutes)
+}
+
+-- Id équipé pour une espèce : l'emplacement propre d'abord, puis le global. L'id doit exister et
+-- appartenir à l'emplacement ; la possession est vérifiée par le serveur à l'équipement (EquipCosmetic).
+-- `ownOnly` : sans repli sur le global (créatures de l'enclos du lobby, qui ne sont pas équipées).
+function Look.resolve(equipped: any, base: string, species: string, ownOnly: boolean?): string?
+	if type(equipped) ~= "table" then
+		return nil
+	end
+	local id = equipped[`{base}:{species}`]
+	if id == nil and not ownOnly then
+		id = equipped[base]
+	end
+	if type(id) ~= "string" then
+		return nil
+	end
+	local def = Cosmetics[id]
+	return if def and def.slot == base then id else nil
+end
+
+-- "" quand rien n'est équipé.
+function Look.encode(equipped: any, species: string, ownOnly: boolean?): string
+	local out = table.create(#Look.Slots)
+	local any = false
+	for k, base in Look.Slots do
+		local id = Look.resolve(equipped, base, species, ownOnly)
+		out[k] = id or ""
+		any = any or id ~= nil
+	end
+	return if any then table.concat(out, Look.Separator) else ""
+end
+
+-- Lecture inverse (client) : (chapeau?, couleur?, aura?) ; un id inconnu ou mal placé est ignoré.
+function Look.decode(value: any): (string?, string?, string?)
+	if type(value) ~= "string" or value == "" then
+		return nil, nil, nil
+	end
+	local parts = string.split(value, Look.Separator)
+	local ids: { [number]: string } = {}
+	for k, base in Look.Slots do
+		local id = parts[k]
+		local def = if id and id ~= "" then Cosmetics[id] else nil
+		if def and def.slot == base then
+			ids[k] = id
+		end
+	end
+	return ids[1], ids[2], ids[3]
+end
+
+-- Couleur d'affichage d'un id CompanionColor (nil si inconnu ou sans couleur).
+function Look.color(id: string?): Color3?
+	local def = if id then Cosmetics[id] else nil
+	return if def and def.slot == "CompanionColor" then def.color else nil
+end
+
+Companions.Look = Look
 
 -- Cartes de niveau : techniques d'espèce (A05-03) et Friandises génériques ---------------------------
 Companions.Cards = {

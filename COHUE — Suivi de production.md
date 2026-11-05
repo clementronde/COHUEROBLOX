@@ -399,7 +399,7 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 | A05-02 | Refaire CompanionService : capture, collection, équipement, suivi et attaque | CompanionService | A05-01, A03-03 | P0 — bloquant | À valider |
 | A05-03 | Une attaque et 2 à 3 cartes de technique par espèce | Config/Companions (16 espèces, 39 techniques, dossier 40 §5.2) | A05-02 | P1 — lancement | À valider (branche claude/a05-v3 ; équilibrage pas mesuré en Play) |
 | A05-04 | Tamer : 2 compagnons, capture plus rapide | CompanionService | A04-10 | P1 — lancement | À valider |
-| A05-05 | Emplacements de personnalisation : chapeaux, couleurs, auras | CompanionRenderer | A12-04 | P1 — lancement | À faire |
+| A05-05 | Emplacements de personnalisation : chapeaux, couleurs, auras | CompanionRenderer, CompanionService (attribut CompanionLook<slot>), Config/Companions.Look ; dossier 40 §8.2 | A12-04 | P1 — lancement | À valider (branche claude/a05-a07-v4 ; emplacements par espèce : contract request A12 ; objets à poser par Clément ; pas testé en Play) |
 | A05-06 | Textes des cartes de compagnon en anglais ; remote CaptureState au format de 60-ui-ux (état Available) ; getRunCaptures pour RunSummary.captured | CompanionService, NetDefs/Companion | A08 | P1 — lancement | À valider (branche claude/a05-v3) |
 | A05-07 | Mode lobby de CompanionRenderer : compagnon équipé qui suit, collection dans l'enclos (client seul) | CompanionRenderer (dossier 40 §8.1) | A09, A12 | P1 — lancement | À valider (branche claude/a05-v3 ; pas testé en Studio) |
 | A05-08 | Gel du passage de niveau et coup bloqué : RunManager.isFrozen, Bus.PlayerHit, Bus.RunFrozen | CompanionService | A04-v3 | P0 — bloquant | À valider (branché avec repli ; actif quand claude/a04-v3 est fusionné) |
@@ -408,7 +408,7 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 
 | ID | Tâche | Livrable | Dépend de | Priorité | Statut |
 | --- | --- | --- | --- | --- | --- |
-| A07-01 | Bibliothèque VFX voxel avec budget de particules mobile et réglage de qualité | Module + note | A01-01 | P0 — bloquant | À faire |
+| A07-01 | Bibliothèque VFX voxel avec budget de particules mobile et réglage de qualité | Module + note : partie code faite, `client/Controllers/FXLibrary.luau`, dossier 12 §15 (WeaponFX, EnemyAttackFX, auras de compagnon branchés) | A01-01 | P0 — bloquant | Code à valider (branche claude/a05-a07-v4 ; clé fxQuality et curseur : contract requests ; pas testé en Play) |
 | A07-02 | Effets des 8 armes de départ | WeaponFX | A04-05 | P0 — bloquant | À faire |
 | A07-03 | KO en cubes voxel, XP, montée de niveau | Effets | A07-01 | P0 — bloquant | À faire |
 | A07-04 | Capture, télégraphes de boss, Overtime, portails | Effets | A05-02, A03-06 | P1 — lancement | À faire |
