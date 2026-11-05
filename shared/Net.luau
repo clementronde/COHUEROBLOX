@@ -64,6 +64,13 @@ end
 local Net = {}
 
 local serverFolder: Folder? = nil
+-- Remotes qui ont un handler serveur (Net.onServerEvent). Les autres reçoivent un écouteur
+-- « puits » au publish (audit S-11).
+local handled: { [string]: true } = {}
+-- Appels client -> serveur sur un remote serveur -> client, par joueur (S-11). Un client normal
+-- n'en fait jamais : un compte > 0 signale un client modifié.
+local strayCalls: { [Player]: number } = {}
+local STRAY_WARN_AT = 20
 
 function Net.create()
 	assert(RunService:IsServer(), "Net.create is server-only")
@@ -79,9 +86,34 @@ function Net.create()
 end
 
 -- Parent the folder only after every service has wired its handlers.
+-- S-11 : chaque remote sans handler reçoit un écouteur qui jette l'appel et le compte, pour que
+-- Roblox ne mette pas les appels en file et qu'on repère les clients modifiés.
 function Net.publish()
 	assert(serverFolder, "Net.create must run first")
+	for _, remote in serverFolder:GetChildren() do
+		if not handled[remote.Name] and (remote:IsA("RemoteEvent") or remote:IsA("UnreliableRemoteEvent")) then
+			local name = remote.Name;
+			(remote :: any).OnServerEvent:Connect(function(player: Player)
+				if handled[name] then
+					return -- handler branché après publish (start()) : appel légitime
+				end
+				local n = (strayCalls[player] or 0) + 1
+				strayCalls[player] = n
+				if n == STRAY_WARN_AT then
+					warn(`[Net] {player.UserId} : {n} appels sur des remotes serveur -> client (dernier : {name})`)
+				end
+			end)
+		end
+	end
+	Players.PlayerRemoving:Connect(function(player)
+		strayCalls[player] = nil
+	end)
 	serverFolder.Parent = ReplicatedStorage
+end
+
+-- Appels d'un joueur sur des remotes serveur -> client (S-11 ; signal possible pour la quarantaine).
+function Net.getStrayCalls(player: Player): number
+	return strayCalls[player] or 0
 end
 
 local function get(name: string): Instance
@@ -107,6 +139,7 @@ end
 -- check the type and range of every argument: the only trusted value is `player`.
 function Net.onServerEvent(name: string, perSecond: number, handler: (player: Player, ...any) -> ())
 	local remote = Net.event(name)
+	handled[name] = true
 	local buckets: { [Player]: { tokens: number, last: number } } = {}
 	Players.PlayerRemoving:Connect(function(player)
 		buckets[player] = nil

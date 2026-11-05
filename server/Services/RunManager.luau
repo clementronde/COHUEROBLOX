@@ -1473,9 +1473,21 @@ local function onCharacterDied(player: Player, character: Model)
 	if not r or not r.inRun or state.phase == "Loadout" or state.phase == "Ended" then
 		return
 	end
+	-- S-16 : la position du personnage vient du client (se téléporter puis se tuer = réapparaître
+	-- n'importe où). On prend la dernière position validée par MovementGuard quand elle existe.
+	local guard = find("MovementGuard")
+	local okValid, valid = false, nil
+	if guard and type(guard.getLastValidPosition) == "function" then
+		okValid, valid = safe(guard.getLastValidPosition, player)
+	end
 	local root = character:FindFirstChild("HumanoidRootPart")
-	if root and root:IsA("BasePart") then
-		local p = root.Position
+	local p: Vector3? = nil
+	if okValid and typeof(valid) == "Vector3" then
+		p = valid
+	elseif root and root:IsA("BasePart") then
+		p = root.Position
+	end
+	if p then
 		r.deathPos = Vector3.new(p.X, Heightmap.getY(p.X, p.Z), p.Z)
 	end
 	if isActiveRecord(r) then
