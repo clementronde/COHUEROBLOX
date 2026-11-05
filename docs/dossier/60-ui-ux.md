@@ -117,22 +117,33 @@ Composants ajoutés à « Components v3 — briques » :
 | `Lobby/BarButton` | Tuile sombre cerclée d'une couleur par menu. Grosse icône 3D en briques qui dépasse en haut, libellé de 15 px, badge rouge avec le nombre de nouveautés. |
 | `Lobby/Currency` | Plaque de Silver en haut à gauche. |
 
-Liste proposée pour la barre (finale avec A09) :
+Barre alignée sur A09 (`docs/dossier/65-lobby.md` §2 de sa branche) : 8 boutons dans son ordre. Les libellés « Classes » et « Critters » attendent la réponse de Clément ; ce sont des propriétés, donc faciles à changer. Le liseré prend la couleur de zone du menu (variables `zone/*`) : c'est la même couleur que l'en-tête du menu et le bâtiment.
 
-| Bouton | Icône | Couleur du liseré |
-| --- | --- | --- |
-| Upgrades | Enclume | Orange |
-| Inventory | Sac à dos | Bleu |
-| Class | Casque de chevalier d'A01 | Violet |
-| Shop | Bourse | Or |
-| Quests | Parchemin | Vert |
-| Pass | Ticket | Ciel |
-| Pets (Companions) | Gland à frimousse | Vert clair |
+| Bouton | Icône | Liseré | Pastille |
+| --- | --- | --- | --- |
+| Classes | Casque de chevalier d'A01 | zone/classes (turquoise) | non |
+| Critters | Gland à frimousse | zone/critters (vert) | oui |
+| Upgrades | Enclume | violet (pas de zone) | oui |
+| Inventory | Sac à dos | acier (pas de zone) | non |
+| Quests | Parchemin | zone/quests (bleu) | oui |
+| Ranks | Trophée | zone/ranks (or) | non |
+| Pass | Ticket | ciel (pas de zone) | **jamais** |
+| Shop | Bourse | zone/shop (orange) | **jamais** |
+
+Pas de pastille sur Shop ni Pass : on ne pousse pas à l'achat un public de 9 à 15 ans.
 
 Placement selon le format :
-- **Paysage** : une rangée de 7 boutons au-dessus de la barre du bas de l'écran.
-- **Portrait** : deux rangées, 4 puis 3.
-- **PC** : Entrée lance PLAY, et les touches 1 à 7 ouvrent les menus.
+- **Paysage** : une rangée de 8 boutons espacés de 14 px, au-dessus de la barre du bas de l'écran.
+- **Portrait** : deux rangées de 4.
+- **PC** : Entrée lance PLAY, et les touches 1 à 8 ouvrent les menus.
+
+PLAY reste vert : c'est le rôle « Go » partout dans le jeu. La variable `zone/play` (violette) sert au portail. Si A09 veut la même couleur partout, c'est `zone/play` qui passe au vert.
+
+Corrections demandées par A09 :
+- Button M fait maintenant 44 px de haut.
+- Le libellé des tuiles peut faire jusqu'à 9 lettres à 16 px.
+- Les pastilles sont rentrées dans les boutons de la barre.
+- Nouveau **CloseButton v3** : brique rouge de 46 px avec une croix blanche, réservé aux menus du lobby.
 
 **Icônes d'armes** : A14 passe les armes en pixel art extrudé et livrera les PNG. Ces sprites remplaceront mes icônes d'armes en briques (épée, chaîne d'éclairs, bâton de feu, haches) dans la barre d'armes, l'inventaire et le passage de niveau. Les effets restent lisses et lumineux, c'est le domaine d'A14.
 
