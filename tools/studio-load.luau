@@ -41,7 +41,11 @@ for path in list:gmatch("[^\r\n]+") do
 		end
 		local file = parts[#parts]
 		local class, name = "ModuleScript", (file:gsub("%.luau$", ""))
-		if file:match("%.server%.luau$") then
+		if file:match("%.legacy%.luau$") then
+			class, name = "Script", (file:gsub("%.legacy%.luau$", ""))
+		elseif file:match("%.local%.luau$") then
+			class, name = "LocalScript", (file:gsub("%.local%.luau$", ""))
+		elseif file:match("%.server%.luau$") then
 			class, name = "Script", (file:gsub("%.server%.luau$", ""))
 		elseif file:match("%.client%.luau$") then
 			class, name = "LocalScript", (file:gsub("%.client%.luau$", ""))
