@@ -75,3 +75,16 @@ Le script prévient quand un palier n'atteint pas 90 % de sa cible. Causes possi
 - **La run n'est plus active** (joueur mort, boss tué, retour au lobby) : la horde n'apparaît que pendant une run (`EnemyService.luau:590`). Relancer.
 - **Le jeu attend un choix de carte** : choisir la carte.
 - **Les armes tuent plus vite que la horde n'apparaît** (10 par tick, `Balance.luau:9`) : au palier de 400, un Mage avec beaucoup de zones peut garder le compte bas. Refaire avec une classe de départ sans montée de niveau (choisir « Skip » aux cartes).
+
+## Résultat Studio du 5 nov. 2026 (serveur seulement, PC, solo, mesure de 15 s par palier)
+
+| Palier | Vivants | Heartbeat (Hz) | Pire image (ms) | Mémoire (Mo) | EnemySnapshot (Ko/s par joueur) |
+| --- | --- | --- | --- | --- | --- |
+| 100 | 100 | 60.0 | 21.1 | 2564 | 10.5 |
+| 150 | 150 | 59.9 | 42.9 | 2565 | 15.8 |
+| 200 | 200 | 59.7 | 72.7 | 2565 | 20.9 |
+| 250 | 247 | 59.9 | 32.9 | 2568 | 25.8 |
+| 300 | 299 | 59.9 | 40.9 | 2569 | 31.3 |
+| 400 | 398 | 59.9 | 41.3 | 2571 | 41.5 |
+
+Le serveur tient 60 Hz jusqu'à 400 ennemis. Le débit EnemySnapshot confirme PERF-01 (31 Ko/s à 300). La mesure sur téléphone reste à faire (FPS et réseau côté joueur).
