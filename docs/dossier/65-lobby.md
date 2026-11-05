@@ -49,7 +49,7 @@ Le plan du 4 nov. ([img/65-lobby-plan.svg](img/65-lobby-plan.svg)) est remplacé
 
 ## 2. Le HUD du hub : PLAY et la barre du bas
 
-Maquette de structure : écran 0 du [Figma](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b), capture [img/65-hud-play.png](img/65-hud-play.png). Le style final viendra des composants `Lobby/PlayButton`, `Lobby/BarButton` et `Lobby/Currency` de A08 (v3 « briques », pas encore publiés). Positions sur la référence téléphone 844 × 390 (pixels logiques, `60-ui-ux.md`).
+Maquette de structure : écran 0 du [Figma](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b), capture [img/65-hud-play.png](img/65-hud-play.png). **Le visuel de référence est celui de A08** (v3 « briques », validé par Clément le 5 nov.) : écrans LB01 (lobby) et LB02 (choix du mode) de la page « Lobby v3 — barre et Play » du [Figma A08](https://www.figma.com/design/0Yq5m1skq5dzgOQXZ9bG6D), composants `Lobby/PlayButton`, `Lobby/BarButton`, `Lobby/ModeChoice`, `Lobby/Currency`. A09 fixe la liste des boutons, les pastilles et le flux ; l'écran 0 d'A09 sera refait avec ces composants dès que la bibliothèque v3 est publiée. Positions sur la référence téléphone 844 × 390 (pixels logiques, `60-ui-ux.md`).
 
 | Élément | Place | Taille | Règle |
 | --- | --- | --- | --- |
@@ -198,7 +198,7 @@ Grille des créatures capturées ; silhouettes « ??? » pour celles qu'on n'a p
 - **100 % cosmétique** : aucune stat, aucune classe, aucune résurrection, aucun objet aléatoire payant.
 - **Prix sur chaque article** (Robux ou jetons gagnés en jouant) ; achat par la fenêtre officielle Roblox.
 - **Aperçu gratuit** avant tout achat.
-- **Aucune pression** : pas de compte à rebours, pas de « Only 2 left! », pas de rouge d'alerte, pas de « BEST VALUE », pas de prix qui clignote, pas de fenêtre qui s'ouvre seule, pas de pastille de nombre sur le bouton Shop.
+- **Aucune pression** : pas de compte à rebours, pas de « Only 2 left! », pas de rouge d'alerte, pas de « BEST VALUE », pas de prix qui clignote, pas de fenêtre qui s'ouvre seule, pas de pastille de nombre sur le bouton Shop (la maquette LB01 de A08 en montre une : à retirer).
 - Articles possédés : « Owned » + « Equip ».
 
 ### 6.5 Ranks
