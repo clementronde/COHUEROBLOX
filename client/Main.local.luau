@@ -9,7 +9,7 @@ local Types = require(Shared:WaitForChild("Types"))
 
 local Controllers = script.Parent:WaitForChild("Controllers")
 
--- Fixed order (docs/ARCHITECTURE.md section 2). Searched recursively under Controllers.
+-- Fixed order (docs/ARCHITECTURE.md section 4). Searched recursively under Controllers.
 local ORDER = {
 	"CameraController",
 	"InputController",
@@ -28,6 +28,7 @@ local ORDER = {
 	"PingUI",
 	"MobileButtons",
 	"LoadoutUI",
+	"LobbyController", -- Controllers/Lobby (A09). LoadoutUI le lance aussi : start() protégé, sans effet la 2e fois
 	"EndScreen",
 	"SettingsUI",
 	"SoundController",
