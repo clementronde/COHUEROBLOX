@@ -13,6 +13,19 @@ Dans `C:\Users\Charment\COHUE\assets\claude-design\<NomDeContrat>\`, un dossier 
 
 A03 y lit les fichiers directement : plus besoin de les envoyer. Les versions corrigées pour COHUE restent dans `assets/a03/<modèle>/`.
 
+## Zone des mobs dans COHUE
+
+`Workspace.A03_ZoneMobs` (x 398 à 464, z 762 à 788, à côté du kit d'A01) aligne les modèles de Clément déjà installés, chacun sur un socle avec son nom :
+- Gobelin ;
+- Zombie ;
+- Chauve-souris ;
+- Squelette ;
+- Fantôme.
+
+Ils regardent vers −Z, c'est-à-dire vers le côté libre du sol. Les socles sont espacés de 12 studs. Pour un nouveau modèle, ajouter un socle 12 studs plus loin en x (466) et allonger le sol.
+
+Dans la zone, `Damage` vaut 0 sur chaque mob, pour pouvoir les regarder de près en Play. Remettre la valeur de la fiche pour tester les dégâts.
+
 ## Conventions communes (celles du fantôme)
 
 | Règle | Détail |
