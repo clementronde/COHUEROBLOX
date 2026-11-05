@@ -131,19 +131,25 @@ def build_template(fn, fused=False):
             y = C.front_y(vox, x, z)
         r, d = e["r"], e["d"]
         center = Vector(((x - o[0]) * cell, (y - o[1]) * cell, (z - o[2]) * cell))
+        sz = e.get("sz", 1.0)
         if e["ink"]:
-            parts.append(("sclera", r, (1, d, 1.18), center, cv.PALETTE["Ink"]))
-            parts.append(("glint", r * 0.3, (1, 0.5, 1), center + Vector((-0.32 * r, -r * d * 0.95, 0.42 * r)),
+            parts.append(("sclera", r, (1, d, sz), center, cv.PALETTE["Ink"]))
+            parts.append(("glint", r * 0.3, (1, 0.5, 1), center + Vector((-0.3 * r, -r * d * 0.95, 0.45 * r * sz)),
                           "FFF8EC"))
-            parts.append(("glint", r * 0.13, (1, 0.5, 1), center + Vector((0.2 * r, -r * d * 0.9, 0.05 * r)),
+            parts.append(("glint", r * 0.13, (1, 0.5, 1), center + Vector((0.2 * r, -r * d * 0.9, 0.0)),
                           "FFF8EC"))
         else:
-            parts.append(("sclera", r, (1, d, 1), center, "FFF8EC"))
+            parts.append(("sclera", r, (1, d, sz), center, "FFF8EC"))
             lx, lz = e["look"]
             pr = r * e["p"]
             pc = center + Vector((lx * (r - pr) * 0.9, -r * d * 0.82, lz * (r - pr) * 0.9))
             parts.append(("pupil", pr, (1, 0.45, 1), pc, cv.PALETTE["Ink"]))
             parts.append(("glint", pr * 0.33, (1, 0.5, 1), pc + Vector((-0.35 * pr, -pr * 0.3, 0.4 * pr)), "FFF8EC"))
+            lid = e.get("lid", 0.0)
+            if lid > 0:                  # paupière lourde de la couleur de la peau, sur le haut de l'oeil
+                skin = "".join(f"{round(c * 255):02X}" for c in cv.tone(meta.get("skin", "Sky.dd")))
+                parts.append(("lid", r * 1.1, (1, d * 1.25, lid * 1.05),
+                              center + Vector((0, -r * 0.02, r * (1 - lid))), skin))
     _templates[key] = (body, parts, meta)
     body.location = (0, -10000, 0)       # le modèle d'origine reste hors champ
     return _templates[key]
@@ -311,15 +317,16 @@ def horde_points(n=70, player=(0.0, 6.0), seed=42):
 
 
 def view_horde(out, kind, fused=True):
-    """70 ennemis à la caméra du jeu : 36 Grunts, 20 Runners, 14 Poltergeists, dont 2 élites.
-    Maille fusionnée du jeu (technique B) : c'est le rendu qu'aura la horde."""
+    """La horde du monde 1 à la caméra du jeu : 70 gobelins des 4 rôles (34 Grunts, 14 Archers, 10 Shamans,
+    12 Bombers), dont 2 élites. Maille fusionnée du jeu (technique B) : c'est le rendu qu'aura la horde.
+    Le vrai risque est de distinguer les 4 rôles d'une même famille sur son sol (relecture du 5 nov.)."""
     sc = A14.fresh()
     light(sc)
     ground(sc, kind, half=13, seed=5)
     edge_dressing(seed=4)
     player = (0.0, 6.0)
     BD.dressed("Knight", 3, player[0], y=player[1], rot=0.0)   # dos à la caméra, face à la horde
-    kinds = [C.goblin_grunt] * 36 + [C.zombie_runner] * 20 + [C.ghost_poltergeist] * 14
+    kinds = [C.goblin_grunt] * 34 + [C.goblin_archer] * 14 + [C.goblin_shaman] * 10 + [C.goblin_bomber] * 12
     random.Random(7).shuffle(kinds)
     rnd = random.Random(9)
     for k, (x, y) in enumerate(horde_points()):
@@ -332,22 +339,36 @@ def view_horde(out, kind, fused=True):
 
 
 def view_silhouettes(out):
-    """Silhouettes noires de face (test à 64 px, guide DA règle 10) : une image par modèle."""
-    for fn in C.ALL:
-        sc = A14.fresh()
-        place(fn, (0, 0, 0))
-        w, d, h = C_size(fn)
-        lift = fn()[2].get("float", 0.0)
-        size = max(w, h + lift) * 1.08
-        B.camera(sc, (0, -60, (h + lift) / 2), (0, 0, (h + lift) / 2), ortho=size)
-        B.silhouette_mode(sc, True)
-        B.render(sc, out.replace(".png", f"_{fn.__name__}.png"), res=(512, 512), transparent=True, samples=1)
-        B.silhouette_mode(sc, False)
+    """Silhouettes noires de face et de profil (test à 64 px, guide DA règle 10) : deux images par modèle."""
+    for fn in C.ALL + C.GOBLINS[1:]:
+        for side, cam in (("", (0, -60)), ("_side", (60, 0))):
+            sc = A14.fresh()
+            _templates.clear()
+            place(fn, (0, 0, 0))
+            w, d, h = C_size(fn)
+            lift = fn()[2].get("float", 0.0)
+            size = max(w, d, h + lift) * 1.08
+            B.camera(sc, (cam[0], cam[1], (h + lift) / 2), (0, 0, (h + lift) / 2), ortho=size)
+            B.silhouette_mode(sc, True)
+            B.render(sc, out.replace(".png", f"_{fn.__name__}{side}.png"), res=(512, 512), transparent=True,
+                     samples=1)
+            B.silhouette_mode(sc, False)
+
+
+def view_goblins(out):
+    """Les 4 gobelins du monde 1 refaits, en maille du jeu (technique B)."""
+    sc = A14.fresh()
+    light(sc)
+    S.block("Plinth", (0, 0, -0.5), (44, 20, 1), "Leaf.d", jitter=0.0)
+    for k, fn in enumerate(C.GOBLINS):
+        place(fn, (-9.0 + k * 6.0, 0, 0), rot_z=math.radians(10 - 6 * k), fused=True)
+    B.camera(sc, (0.0, -30.0, 9.0), (0.0, 0.0, 2.6), lens=40)
+    A14.render(sc, out, res=(2400, 900), samples=64)
 
 
 def tris_report(out):
     stats = {}
-    for fn in C.ALL:
+    for fn in C.ALL + C.GOBLINS[1:]:
         vox, origin, meta = fn()
         verts, faces, vcols, o = brick.mesh_lists(vox, origin, meta["cell"])
         stats[vox.name] = {"bricks_tris_sans_chanfrein": sum(2 if len(f) == 4 else 1 for f in faces),
@@ -357,7 +378,7 @@ def tris_report(out):
         json.dump(stats, f, indent=1)
 
 
-VIEWS = {"lineup": view_lineup, "boss": view_boss, "compare": view_compare,
+VIEWS = {"lineup": view_lineup, "boss": view_boss, "compare": view_compare, "goblins": view_goblins,
          "horde_grass": lambda o: view_horde(o, "grass"), "horde_sand": lambda o: view_horde(o, "sand"),
          "horde_bricks": lambda o: view_horde(o, "grass", fused=False),
          "silhouettes": view_silhouettes}
@@ -370,4 +391,7 @@ if __name__ == "__main__":
     tris_report(os.path.join(outdir, "tris.json"))
     for name in (list(VIEWS) if which == "all" else which.split(",")):
         _templates.clear()
+        cam_data = bpy.data.cameras.get("A01_Cam")
+        if cam_data:                     # la caméra de jeu (champ vertical) ne doit pas déborder sur la vue suivante
+            cam_data.sensor_fit = "AUTO"
         VIEWS[name](os.path.join(outdir, f"a03_{name}.png"))
