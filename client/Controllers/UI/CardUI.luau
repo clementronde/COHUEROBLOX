@@ -1171,6 +1171,12 @@ function CardUI.start()
 			renderStats()
 		end
 	end)
+	-- The new level arrives just after the offer: the title follows it while the window is open.
+	UITheme.watch("PlayerProgress", function(p: any)
+		if offer and type(p) == "table" and p.level then
+			titleLabel.Text = UITheme.format(S.LevelTitle, { n = p.level })
+		end
+	end)
 
 	-- Optional remote (A04): hooked if it exists or appears later; nothing waits on it.
 	local function hook(r: Instance)
