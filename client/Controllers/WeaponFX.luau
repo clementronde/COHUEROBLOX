@@ -61,8 +61,11 @@ type ShapeInfo = {
 	spin: number,
 	life: number,
 	fill: boolean,
+	shrink: number,
 	pulse: number,
 }
+type BeamInfo = { beam: Beam, seg: number, w: number, t: number }
+type BurstInfo = { e: ParticleEmitter, n: number, perRadius: boolean, sizeR: NumberSequence? }
 type FxInst = {
 	model: Model,
 	template: Model,
@@ -71,9 +74,11 @@ type FxInst = {
 	life: number,
 	height: number,
 	spin: number,
+	tilt: number,
 	shapes: { ShapeInfo },
+	beams: { BeamInfo },
 	zones: { { part: BasePart, s: number, life: number } },
-	bursts: { { e: ParticleEmitter, n: number, perRadius: boolean } },
+	bursts: { BurstInfo },
 	continuous: { ParticleEmitter },
 	lights: { PointLight },
 	trails: { Trail },
@@ -239,7 +244,9 @@ local function describe(model: Model, template: Model): FxInst
 		life = num(template, "Life", 0.4),
 		height = num(template, "Height", 0.08),
 		spin = num(template, "Spin", 0),
+		tilt = math.rad(num(template, "Tilt", 0)),
 		shapes = {},
+		beams = {},
 		zones = {},
 		bursts = {},
 		continuous = {},
@@ -268,6 +275,7 @@ local function describe(model: Model, template: Model): FxInst
 					spin = num(child, "Spin", 0),
 					life = num(child, "Life", 0),
 					fill = child:GetAttribute("Fill") == true,
+					shrink = num(child, "Shrink", 0),
 					pulse = num(child, "Pulse", 0),
 				})
 			end
@@ -284,8 +292,15 @@ local function describe(model: Model, template: Model): FxInst
 			end
 			local n = num(d, "Burst", 0)
 			if n > 0 then
-				table.insert(fx.bursts, { e = d, n = n, perRadius = d:GetAttribute("PerRadius") == true })
+				table.insert(fx.bursts, {
+					e = d,
+					n = n,
+					perRadius = d:GetAttribute("PerRadius") == true,
+					sizeR = if d:GetAttribute("SizeR") == true then d.Size else nil, -- taille en rayons
+				})
 			end
+		elseif d:IsA("Beam") and d:GetAttribute("Layer") then
+			table.insert(fx.beams, { beam = d, seg = num(d, "Seg", 1), w = num(d, "W", d.Width0), t = num(d, "T", 0) })
 		elseif d:IsA("PointLight") then
 			table.insert(fx.lights, d)
 		elseif d:IsA("Trail") then
@@ -349,10 +364,22 @@ local function release(fx: FxInst?)
 	table.insert(pool, fx)
 end
 
+local function scaled(s: NumberSequence, k: number): NumberSequence
+	local kps = table.create(#s.Keypoints)
+	for i, kp in s.Keypoints do
+		kps[i] = NumberSequenceKeypoint.new(kp.Time, kp.Value * k, kp.Envelope * k)
+	end
+	return NumberSequence.new(kps)
+end
+
 local function burst(fx: FxInst, radius: number)
 	for _, b in fx.bursts do
 		local k = if b.perRadius then math.clamp(radius / 5, 0.5, 3) else 1
 		local n = math.max(1, math.floor(b.n * k * tier.particles + 0.5))
+		local base = b.sizeR
+		if base then
+			b.e.Size = scaled(base, radius)
+		end
 		b.e:Emit(n)
 	end
 end
@@ -366,10 +393,14 @@ end
 -- Pose un effet « au sol » : formes à l'échelle du rayon, zones, transparences selon u (0..1)
 local function placeArea(fx: FxInst, base: CFrame, radius: number, u: number, progress: number?)
 	local e = 1 - (1 - math.clamp(u, 0, 1)) ^ 2
+	queue(fx.anchor, base) -- émetteurs posés au centre (onde de choc, éclair)
 	for _, sh in fx.shapes do
 		local life = if sh.life > 0 then sh.life / math.max(fx.life, 0.01) else 1
 		local v = math.clamp(u / life, 0, 1)
-		local k = if sh.fill and progress then math.max(progress, 0.05) else (if sh.grow < 1 then sh.grow + (1 - sh.grow) * e else 1)
+		local k = if sh.shrink > 0 and progress then 1 - sh.shrink * progress
+			elseif sh.fill and progress then math.max(progress, 0.05)
+			elseif sh.grow < 1 then sh.grow + (1 - sh.grow) * e
+			else 1
 		local r = radius * sh.s * k
 		sh.part.Size = Vector3.new(sh.base.X * r, sh.base.Y, sh.base.Z * r)
 		local cf = base * CFrame.new(sh.c * r)
@@ -533,11 +564,19 @@ local function onSegment(visual: number, x: number, z: number, p1: number, p2: n
 	fx.anchor.CFrame = CFrame.new(a)
 	local side = (b - a):Cross(Vector3.yAxis)
 	side = if side.Magnitude > 0.01 then side.Unit else Vector3.xAxis
-	local pts = { a, a:Lerp(b, 0.33) + side * rng:NextNumber(-0.9, 0.9), a:Lerp(b, 0.66) + side * rng:NextNumber(-0.9, 0.9), b }
-	for i = 0, 3 do
+	-- autant de points que le modèle en porte (P0..Pn) : zigzag fin, petits écarts au hasard
+	local n = 1
+	while fx.attachments["P" .. (n + 1)] do
+		n += 1
+	end
+	local amp = math.clamp((b - a).Magnitude * 0.05, 0.25, 0.7)
+	for i = 0, n do
 		local at = fx.attachments["P" .. i]
 		if at then
-			at.WorldPosition = pts[i + 1]
+			local t = i / n
+			local jitter = if i == 0 or i == n then Vector3.zero
+				else side * rng:NextNumber(-amp, amp) + Vector3.new(0, rng:NextNumber(-0.25, 0.25), 0)
+			at.WorldPosition = a:Lerp(b, t) + jitter
 		end
 	end
 	local tip = fx.attachments.Tip
@@ -642,7 +681,60 @@ end
 
 -- Image par image --------------------------------------------------------------------------------
 
+-- Largeur du ruban le long du geste (u : 0 = départ, 1 = tête) : mince au départ, large vers la tête
+local function slashBody(u: number): number
+	local tip = math.max(0, (u - 0.85) / 0.15)
+	return math.max(0.03, (u ^ 1.6) * (1 - tip * tip))
+end
+
+local TAIL_FADE = { 0.55, 0.2, 0 } -- les segments du départ sont plus transparents (traîne)
+
+local function stepSlash(e: AreaEntry, fx: FxInst, base: CFrame, u: number)
+	-- coup d'épée en ruban couché : S0..S3 posés sur l'arc (axe X = sens du geste), Beams courbés en arcs de
+	-- cercle, largeur effilée, transparence qui monte avec la vie ; incliné de Tilt vers la caméra
+	local half = math.rad(math.clamp(e.half, 10, 85))
+	local a0, a1 = -half, half
+	if e.flip then
+		a0, a1 = a1, a0
+	end
+	local r = e.radius * 1.15
+	local lift = math.tan(fx.tilt)
+	local sign = if a1 > a0 then 1 else -1
+	local nseg = 3
+	local step = (a1 - a0) / nseg
+	local curve = 4 / 3 * math.tan(math.abs(step) / 4) * r
+	for k = 0, nseg do
+		local at = fx.attachments["S" .. k]
+		if at then
+			local ang = a0 + step * k
+			local dir = Vector3.new(math.sin(ang), 0, -math.cos(ang)) -- repère de base : avant = -Z
+			local tan = Vector3.new(math.cos(ang), 0, math.sin(ang)) * sign
+			local rr = r * (0.9 + 0.1 * slashBody(k / nseg))
+			local p = dir * rr + Vector3.new(0, math.max(0, -dir.Z * rr) * lift, 0)
+			at.CFrame = CFrame.fromMatrix(p, tan, Vector3.yAxis)
+		end
+	end
+	local v = if tier.fade then math.clamp((u - 0.25) / 0.75, 0, 1) else 0
+	for _, bi in fx.beams do
+		local b = bi.beam
+		local k0, k1 = (bi.seg - 1) / nseg, bi.seg / nseg
+		b.Width0 = bi.w * slashBody(k0)
+		b.Width1 = bi.w * slashBody(k1)
+		b.CurveSize0 = curve
+		b.CurveSize1 = curve
+		local tail = TAIL_FADE[bi.seg] or 0
+		local t0 = 1 - (1 - bi.t) * (1 - tail) * (1 - v)
+		local t1 = 1 - (1 - bi.t) * (1 - (TAIL_FADE[bi.seg + 1] or 0)) * (1 - v)
+		b.Transparency = NumberSequence.new(t0, t1)
+	end
+	queue(fx.anchor, base)
+end
+
 local function stepCone(e: AreaEntry, fx: FxInst, base: CFrame, u: number)
+	if #fx.beams > 0 then
+		stepSlash(e, fx, base, u)
+		return
+	end
 	-- croissant : on montre les segments du milieu selon l'angle ; la fin du geste s'efface en dernier
 	local total = 0
 	for _, sh in fx.shapes do

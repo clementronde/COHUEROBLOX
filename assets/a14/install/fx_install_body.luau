@@ -1,21 +1,29 @@
 --!nocheck
 -- A14 : construit les modèles d'effets des armes dans ReplicatedStorage.Assets.FX (généré par
--- assets/a14/make_fx_install.py à partir de fx_install_body.luau). À lancer une fois dans Studio, en mode
--- édition, APRÈS A14_weapons_install.luau (il a besoin des formes FX_* et des pièces de Assets.Weapons).
+-- assets/a14/make_fx_install.py à partir de fx_install_body.luau). À lancer dans Studio, en mode édition,
+-- APRÈS A14_weapons_install.luau (il a besoin des formes FX_* et des pièces de Assets.Weapons).
+-- Effets v2 « naturels » (dossier 12, section 15, validés par Clément le 5 nov.) : particules douces à
+-- textures intégrées à Roblox, rubans en Beam et Trail ; plus de pièces en pixels pour les projectiles rapides.
+-- Relançable : il vide Weapons, Special, Shared et Enemies puis les reconstruit ; Shapes est gardé.
 -- Règle « rien construit par script » : ces objets sont posés une fois dans la place ; WeaponFX ne fait que
 -- les cloner et changer leurs propriétés (position, taille, transparence) et appeler :Emit().
 --
 -- Contrat lu par client/Controllers/WeaponFX.luau :
 --   Assets.FX.Weapons.<WeaponId>.<Rôle>, Assets.FX.Special.<Nom>.<Rôle>, Assets.FX.Shared.<Rôle> : Model.
 --   Rôles : Projectile, Impact, Area, Cone, Segment, Aura, Orbit, Turret, Fall, Telegraph.
---   Attributs du Model : Kind, Life (s), Height (studs au-dessus du sol).
---   « Anchor » (Part invisible, PrimaryPart) porte les Attachments, Trails, émetteurs et lumières qui suivent.
+--   Attributs du Model : Kind, Life (s), Height (studs au-dessus du sol), Spin (rad/s), Tilt (degrés, Cone).
+--   « Anchor » (Part invisible, PrimaryPart) : posé au centre de l'effet ; porte les Attachments, Trails,
+--   Beams, émetteurs et lumières.
 --   Formes (MeshPart, Neon) : S (taille = Base x rayon x S), Base (taille pour un rayon de 1), C (centre pour
 --   un rayon de 1), Fade0 / Fade1 (transparence au début / à la fin), Grow (taille de départ, 0..1),
---   Seg (segment du croissant), Spin (rad/s), Life (vie propre, s).
---   « Zone » (Part invisible) : S ; ses ParticleEmitter (forme Disc) remplissent la zone.
+--   Spin (rad/s), Life (vie propre, s), Fill (suit le remplissage de l'alerte), Shrink (se resserre de
+--   Shrink x remplissage), Pulse (période, s).
+--   « Zone » ou « Burn » (Part invisible) : S, Life ; ses ParticleEmitter (forme Disc) remplissent la zone.
+--   Beams du coup d'épée (Cone) : attribut Layer (Halo, Glow, Edge, Core), Seg (1..3), W (largeur max, studs),
+--   T (transparence) ; Attachments S0..S3 sur Anchor (S0 = départ du geste, S3 = tête).
+--   Éclair (Segment) : Attachments P0..Pn et Tip ; Beams Glow<i> et Core<i> entre P(i-1) et P(i).
 --   ParticleEmitter : Burst (nombre émis au départ), PerRadius (le nombre suit le rayon / 5),
---   Continuous (allumé pendant la vie).
+--   Continuous (allumé pendant la vie), SizeR (la taille est en rayons : le code la multiplie par le rayon).
 --   Pièce (Model cloné de Assets.Weapons, soudé à Anchor) : attribut Piece = nom, Offset (CFrame).
 --   PointLight : HighOnly (allumée en qualité Haute seulement).
 local RS = game:GetService("ReplicatedStorage")
@@ -79,23 +87,31 @@ for p in parents do
 	end
 end
 
+-- La v2 remplace tous les modèles d'effets (les formes restent)
+for _, name in { "Weapons", "Special", "Shared", "Enemies" } do
+	local old = FX:FindFirstChild(name)
+	if old then
+		old:Destroy()
+	end
+end
+
 -- 2. Couleurs (palette COHUE) et textures intégrées à Roblox (rien à téléverser)
 local C = {
 	White = Color3.fromRGB(255, 248, 236), Cream = Color3.fromRGB(255, 232, 184), Gold = Color3.fromRGB(255, 194, 26),
-	Ember = Color3.fromRGB(255, 122, 26), Sky = Color3.fromRGB(63, 208, 245), Royal = Color3.fromRGB(45, 107, 230),
-	Grape = Color3.fromRGB(140, 82, 224), Plum = Color3.fromRGB(75, 56, 102), Leaf = Color3.fromRGB(61, 190, 74),
-	Stone = Color3.fromRGB(156, 148, 136), Smoke = Color3.fromRGB(190, 184, 176), Ink = Color3.fromRGB(42, 28, 61),
-	Tomato = Color3.fromRGB(230, 57, 70),
+	Amber = Color3.fromRGB(255, 176, 32), Butter = Color3.fromRGB(255, 226, 122), Ember = Color3.fromRGB(255, 122, 26),
+	Sky = Color3.fromRGB(60, 200, 255), Ice = Color3.fromRGB(143, 227, 255), Frost = Color3.fromRGB(191, 239, 255),
+	Royal = Color3.fromRGB(45, 107, 230), Grape = Color3.fromRGB(140, 82, 224), Lilac = Color3.fromRGB(192, 140, 255),
+	Plum = Color3.fromRGB(75, 56, 102), Teal = Color3.fromRGB(46, 240, 192), Stone = Color3.fromRGB(156, 148, 136),
+	Smoke = Color3.fromRGB(190, 184, 176), Ash = Color3.fromRGB(110, 106, 100), Dust = Color3.fromRGB(196, 170, 130),
 }
 local TEX = {
-	Glow = "rbxasset://textures/particles/forcefield_glow_main.dds",
-	Spark = "rbxasset://textures/particles/sparkles_main.dds",
-	FireSpark = "rbxasset://textures/particles/fire_sparks_main.dds",
-	Fire = "rbxasset://textures/particles/fire_main.dds",
+	Glow = "rbxasset://textures/particles/explosion01_implosion_main.dds", -- lueur ronde et douce
+	Core = "rbxasset://textures/particles/explosion01_core_main.dds", -- boule de feu
+	Shock = "rbxasset://textures/particles/explosion01_shockwave_main.dds", -- onde de choc (anneau doux)
 	Smoke = "rbxasset://textures/particles/smoke_main.dds",
-	Shock = "rbxasset://textures/particles/explosion01_shockwave_main.dds",
-	Core = "rbxasset://textures/particles/explosion01_core_main.dds",
+	Fire = "rbxasset://textures/particles/fire_main.dds",
 }
+local SHOCK_R = 1 / 0.29 -- l'anneau de la texture d'onde de choc est à 0,29 de sa largeur
 
 -- 3. Briques de construction
 local function newModel(parent: Instance, name: string, kind: string, life: number, height: number?): Model
@@ -157,6 +173,14 @@ local function zone(m: Model, s: number): Part
 	return z
 end
 
+local function seq(a: number, b: number?): NumberSequence
+	return NumberSequence.new(a, b or a)
+end
+
+local function fade(a: number, b: number?): NumberSequence
+	return NumberSequence.new({ NumberSequenceKeypoint.new(0, a), NumberSequenceKeypoint.new(1, b or 1) })
+end
+
 local function emitter(parent: Instance, name: string, p: { [string]: any }): ParticleEmitter
 	local e = Instance.new("ParticleEmitter")
 	e.Name = name
@@ -166,30 +190,42 @@ local function emitter(parent: Instance, name: string, p: { [string]: any }): Pa
 	e.LightEmission = p.LightEmission or 1
 	e.LightInfluence = 0
 	e.Brightness = p.Brightness or 2
-	e.Size = p.Size or NumberSequence.new(1, 0)
-	e.Transparency = p.Transparency or NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
+	e.Size = p.Size or seq(1, 0)
+	e.Transparency = p.Transparency or fade(0.1, 1)
 	e.Lifetime = p.Lifetime or NumberRange.new(0.3, 0.5)
 	e.Speed = p.Speed or NumberRange.new(4, 8)
 	e.SpreadAngle = p.Spread or Vector2.new(180, 180)
 	e.Rate = p.Rate or 0
 	e.Rotation = p.Rotation or NumberRange.new(0, 360)
-	e.RotSpeed = p.RotSpeed or NumberRange.new(-90, 90)
+	e.RotSpeed = p.RotSpeed or NumberRange.new(-60, 60)
 	e.Drag = p.Drag or 2
 	e.Acceleration = p.Acceleration or Vector3.zero
 	e.ZOffset = p.ZOffset or 0
+	e.LockedToPart = p.Locked == true
 	if p.Shape then
 		e.Shape = p.Shape
 		e.ShapeStyle = Enum.ParticleEmitterShapeStyle.Volume
 	end
-	if p.Orientation then
-		e.Orientation = p.Orientation
-	end
-	if p.Squash then
-		e.Squash = p.Squash
+	if p.Flat then
+		-- posée à plat au sol : vitesse minuscule vers le haut, particule perpendiculaire à sa vitesse
+		e.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
+		e.EmissionDirection = Enum.NormalId.Top
+		e.Speed = NumberRange.new(0.01)
+		e.SpreadAngle = Vector2.zero
+		e.Drag = 0
+		e.Acceleration = Vector3.zero
+		e.RotSpeed = NumberRange.new(-20, 20)
+	elseif p.Streak then
+		-- étincelle étirée dans le sens du mouvement
+		e.Orientation = Enum.ParticleOrientation.VelocityParallel
+		e.Squash = seq(p.Squash or 1.6)
+		e.Rotation = NumberRange.new(0)
+		e.RotSpeed = NumberRange.new(0)
 	end
 	e:SetAttribute("Burst", p.Burst or 0)
 	e:SetAttribute("PerRadius", p.PerRadius == true)
 	e:SetAttribute("Continuous", p.Continuous == true)
+	e:SetAttribute("SizeR", p.SizeR == true)
 	e.Parent = parent
 	return e
 end
@@ -205,35 +241,42 @@ local function light(parent: Instance, color: Color3, range: number, brightness:
 	l.Parent = parent
 end
 
-local function trail(anchor: BasePart, color: Color3, width: number, life: number, color1: Color3?)
+local function trail(anchor: BasePart, tag: string, color: Color3, width: number, life: number, t0: number, color1: Color3?)
 	local a0 = Instance.new("Attachment")
-	a0.Name = "T0"
+	a0.Name = "T0" .. tag
 	a0.Position = Vector3.new(0, width / 2, 0)
 	a0.Parent = anchor
 	local a1 = Instance.new("Attachment")
-	a1.Name = "T1"
+	a1.Name = "T1" .. tag
 	a1.Position = Vector3.new(0, -width / 2, 0)
 	a1.Parent = anchor
 	local t = Instance.new("Trail")
+	t.Name = "Trail" .. tag
 	t.Attachment0 = a0
 	t.Attachment1 = a1
 	t.Color = ColorSequence.new(color, color1 or color)
 	t.LightEmission = 1
 	t.LightInfluence = 0
 	t.Lifetime = life
-	t.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.1), NumberSequenceKeypoint.new(1, 1) })
-	t.WidthScale = NumberSequence.new(1, 0.1)
+	t.Transparency = fade(t0, 1)
+	t.WidthScale = NumberSequence.new(1, 0)
 	t.FaceCamera = true
 	t.Enabled = false
+	t:SetAttribute("Trail", true)
 	t.Parent = anchor
 	return t
 end
 
+-- Traînée douce : un ruban large et peu opaque, un cœur fin et clair
+local function softTrail(anchor: BasePart, color: Color3, width: number, life: number)
+	trail(anchor, "Glow", color, width, life, 0.45)
+	trail(anchor, "Core", C.White, width * 0.32, life * 0.7, 0.05, color)
+end
+
 -- Orientation d'une pièce : son axe « pointe » vers l'avant (-Z), sa face plate vers le haut.
-local FLY_UP = CFrame.fromMatrix(Vector3.zero, Vector3.new(1, 0, 0), Vector3.new(0, 0, -1))     -- pointe +Y (dague, lance)
-local FLY_X = CFrame.fromMatrix(Vector3.zero, Vector3.new(0, 0, -1), Vector3.new(-1, 0, 0))     -- pointe +X (flèche, carreau)
-local FLAT = FLY_UP                                                                              -- pièce à plat (hache, lame, boomerang)
-local UPRIGHT = CFrame.new()                                                                     -- face à la caméra (bombe, météore, tourelle)
+local FLY_UP = CFrame.fromMatrix(Vector3.zero, Vector3.new(1, 0, 0), Vector3.new(0, 0, -1))     -- pointe +Y
+local FLAT = FLY_UP                                                                              -- pièce à plat
+local UPRIGHT = CFrame.new()                                                                     -- face caméra
 
 local function piece(m: Model, pieceName: string, offset: CFrame, scale: number?)
 	local src = weaponsFolder:FindFirstChild(pieceName)
@@ -261,106 +304,194 @@ local function piece(m: Model, pieceName: string, offset: CFrame, scale: number?
 end
 
 -- 4. Recettes d'effets
+
 local function impact(parent: Instance, name: string, color: Color3, n: number)
-	local m = newModel(parent, name, "impact", 0.45, 2.4)
-	emitter(m.PrimaryPart, "Flare", { Texture = TEX.Glow, Color = C.White, Burst = 1, Size = NumberSequence.new(2.4, 0),
-		Speed = NumberRange.new(0), Lifetime = NumberRange.new(0.15, 0.2) })
-	emitter(m.PrimaryPart, "Sparks", { Texture = TEX.Spark, Color = color, Burst = n, Size = NumberSequence.new(0.6, 0),
-		Speed = NumberRange.new(8, 14), Lifetime = NumberRange.new(0.2, 0.35) })
+	-- éclair blanc, halo coloré, étincelles étirées
+	local m = newModel(parent, name, "impact", 0.4, 2.4)
+	local a = m.PrimaryPart
+	emitter(a, "Flash", { Color = C.White, Burst = 1, Size = seq(2.6, 0.4), Speed = NumberRange.new(0),
+		Lifetime = NumberRange.new(0.12, 0.16), Transparency = fade(0, 1) })
+	emitter(a, "Halo", { Color = color, Burst = 1, Size = seq(3.8, 1.0), Speed = NumberRange.new(0),
+		Lifetime = NumberRange.new(0.18, 0.22), Transparency = fade(0.35, 1) })
+	emitter(a, "Sparks", { Color = C.White, Color1 = color, Burst = n, Size = seq(0.45, 0), Streak = true,
+		Speed = NumberRange.new(10, 18), Lifetime = NumberRange.new(0.16, 0.28), Acceleration = Vector3.new(0, -18, 0) })
 	return m
 end
 
-local function projectile(parent: Instance, pieceName: string?, offset: CFrame, trailColor: Color3, opts)
+local function lightShot(parent: Instance, color: Color3, width: number, trailLife: number)
+	-- projectile rapide en lumière : tête claire (deux lueurs collées au projectile) et traînée douce
+	local m = newModel(parent, "Projectile", "projectile", 0, 2.5)
+	local a = m.PrimaryPart
+	emitter(a, "Head", { Color = color, Rate = 60, Continuous = true, Locked = true, Size = seq(width * 2.6, width * 1.6),
+		Speed = NumberRange.new(0), Lifetime = NumberRange.new(0.08, 0.1), Transparency = fade(0.25, 1) })
+	emitter(a, "HeadCore", { Color = C.White, Rate = 60, Continuous = true, Locked = true, Size = seq(width * 1.2, width * 0.8),
+		Speed = NumberRange.new(0), Lifetime = NumberRange.new(0.06, 0.08), Transparency = fade(0, 1) })
+	softTrail(a, color, width, trailLife)
+	return m
+end
+
+local function pieceShot(parent: Instance, pieceName: string, offset: CFrame, color: Color3, opts)
+	-- objet lancé en pixel art (boomerang) : la pièce, une lueur douce derrière, une traînée
 	opts = opts or {}
 	local m = newModel(parent, "Projectile", "projectile", 0, opts.height or 2.5)
-	if pieceName then
-		piece(m, pieceName, offset, opts.scale)
-	end
-	local t = trail(m.PrimaryPart, trailColor, opts.trailWidth or 0.5, opts.trailLife or 0.18, opts.trailColor1)
-	t:SetAttribute("Trail", true)
-	if opts.glow then
-		emitter(m.PrimaryPart, "Glow", { Texture = TEX.Glow, Color = opts.glow, Rate = 30, Continuous = true,
-			Size = NumberSequence.new(opts.glowSize or 2.2, 0.4), Speed = NumberRange.new(0), Lifetime = NumberRange.new(0.12, 0.16) })
-	end
-	if opts.fire then
-		emitter(m.PrimaryPart, "Fire", { Texture = TEX.Fire, Color = opts.fire, Color1 = C.Ember, Rate = 40, Continuous = true,
-			Size = NumberSequence.new(1.4, 0.2), Speed = NumberRange.new(0.5, 1.5), Lifetime = NumberRange.new(0.2, 0.35) })
-		light(m.PrimaryPart, C.Ember, 10, 2)
-	end
+	piece(m, pieceName, offset, opts.scale)
+	emitter(m.PrimaryPart, "Glow", { Color = color, Rate = 30, Continuous = true, Locked = true, Size = seq(opts.glow or 3, 1.5),
+		Speed = NumberRange.new(0), Lifetime = NumberRange.new(0.1, 0.12), Transparency = fade(0.55, 1) })
+	softTrail(m.PrimaryPart, color, opts.trailWidth or 0.9, opts.trailLife or 0.2)
 	if opts.spin then
 		m:SetAttribute("Spin", opts.spin)
 	end
 	return m
 end
 
-local function ringBurst(parent: Instance, name: string, kind: string, color: Color3, opts)
-	-- onde au sol : anneau épais qui grandit et s'efface, disque clair, étincelles, fumée, lumière
+local function fireball(parent: Instance)
+	-- boule de feu : tête très claire, flammes qui traînent, fumée légère, ruban chaud
+	local m = newModel(parent, "Projectile", "projectile", 0, 2.5)
+	local a = m.PrimaryPart
+	emitter(a, "Head", { Color = C.Butter, Rate = 50, Continuous = true, Locked = true, Size = seq(4, 2.4),
+		Speed = NumberRange.new(0), Lifetime = NumberRange.new(0.08, 0.1), Transparency = fade(0.2, 1) })
+	emitter(a, "HeadCore", { Color = C.White, Rate = 50, Continuous = true, Locked = true, Size = seq(1.8, 1.2),
+		Speed = NumberRange.new(0), Lifetime = NumberRange.new(0.06, 0.08), Transparency = fade(0, 1) })
+	emitter(a, "Flames", { Texture = TEX.Core, Color = C.Butter, Color1 = C.Amber, LightEmission = 0.7, Rate = 45,
+		Continuous = true, Size = seq(2.2, 0.6), Speed = NumberRange.new(0.5, 1.5), Lifetime = NumberRange.new(0.22, 0.36),
+		Transparency = fade(0.1, 1), RotSpeed = NumberRange.new(-120, 120) })
+	emitter(a, "Smoke", { Texture = TEX.Smoke, Color = C.Smoke, Color1 = C.Ash, LightEmission = 0, Brightness = 1, Rate = 10,
+		Continuous = true, Size = seq(1.4, 2.6), Speed = NumberRange.new(0.5, 1), Lifetime = NumberRange.new(0.5, 0.8),
+		Transparency = fade(0.6, 1), Acceleration = Vector3.new(0, 2, 0) })
+	softTrail(a, C.Amber, 1.6, 0.22)
+	light(a, C.Amber, 12, 2)
+	return m
+end
+
+local function explosion(parent: Instance, name: string, opts)
+	-- explosion : onde de choc posée au sol, éclair, boules de feu qui gonflent, fumée, braises ; jamais de rouge
 	opts = opts or {}
-	local m = newModel(parent, name, kind, opts.life or 0.5, 0.08)
-	shape(m, opts.ring or "FX_RingThick", color, { S = 1, Grow = opts.grow or 0.35, Fade0 = 0, Fade1 = 1 })
-	if opts.fill ~= false then
-		shape(m, "FX_Disc", opts.fillColor or color, { S = 0.98, Grow = 0.6, Fade0 = opts.fillAlpha or 0.75, Fade1 = 1 })
+	local m = newModel(parent, name, "area", opts.life or 0.55, 0.08)
+	local a = m.PrimaryPart
+	local hot, warm = opts.hot or C.Butter, opts.warm or C.Amber
+	emitter(a, "Shock", { Texture = TEX.Shock, Flat = true, Color = warm, Burst = 2, SizeR = true,
+		Size = seq(0.3 * SHOCK_R, 1.05 * SHOCK_R), Lifetime = NumberRange.new(0.32, 0.36), Transparency = fade(0, 1), Brightness = 3 })
+	emitter(a, "Flash", { Color = C.White, Burst = 1, SizeR = true, Size = seq(1.1, 0.2), Speed = NumberRange.new(0),
+		Lifetime = NumberRange.new(0.14, 0.16), Transparency = fade(0, 1) })
+	local z = zone(m, 0.5)
+	emitter(z, "Fireballs", { Texture = TEX.Core, Color = hot, Color1 = warm, LightEmission = 0.7, Burst = opts.fire or 7,
+		PerRadius = true, SizeR = true, Size = seq(0.45, 0.9), Speed = NumberRange.new(2, 5), Spread = Vector2.new(60, 60),
+		Lifetime = NumberRange.new(0.35, 0.55), Transparency = fade(0.05, 1), Acceleration = Vector3.new(0, 6, 0),
+		RotSpeed = NumberRange.new(-90, 90), Shape = Enum.ParticleEmitterShape.Disc })
+	if opts.smoke ~= false then
+		emitter(z, "Smoke", { Texture = TEX.Smoke, Color = C.Smoke, Color1 = C.Ash, LightEmission = 0, Brightness = 1,
+			Burst = opts.smoke or 5, PerRadius = true, SizeR = true, Size = seq(0.5, 0.95), Speed = NumberRange.new(2, 4),
+			Spread = Vector2.new(40, 40), Lifetime = NumberRange.new(0.9, 1.3), Transparency = fade(0.45, 1),
+			Acceleration = Vector3.new(0, 3, 0), Shape = Enum.ParticleEmitterShape.Disc })
 	end
-	local z = zone(m, opts.zoneS or 0.7)
-	if opts.flash then
-		emitter(z, "Flash", { Texture = TEX.Glow, Color = C.White, Burst = 1, Size = NumberSequence.new(opts.flash, 0),
-			Speed = NumberRange.new(0), Lifetime = NumberRange.new(0.18, 0.22), Shape = Enum.ParticleEmitterShape.Box })
-		emitter(z, "Fireball", { Texture = TEX.Core, Color = opts.core or color, Burst = 3, Size = NumberSequence.new(opts.flash * 1.4, 0),
-			Speed = NumberRange.new(1, 3), Lifetime = NumberRange.new(0.3, 0.45), Shape = Enum.ParticleEmitterShape.Box })
-	end
-	emitter(z, "Sparks", { Texture = TEX.Spark, Color = opts.sparkColor or C.White, Color1 = color, Burst = opts.sparks or 10,
-		PerRadius = true, Size = NumberSequence.new(0.7, 0), Speed = NumberRange.new(10, 18), Lifetime = NumberRange.new(0.25, 0.4),
-		Spread = Vector2.new(70, 70), Shape = Enum.ParticleEmitterShape.Disc, Acceleration = Vector3.new(0, -20, 0) })
-	if opts.smoke then
-		emitter(z, "Smoke", { Texture = TEX.Smoke, Color = C.Smoke, LightEmission = 0, Brightness = 1, Burst = opts.smoke, PerRadius = true,
-			Size = NumberSequence.new(2.5, 4), Speed = NumberRange.new(1, 3), Lifetime = NumberRange.new(0.6, 0.9),
-			Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1) }),
-			Shape = Enum.ParticleEmitterShape.Disc, Acceleration = Vector3.new(0, 3, 0) })
-	end
+	emitter(z, "Embers", { Color = hot, Color1 = C.White, Burst = opts.embers or 12, PerRadius = true, Streak = true,
+		Size = seq(0.4, 0), Speed = NumberRange.new(14, 22), Spread = Vector2.new(75, 75), Lifetime = NumberRange.new(0.3, 0.5),
+		Acceleration = Vector3.new(0, -25, 0), Shape = Enum.ParticleEmitterShape.Disc })
 	if opts.burn then
-		local b = zone(m, 0.85)
+		local b = zone(m, 0.8)
 		b.Name = "Burn"
 		b:SetAttribute("Life", opts.burn)
 		emitter(b, "Flames", { Texture = TEX.Fire, Color = C.Gold, Color1 = C.Ember, Rate = 18, Continuous = true,
-			Size = NumberSequence.new(1.2, 0.2), Speed = NumberRange.new(1, 2), Lifetime = NumberRange.new(0.35, 0.5),
+			Size = seq(1.4, 0.2), Speed = NumberRange.new(1, 2), Lifetime = NumberRange.new(0.35, 0.5),
 			Spread = Vector2.new(10, 10), Shape = Enum.ParticleEmitterShape.Disc, Acceleration = Vector3.new(0, 4, 0) })
 		m:SetAttribute("Life", math.max(m:GetAttribute("Life"), opts.burn))
 	end
-	if opts.lingerDisc then
-		shape(m, "FX_Disc", opts.lingerDisc, { S = 0.95, Grow = 1, Fade0 = 0.6, Fade1 = 1, Life = opts.lingerLife or 1 })
-		m:SetAttribute("Life", math.max(m:GetAttribute("Life"), opts.lingerLife or 1))
-	end
-	light(m.PrimaryPart, color, 16, opts.lightBrightness or 3)
+	light(a, warm, 18, opts.lightBrightness or 3)
 	return m
 end
 
-local function swing(parent: Instance)
-	-- croissant du coup de taille : 9 segments (halo Sky, cœur blanc), le code en montre 7 pour 140°
-	local m = newModel(parent, "Cone", "cone", 0.3, 2.6)
-	for i = 1, ARC_SEGMENTS do
-		shape(m, "FX_ArcHalo" .. i, C.Sky, { S = 1, Seg = i, Fade0 = 0.35, Fade1 = 1, C = ARC_CENTERS["FX_ArcHalo" .. i] })
-		shape(m, "FX_ArcCore" .. i, C.White, { S = 1, Seg = i, Fade0 = 0, Fade1 = 1, C = ARC_CENTERS["FX_ArcCore" .. i] })
+local function wave(parent: Instance, name: string, color: Color3, opts)
+	-- onde : onde de choc douce au sol (une ou deux), éclair, poussière ou étincelles selon l'arme
+	opts = opts or {}
+	local m = newModel(parent, name, "area", opts.life or 0.45, 0.08)
+	local a = m.PrimaryPart
+	emitter(a, "Shock", { Texture = TEX.Shock, Flat = true, Color = color, Burst = opts.shocks or 2, SizeR = true,
+		Size = seq((opts.grow or 0.25) * SHOCK_R, 1.05 * SHOCK_R), Lifetime = NumberRange.new(0.3, 0.34),
+		Transparency = fade(0, 1), Brightness = 3 })
+	if opts.flash then
+		emitter(a, "Flash", { Color = C.White, Burst = 1, SizeR = true, Size = seq(opts.flash, 0.2), Speed = NumberRange.new(0),
+			Lifetime = NumberRange.new(0.12, 0.15), Transparency = fade(0.1, 1) })
 	end
-	local z = zone(m, 0.9)
-	emitter(z, "Sparks", { Texture = TEX.Spark, Color = C.White, Color1 = C.Sky, Burst = 10, PerRadius = true,
-		Size = NumberSequence.new(0.6, 0), Speed = NumberRange.new(10, 16), Lifetime = NumberRange.new(0.2, 0.3),
-		Spread = Vector2.new(40, 40), Shape = Enum.ParticleEmitterShape.Disc })
+	local z = zone(m, 0.8)
+	if opts.dust then
+		emitter(z, "Dust", { Texture = TEX.Smoke, Color = opts.dust, Color1 = C.Smoke, LightEmission = 0, Brightness = 1,
+			Burst = 6, PerRadius = true, SizeR = true, Size = seq(0.35, 0.7), Speed = NumberRange.new(2, 4),
+			Spread = Vector2.new(70, 70), Lifetime = NumberRange.new(0.6, 0.9), Transparency = fade(0.4, 1),
+			Acceleration = Vector3.new(0, 2, 0), Shape = Enum.ParticleEmitterShape.Disc })
+	end
+	if opts.mist then
+		emitter(z, "Mist", { Texture = TEX.Smoke, Color = opts.mist, Color1 = C.Frost, LightEmission = 0.4, Brightness = 1.5,
+			Burst = 6, PerRadius = true, SizeR = true, Size = seq(0.3, 0.45), Speed = NumberRange.new(1, 2),
+			Spread = Vector2.new(80, 80), Lifetime = NumberRange.new(0.7, 1.0), Transparency = fade(0.5, 1),
+			Shape = Enum.ParticleEmitterShape.Disc })
+	end
+	emitter(z, "Sparks", { Color = opts.sparkColor or C.White, Color1 = color, Burst = opts.sparks or 10, PerRadius = true,
+		Streak = true, Size = seq(0.4, 0), Speed = NumberRange.new(12, 20), Spread = Vector2.new(80, 80),
+		Lifetime = NumberRange.new(0.22, 0.38), Acceleration = Vector3.new(0, opts.gravity or -15, 0),
+		Shape = Enum.ParticleEmitterShape.Disc })
+	light(a, color, 16, 2.5)
 	return m
 end
 
-local function segment(parent: Instance, color: Color3, coreWidth: number, glowWidth: number)
-	-- éclair : 3 rayons blancs fins et 3 halos colorés entre P0..P3 ; le code décale P1 et P2 en zigzag
+local function slash(parent: Instance)
+	-- coup d'épée « ruban couché » : quatre couches de Beams FaceCamera (halo, lueur, bord, cœur blanc),
+	-- trois segments chacune entre S0..S3 ; WeaponFX les pose sur l'arc, règle largeurs et transparences
+	local m = newModel(parent, "Cone", "slash", 0.28, 2.2)
+	m:SetAttribute("Tilt", 8)
+	local a = m.PrimaryPart
+	local at = {}
+	for i = 0, 3 do
+		local x = Instance.new("Attachment")
+		x.Name = "S" .. i
+		x.Parent = a
+		at[i] = x
+	end
+	local layers = {
+		{ "Halo", C.Sky, 9.0, 0.82 },
+		{ "Glow", C.Sky, 6.0, 0.62 },
+		{ "Edge", C.Ice, 3.6, 0.35 },
+		{ "Core", C.White, 1.3, 0.0 },
+	}
+	for _, L in layers do
+		for i = 1, 3 do
+			local b = Instance.new("Beam")
+			b.Name = L[1] .. i
+			b.Attachment0 = at[i - 1]
+			b.Attachment1 = at[i]
+			b.Color = ColorSequence.new(L[2])
+			b.LightEmission = 1
+			b.LightInfluence = 0
+			b.FaceCamera = true
+			b.Segments = 12
+			b.Width0 = L[3]
+			b.Width1 = L[3]
+			b.Transparency = seq(L[4])
+			b.Texture = ""
+			b:SetAttribute("Layer", L[1])
+			b:SetAttribute("Seg", i)
+			b:SetAttribute("W", L[3])
+			b:SetAttribute("T", L[4])
+			b.Parent = a
+		end
+	end
+	emitter(at[3], "HeadSparks", { Color = C.White, Color1 = C.Sky, Burst = 8, Streak = true, Size = seq(0.4, 0),
+		Speed = NumberRange.new(10, 16), Lifetime = NumberRange.new(0.18, 0.28), Acceleration = Vector3.new(0, -15, 0) })
+	return m
+end
+
+local function segment(parent: Instance, color: Color3, points: number)
+	-- éclair : n segments fins (le code les décale en zigzag), halo peu opaque + cœur blanc fin
 	local m = newModel(parent, "Segment", "segment", 0.16, 2.5)
 	local a = m.PrimaryPart
 	local pts = {}
-	for i = 0, 3 do
+	for i = 0, points do
 		local at = Instance.new("Attachment")
 		at.Name = "P" .. i
 		at.Parent = a
 		pts[i] = at
 	end
-	for i = 1, 3 do
-		for _, spec in { { "Glow", color, glowWidth, 0.35 }, { "Core", C.White, coreWidth, 0 } } do
+	for i = 1, points do
+		for _, spec in { { "Glow", color, 1.4, 0.6 }, { "Core", C.White, 0.3, 0 } } do
 			local b = Instance.new("Beam")
 			b.Name = spec[1] .. i
 			b.Attachment0 = pts[i - 1]
@@ -371,61 +502,78 @@ local function segment(parent: Instance, color: Color3, coreWidth: number, glowW
 			b.LightEmission = 1
 			b.LightInfluence = 0
 			b.FaceCamera = true
-			b.Transparency = NumberSequence.new(spec[4])
+			b.Transparency = seq(spec[4])
 			b.Segments = 1
+			b.Texture = ""
 			b.Parent = a
 		end
 	end
 	local tip = Instance.new("Attachment")
 	tip.Name = "Tip"
 	tip.Parent = a
-	emitter(tip, "Flare", { Texture = TEX.Glow, Color = C.White, Color1 = color, Burst = 1, Size = NumberSequence.new(2.2, 0),
-		Speed = NumberRange.new(0), Lifetime = NumberRange.new(0.12, 0.16) })
-	emitter(tip, "Sparks", { Texture = TEX.Spark, Color = color, Burst = 5, Size = NumberSequence.new(0.5, 0),
-		Speed = NumberRange.new(8, 12), Lifetime = NumberRange.new(0.15, 0.25) })
+	emitter(tip, "Flare", { Color = C.White, Color1 = color, Burst = 1, Size = seq(3, 0.5), Speed = NumberRange.new(0),
+		Lifetime = NumberRange.new(0.12, 0.16), Transparency = fade(0, 1) })
+	emitter(tip, "Sparks", { Color = C.White, Color1 = color, Burst = 6, Streak = true, Size = seq(0.35, 0),
+		Speed = NumberRange.new(8, 14), Lifetime = NumberRange.new(0.15, 0.25) })
 	return m
 end
 
 local function aura(parent: Instance, color: Color3)
+	-- aura permanente : flaque de lumière douce, anneau qui pulse, poussière lumineuse qui monte
 	local m = newModel(parent, "Aura", "aura", 0, 0.1)
-	shape(m, "FX_Disc", color, { S = 1, Fade0 = 0.8, Fade1 = 0.8 })
-	shape(m, "FX_Ring", color, { S = 1, Fade0 = 0.1, Fade1 = 0.1, Pulse = 0.5 })
+	shape(m, "FX_Disc", color, { S = 1, Fade0 = 0.86, Fade1 = 0.86 })
+	shape(m, "FX_RingThick", color, { S = 1, Fade0 = 0.7, Fade1 = 0.7, Pulse = 0.8 })
+	shape(m, "FX_Ring", C.Cream, { S = 1, Fade0 = 0.45, Fade1 = 0.45 })
 	local z = zone(m, 0.85)
-	emitter(z, "Motes", { Texture = TEX.Spark, Color = C.Cream, Color1 = color, Rate = 6, Continuous = true,
-		Size = NumberSequence.new(0.6, 0), Speed = NumberRange.new(1, 2), Lifetime = NumberRange.new(0.6, 1),
-		Spread = Vector2.new(10, 10), Shape = Enum.ParticleEmitterShape.Disc, Acceleration = Vector3.new(0, 3, 0) })
+	emitter(z, "Motes", { Color = C.Cream, Color1 = color, Rate = 8, Continuous = true, Size = seq(0.5, 0),
+		Speed = NumberRange.new(1, 2), Lifetime = NumberRange.new(0.7, 1.1), Spread = Vector2.new(10, 10),
+		Shape = Enum.ParticleEmitterShape.Disc, Acceleration = Vector3.new(0, 3, 0), Transparency = fade(0.2, 1) })
 	return m
 end
 
-local function orbit(parent: Instance, pieceName: string, trailColor: Color3, scale: number?)
+local function orbit(parent: Instance, pieceName: string, color: Color3, scale: number?)
+	-- objet en orbite (pixel art) avec une traînée douce
 	local m = newModel(parent, "Orbit", "orbit", 0, 2)
 	piece(m, pieceName, FLAT, scale)
-	local t = trail(m.PrimaryPart, trailColor, 0.6, 0.12)
-	t:SetAttribute("Trail", true)
+	softTrail(m.PrimaryPart, color, 0.8, 0.14)
 	return m
 end
 
 local function telegraph(parent: Instance)
-	-- alerte du joueur : anneau Gold en pointillé, disque doré qui se remplit, bord blanc ; jamais coupé
+	-- alerte du joueur : anneau or-orangé épais, un second anneau qui se resserre jusqu'à l'impact, voile léger
 	local m = newModel(parent, "Telegraph", "telegraph", 0, 0.06)
-	shape(m, "FX_Ring", C.Ink, { S = 1.03, Fade0 = 0.55, Fade1 = 0.55, Matte = true })
-	shape(m, "FX_RingDashed", C.Gold, { S = 1, Fade0 = 0, Fade1 = 0, Spin = 0.6 })
-	shape(m, "FX_Disc", C.Gold, { S = 1, Fade0 = 0.88, Fade1 = 0.88 })
-	shape(m, "FX_Disc", C.Gold, { S = 1, Fill = true, Fade0 = 0.75, Fade1 = 0.6 })
-	shape(m, "FX_Ring", C.White, { S = 1, Fill = true, Fade0 = 0.1, Fade1 = 0 })
+	shape(m, "FX_RingThick", C.Amber, { S = 1, Fade0 = 0.35, Fade1 = 0.35 })
+	shape(m, "FX_Ring", C.Butter, { S = 1, Shrink = 0.55, Fade0 = 0.2, Fade1 = 0.1 })
+	shape(m, "FX_Disc", C.Amber, { S = 1, Fade0 = 0.9, Fade1 = 0.84 })
 	return m
 end
 
-local function fall(parent: Instance, pieceName: string, scale: number?, glow: Color3?)
-	-- pièce qui tombe du ciel pendant le télégraphe (météore, bombe)
+local function fallBomb(parent: Instance)
+	-- bombe (pixel art) qui tombe pendant l'alerte : mèche lumineuse et traînée
 	local m = newModel(parent, "Fall", "fall", 0, 0.8)
-	piece(m, pieceName, UPRIGHT, scale)
-	local t = trail(m.PrimaryPart, glow or C.Ember, 1.2, 0.25, C.Gold)
-	t:SetAttribute("Trail", true)
-	if glow then
-		emitter(m.PrimaryPart, "Glow", { Texture = TEX.Fire, Color = C.Gold, Color1 = glow, Rate = 30, Continuous = true,
-			Size = NumberSequence.new(2.4, 0.4), Speed = NumberRange.new(0.5, 1), Lifetime = NumberRange.new(0.15, 0.25) })
-	end
+	piece(m, "Bomb", UPRIGHT, 1)
+	emitter(m.PrimaryPart, "Fuse", { Color = C.Butter, Color1 = C.Amber, Rate = 30, Continuous = true, Size = seq(1.2, 0),
+		Speed = NumberRange.new(1, 3), Lifetime = NumberRange.new(0.15, 0.25), Transparency = fade(0.1, 1) })
+	softTrail(m.PrimaryPart, C.Amber, 1.0, 0.25)
+	return m
+end
+
+local function fallMeteor(parent: Instance)
+	-- météore : roc de feu (lueur, flammes, cœur blanc), colonne de fumée derrière
+	local m = newModel(parent, "Fall", "fall", 0, 0.8)
+	local a = m.PrimaryPart
+	emitter(a, "Glow", { Color = C.Amber, Rate = 40, Continuous = true, Locked = true, Size = seq(6.5, 4),
+		Speed = NumberRange.new(0), Lifetime = NumberRange.new(0.08, 0.1), Transparency = fade(0.3, 1) })
+	emitter(a, "Core", { Color = C.White, Rate = 40, Continuous = true, Locked = true, Size = seq(2.8, 1.8),
+		Speed = NumberRange.new(0), Lifetime = NumberRange.new(0.06, 0.08), Transparency = fade(0, 1) })
+	emitter(a, "Flames", { Texture = TEX.Core, Color = C.Butter, Color1 = C.Gold, LightEmission = 0.7, Rate = 50,
+		Continuous = true, Size = seq(3.2, 1), Speed = NumberRange.new(0.5, 2), Lifetime = NumberRange.new(0.25, 0.4),
+		Transparency = fade(0.05, 1), RotSpeed = NumberRange.new(-120, 120) })
+	emitter(a, "Smoke", { Texture = TEX.Smoke, Color = C.Smoke, Color1 = C.Ash, LightEmission = 0, Brightness = 1, Rate = 16,
+		Continuous = true, Size = seq(2, 3.4), Speed = NumberRange.new(0.5, 1), Lifetime = NumberRange.new(0.6, 0.9),
+		Transparency = fade(0.5, 1) })
+	softTrail(a, C.Amber, 2.4, 0.3)
+	light(a, C.Amber, 16, 3)
 	return m
 end
 
@@ -435,40 +583,40 @@ local function weapon(id: string): Folder
 	return folder(W, id)
 end
 
-swing(weapon("Broadsword"))
+slash(weapon("Broadsword"))
 
-projectile(weapon("Longbow"), "Arrow", FLY_X, C.Cream, { trailWidth = 0.35 })
-impact(weapon("Longbow"), "Impact", C.Leaf, 6)
+lightShot(weapon("Longbow"), C.Teal, 0.7, 0.22)
+impact(weapon("Longbow"), "Impact", C.Teal, 6)
 
-projectile(weapon("FireStaff"), nil, CFrame.new(), C.Ember, { glow = C.Gold, fire = C.Gold, trailWidth = 1.1, trailLife = 0.25, trailColor1 = C.Ember })
-ringBurst(weapon("FireStaff"), "Area", "area", C.Ember, { flash = 4, smoke = 6, sparks = 14, burn = 2, core = C.Gold })
+fireball(weapon("FireStaff"))
+explosion(weapon("FireStaff"), "Area", { burn = 2 })
 
-ringBurst(weapon("QuakeHammer"), "Area", "area", C.Cream, { grow = 0.15, smoke = 10, sparks = 8, fillAlpha = 0.85, life = 0.45 })
+wave(weapon("QuakeHammer"), "Area", C.Cream, { grow = 0.15, dust = C.Dust, sparks = 6, sparkColor = C.Cream, flash = 0.6 })
 
-projectile(weapon("ThrowingDaggers"), "ThrowingDaggers", FLY_UP, C.Grape, { trailWidth = 0.3, scale = 0.6 })
-impact(weapon("ThrowingDaggers"), "Impact", C.White, 5)
+lightShot(weapon("ThrowingDaggers"), C.Lilac, 0.55, 0.18)
+impact(weapon("ThrowingDaggers"), "Impact", C.Lilac, 5)
 
 aura(weapon("HolyAura"), C.Gold)
 
 orbit(weapon("SpinningAxes"), "SpinningAxes", C.Cream, 0.7)
 
-ringBurst(weapon("BeastWhip"), "Area", "area", C.Ember, { ring = "FX_Ring", grow = 0.6, fill = false, sparks = 12, sparkColor = C.Gold, life = 0.3 })
+wave(weapon("BeastWhip"), "Area", C.Amber, { grow = 0.5, shocks = 1, sparks = 12, sparkColor = C.Butter, life = 0.3 })
 
-segment(weapon("LightningChain"), C.Sky, 0.18, 0.9)
+segment(weapon("LightningChain"), C.Sky, 10)
 
-ringBurst(weapon("FrostNova"), "Area", "area", C.Sky, { grow = 0.2, sparks = 16, sparkColor = C.White, fillColor = C.White, lingerDisc = C.Sky, lingerLife = 1 })
+wave(weapon("FrostNova"), "Area", C.Ice, { grow = 0.2, mist = C.Frost, sparks = 14, sparkColor = C.Frost, gravity = -4, life = 0.5 })
 
-projectile(weapon("Boomerang"), "Boomerang", FLAT, C.Gold, { spin = 18, trailWidth = 0.8, scale = 0.8 })
+pieceShot(weapon("Boomerang"), "Boomerang", FLAT, C.Gold, { spin = 18, trailWidth = 1.0, scale = 0.8 })
 
 telegraph(folder(FX, "Shared"))
-fall(weapon("BombBag"), "Bomb", 1)
-ringBurst(weapon("BombBag"), "Area", "area", C.Ember, { flash = 5, smoke = 8, sparks = 16, core = C.Gold })
+fallBomb(weapon("BombBag"))
+explosion(weapon("BombBag"), "Area", {})
 
-projectile(weapon("SpearThrow"), "SpearThrow", FLY_UP, C.Cream, { trailWidth = 0.45 })
-impact(weapon("SpearThrow"), "Impact", C.White, 6)
+lightShot(weapon("SpearThrow"), C.Butter, 0.8, 0.3)
+impact(weapon("SpearThrow"), "Impact", C.Butter, 6)
 
-fall(weapon("MeteorRain"), "MeteorRain", 1.2, C.Ember)
-ringBurst(weapon("MeteorRain"), "Area", "area", C.Ember, { flash = 6, smoke = 10, sparks = 20, burn = 2, core = C.Gold })
+fallMeteor(weapon("MeteorRain"))
+explosion(weapon("MeteorRain"), "Area", { burn = 2, fire = 9, embers = 16 })
 
 orbit(weapon("OrbitingBlades"), "OrbitingBlades", C.Sky, 0.45)
 
@@ -476,35 +624,35 @@ do
 	local t = newModel(weapon("CrossbowTurret"), "Turret", "turret", 0, 0)
 	piece(t, "CrossbowTurret", UPRIGHT, 0.9)
 	emitter(t.PrimaryPart, "Dust", { Texture = TEX.Smoke, Color = C.Smoke, LightEmission = 0, Brightness = 1, Burst = 8,
-		Size = NumberSequence.new(1.6, 2.6), Speed = NumberRange.new(3, 5), Lifetime = NumberRange.new(0.4, 0.6),
-		Spread = Vector2.new(80, 80) })
+		Size = seq(1.6, 2.6), Speed = NumberRange.new(3, 5), Lifetime = NumberRange.new(0.4, 0.6),
+		Spread = Vector2.new(80, 80), Transparency = fade(0.4, 1) })
 end
-projectile(weapon("CrossbowTurret"), "Bolt", FLY_X, C.Cream, { trailWidth = 0.3 })
-impact(weapon("CrossbowTurret"), "Impact", C.White, 4)
+lightShot(weapon("CrossbowTurret"), C.Cream, 0.5, 0.16)
+impact(weapon("CrossbowTurret"), "Impact", C.Cream, 4)
 
 -- 6. Effets des passifs et des objets (Codec.Visual)
 local SP = folder(FX, "Special")
-ringBurst(folder(SP, "Parry"), "Area", "area", C.Royal, { ring = "FX_Ring", grow = 0.5, fill = false, sparks = 8, sparkColor = C.White, life = 0.3 })
+wave(folder(SP, "Parry"), "Area", C.Royal, { grow = 0.5, shocks = 1, sparks = 8, flash = 0.5, life = 0.3 })
 do
 	local m = newModel(folder(SP, "Blessing"), "Area", "area", 0.8, 0.1)
 	local z = zone(m, 0.8)
-	emitter(z, "Crosses", { Texture = TEX.Spark, Color = C.Gold, Color1 = C.Cream, Burst = 8, Size = NumberSequence.new(0.9, 0),
-		Speed = NumberRange.new(2, 4), Lifetime = NumberRange.new(0.6, 0.8), Spread = Vector2.new(10, 10),
-		Shape = Enum.ParticleEmitterShape.Disc, Acceleration = Vector3.new(0, 4, 0) })
+	emitter(z, "Motes", { Color = C.Gold, Color1 = C.Cream, Burst = 10, Size = seq(0.6, 0), Speed = NumberRange.new(2, 4),
+		Lifetime = NumberRange.new(0.6, 0.8), Spread = Vector2.new(10, 10), Shape = Enum.ParticleEmitterShape.Disc,
+		Acceleration = Vector3.new(0, 4, 0) })
 end
-projectile(folder(SP, "Ghost"), nil, CFrame.new(), C.Cream, { glow = C.White, glowSize = 2.6, trailWidth = 1.2, trailLife = 0.3 })
-ringBurst(folder(SP, "Whistle"), "Area", "area", C.White, { ring = "FX_Ring", grow = 0.2, fill = false, sparks = 6, life = 0.4 })
-ringBurst(folder(SP, "Megaphone"), "Area", "area", C.Gold, { ring = "FX_Ring", grow = 0.2, fillAlpha = 0.9, sparks = 10, life = 0.4 })
-ringBurst(folder(SP, "Thorns"), "Area", "area", C.Stone, { ring = "FX_RingThick", grow = 0.3, fill = false, sparks = 8, sparkColor = C.Cream, life = 0.3 })
+lightShot(folder(SP, "Ghost"), C.Frost, 1.0, 0.3)
+wave(folder(SP, "Whistle"), "Area", C.White, { grow = 0.2, shocks = 1, sparks = 6, life = 0.4 })
+wave(folder(SP, "Megaphone"), "Area", C.Gold, { grow = 0.2, sparks = 10, life = 0.4 })
+wave(folder(SP, "Thorns"), "Area", C.Stone, { grow = 0.3, shocks = 1, sparks = 8, sparkColor = C.Cream, life = 0.3 })
 do
 	local m = newModel(folder(SP, "Shadowstep"), "Area", "area", 0.6, 0.1)
 	local z = zone(m, 0.6)
 	emitter(z, "Smoke", { Texture = TEX.Smoke, Color = C.Plum, Color1 = C.Grape, LightEmission = 0.3, Burst = 10,
-		Size = NumberSequence.new(2, 3.4), Speed = NumberRange.new(2, 4), Lifetime = NumberRange.new(0.4, 0.6),
+		Size = seq(2, 3.4), Speed = NumberRange.new(2, 4), Lifetime = NumberRange.new(0.4, 0.6),
 		Shape = Enum.ParticleEmitterShape.Disc, Acceleration = Vector3.new(0, 4, 0) })
 end
-segment(folder(SP, "ChainBolt"), C.Gold, 0.14, 0.7)
-ringBurst(folder(SP, "MiniBomb"), "Area", "area", C.Ember, { flash = 2.5, smoke = 3, sparks = 8, core = C.Gold, life = 0.35 })
+segment(folder(SP, "ChainBolt"), C.Gold, 6)
+explosion(folder(SP, "MiniBomb"), "Area", { life = 0.4, fire = 4, smoke = 3, embers = 8, lightBrightness = 2 })
 
 -- 7. Attaques des ennemis (EnemyAttackFX) : couleur posée par le code selon le profil de l'ennemi,
 -- peu lumineuses (le Neon et la lumière sont pour le joueur), formes mates
@@ -512,40 +660,35 @@ local EN = folder(FX, "Enemies")
 do
 	local m = newModel(EN, "Sweep", "enemy", 0.4, 1.2)
 	local z = zone(m, 0.6)
-	emitter(z, "Swipe", { Texture = TEX.Spark, LightEmission = 0.3, Burst = 6, Size = NumberSequence.new(1.1, 0),
-		Speed = NumberRange.new(6, 9), Lifetime = NumberRange.new(0.2, 0.3), Spread = Vector2.new(35, 10),
-		Shape = Enum.ParticleEmitterShape.Disc, Squash = NumberSequence.new(-1.5) })
-	emitter(z, "Debris", { Texture = TEX.Spark, LightEmission = 0.2, Burst = 5, Size = NumberSequence.new(0.5, 0),
-		Speed = NumberRange.new(5, 9), Lifetime = NumberRange.new(0.3, 0.45), Acceleration = Vector3.new(0, -25, 0) })
+	emitter(z, "Swipe", { LightEmission = 0.3, Burst = 6, Size = seq(1.1, 0), Speed = NumberRange.new(6, 9),
+		Lifetime = NumberRange.new(0.2, 0.3), Spread = Vector2.new(35, 10), Shape = Enum.ParticleEmitterShape.Disc, Streak = true })
+	emitter(z, "Debris", { LightEmission = 0.2, Burst = 5, Size = seq(0.5, 0), Speed = NumberRange.new(5, 9),
+		Lifetime = NumberRange.new(0.3, 0.45), Acceleration = Vector3.new(0, -25, 0) })
 end
 do
 	local m = newModel(EN, "Burst", "enemy", 0.4, 0.08)
 	shape(m, "FX_Ring", C.White, { S = 1, Grow = 0.3, Fade0 = 0.3, Fade1 = 1, Matte = true })
 	local z = zone(m, 0.6)
 	emitter(z, "Dust", { Texture = TEX.Smoke, LightEmission = 0, Brightness = 1, Burst = 4, PerRadius = true,
-		Size = NumberSequence.new(1.4, 2.4), Speed = NumberRange.new(2, 4), Lifetime = NumberRange.new(0.35, 0.5),
-		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.55), NumberSequenceKeypoint.new(1, 1) }),
-		Shape = Enum.ParticleEmitterShape.Disc })
-	emitter(z, "Debris", { Texture = TEX.Spark, LightEmission = 0.2, Burst = 6, Size = NumberSequence.new(0.5, 0),
-		Speed = NumberRange.new(6, 10), Lifetime = NumberRange.new(0.3, 0.45), Spread = Vector2.new(60, 60),
-		Acceleration = Vector3.new(0, -25, 0) })
+		Size = seq(1.4, 2.4), Speed = NumberRange.new(2, 4), Lifetime = NumberRange.new(0.35, 0.5),
+		Transparency = fade(0.55, 1), Shape = Enum.ParticleEmitterShape.Disc })
+	emitter(z, "Debris", { LightEmission = 0.2, Burst = 6, Size = seq(0.5, 0), Speed = NumberRange.new(6, 10),
+		Lifetime = NumberRange.new(0.3, 0.45), Spread = Vector2.new(60, 60), Acceleration = Vector3.new(0, -25, 0) })
 end
 do
 	local m = newModel(EN, "Shot", "enemy", 0.3, 1.6)
 	emitter(m.PrimaryPart, "Puff", { Texture = TEX.Smoke, LightEmission = 0.1, Brightness = 1, Burst = 3,
-		Size = NumberSequence.new(1.2, 2), Speed = NumberRange.new(2, 4), Lifetime = NumberRange.new(0.2, 0.3),
-		Spread = Vector2.new(25, 25) })
-	emitter(m.PrimaryPart, "Debris", { Texture = TEX.Spark, LightEmission = 0.2, Burst = 4, Size = NumberSequence.new(0.4, 0),
-		Speed = NumberRange.new(6, 10), Lifetime = NumberRange.new(0.15, 0.25), Spread = Vector2.new(25, 25) })
+		Size = seq(1.2, 2), Speed = NumberRange.new(2, 4), Lifetime = NumberRange.new(0.2, 0.3), Spread = Vector2.new(25, 25) })
+	emitter(m.PrimaryPart, "Debris", { LightEmission = 0.2, Burst = 4, Size = seq(0.4, 0), Speed = NumberRange.new(6, 10),
+		Lifetime = NumberRange.new(0.15, 0.25), Spread = Vector2.new(25, 25) })
 end
 do
 	local m = newModel(EN, "Land", "enemy", 0.45, 0.08)
 	shape(m, "FX_RingThick", C.White, { S = 1, Grow = 0.25, Fade0 = 0.35, Fade1 = 1, Matte = true })
 	local z = zone(m, 0.7)
 	emitter(z, "Dust", { Texture = TEX.Smoke, LightEmission = 0, Brightness = 1, Burst = 6, PerRadius = true,
-		Size = NumberSequence.new(1.6, 2.8), Speed = NumberRange.new(3, 5), Lifetime = NumberRange.new(0.4, 0.55),
-		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 1) }),
-		Shape = Enum.ParticleEmitterShape.Disc })
+		Size = seq(1.6, 2.8), Speed = NumberRange.new(3, 5), Lifetime = NumberRange.new(0.4, 0.55),
+		Transparency = fade(0.5, 1), Shape = Enum.ParticleEmitterShape.Disc })
 end
 do
 	local m = newModel(EN, "Boss", "enemy", 0.6, 0.08)
@@ -553,12 +696,11 @@ do
 	shape(m, "FX_Disc", C.White, { S = 0.95, Grow = 0.5, Fade0 = 0.75, Fade1 = 1, Matte = true })
 	local z = zone(m, 0.7)
 	emitter(z, "Dust", { Texture = TEX.Smoke, LightEmission = 0, Brightness = 1, Burst = 10, PerRadius = true,
-		Size = NumberSequence.new(2.5, 4.5), Speed = NumberRange.new(3, 6), Lifetime = NumberRange.new(0.5, 0.8),
-		Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.45), NumberSequenceKeypoint.new(1, 1) }),
-		Shape = Enum.ParticleEmitterShape.Disc })
-	emitter(z, "Debris", { Texture = TEX.Spark, LightEmission = 0.2, Burst = 12, PerRadius = true, Size = NumberSequence.new(0.8, 0),
+		Size = seq(2.5, 4.5), Speed = NumberRange.new(3, 6), Lifetime = NumberRange.new(0.5, 0.8),
+		Transparency = fade(0.45, 1), Shape = Enum.ParticleEmitterShape.Disc })
+	emitter(z, "Debris", { LightEmission = 0.2, Burst = 12, PerRadius = true, Size = seq(0.8, 0),
 		Speed = NumberRange.new(10, 16), Lifetime = NumberRange.new(0.4, 0.6), Spread = Vector2.new(60, 60),
 		Acceleration = Vector3.new(0, -30, 0), Shape = Enum.ParticleEmitterShape.Disc })
 end
 
-print("A14 : effets posés dans ReplicatedStorage.Assets.FX (Weapons, Special, Shared, Enemies, Shapes)")
+print("A14 : effets v2 posés dans ReplicatedStorage.Assets.FX (Weapons, Special, Shared, Enemies ; Shapes gardé)")
