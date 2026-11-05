@@ -1,6 +1,6 @@
 # 65 — Lobby : hub 3D et menus (domaine A09)
 
-Statut : **5 nov. 2026 : le lobby passe à un bouton Play et une barre de menus** (décision de Clément, `01-decisions-v2.md` §7). Ce dossier est réécrit pour ce flux. Restent valables : les 8 écrans de menu et leur habillage (validés le 4 nov.), et les réponses du 4 nov. (§12). Rien n'est construit en vague 1.
+Statut : **5 nov. 2026 : le lobby passe à un bouton Play et une barre de menus** (décision de Clément, `01-decisions-v2.md` §7). Ce dossier est réécrit pour ce flux. Restent valables : les 8 écrans de menu et leur habillage (validés le 4 nov.), et les réponses du 4 nov. (§12). **Lobby jouable en cours de montage dans COHUE** (§2.3) : HUD du hub, choix du mode, menu Classes, 7 menus provisoires.
 Sources : `01-decisions-v2.md` (fait foi), `80-direction-artistique.md` (tout en tenons), `00-vision.md` §5.1, §11.3, §12.1, `70-donnees-progression-monetisation.md` §6, §8, §9, §13, §15, `60-ui-ux.md`.
 
 Le lobby se pilote par l'UI. Un gros bouton **PLAY** lance une run en deux touches, et une **barre de 8 boutons** en bas de l'écran ouvre les menus. Le village est un **décor** composé par Clément avec le kit d'A01 : un bâtiment par menu, avec son nom en grandes lettres de briques, et entrer dans un bâtiment ouvre le même menu. Une première run démarre en **25 à 35 s**.
@@ -61,18 +61,20 @@ Maquette de structure : écran 0 du [Figma](https://www.figma.com/design/cdIWE7A
 
 **Couleurs** : un bouton de la barre, l'en-tête de son menu et son bâtiment partagent la même couleur (variables `zone/*` de A08 ; barre v3 alignée par A08 le 5 nov., commit 621e34f de sa branche).
 
-| Menu | Couleur | Variable |
-| --- | --- | --- |
-| Classes | turquoise | `zone/classes` |
-| Critters | vert lime | `zone/critters` |
-| Upgrades | violet | à créer : `zone/upgrades` |
-| Inventory | acier | à créer : `zone/inventory` |
-| Quests | bleu | `zone/quests` |
-| Ranks | or | `zone/ranks` |
-| Pass | ciel | à créer : `zone/pass` |
-| Shop | mandarine | `zone/shop` |
-| Queue & Party, portail | violet | `zone/play` |
-| Settings | gris | `zone/settings` |
+| Menu | Couleur | Variable Figma | Couleur dans COHUE (palette 16) |
+| --- | --- | --- | --- |
+| Classes | turquoise | `zone/classes` | Sky |
+| Critters | vert lime | `zone/critters` | Lime |
+| Upgrades | violet | à créer : `zone/upgrades` | Grape |
+| Inventory | acier | à créer : `zone/inventory` | Steel |
+| Quests | bleu | `zone/quests` | Royal |
+| Ranks | or | `zone/ranks` | Gold |
+| Pass | rose (ciel avant le 5 nov.) | à créer : `zone/pass` | Bubblegum |
+| Shop | mandarine | `zone/shop` | Ember |
+| Queue & Party, portail | violet | `zone/play` | Grape |
+| Settings | gris | `zone/settings` | Stone |
+
+Dans le jeu, les couleurs viennent de la palette COHUE 16 (`UIKit.tone`), qui n'a pas de turquoise : Classes prend Sky. Pass passe donc en Bubblegum, sinon il aurait la même couleur que Classes.
 
 Le bouton PLAY reste **vert** : c'est l'action principale (rôle Go), pas une zone. Les fenêtres v3 de A08 n'ont que 5 couleurs (Gold, Sky, Leaf, Tomato, Plum) : il faut que l'en-tête de `Window` suive la zone de son menu (demande à A08).
 
@@ -107,6 +109,32 @@ Réglages : bouton engrenage en haut à droite, pas dans la barre.
 3. Téléportation (MatchService, modes Solo / Party / Public), puis écran de chargement de run (n° 1b).
 
 Entrer dans le portail du village ouvre aussi l'écran Queue & Party.
+
+### 2.3 Montage dans COHUE (5 nov., A09-04)
+
+Règle de Clément : rien de visible n'est construit par script en jeu. Les écrans sont posés une fois dans la place par l'outil d'édition `tools/ui/build-lobby.luau` (lancé par `execute_luau` en mode Edit, comme `build-ui-v3.luau` de A08) ; Clément les voit dans StarterGui, peut les retoucher et les sauvegarde.
+
+| Objet posé | Contenu |
+| --- | --- |
+| `StarterGui.COHUE_Lobby` | Zone `Bottom` : `Status` (étiquette), `Play` (brique verte 220 × 58, touche ENTER), `Bar` (8 boutons 66 × 60 : icône, libellé, pastille cachée, touche 1-8). `TopLeft.Silver` (argent). `TopRight.Settings` (engrenage) |
+| `StarterGui.COHUE_ModeSelect` | Fond `Scrim`, fenêtre « PLAY WITH... » (Grape) : `Modes.Solo / Friends / Public`, `Countdown` (chiffre, CANCEL), `Status`, `Header.Close` |
+| `StarterGui.COHUE_LobbyMenus` | Fond `Scrim`, une fenêtre par menu dans `Center` (en-tête de la couleur du menu, icône, titre, croix). `Classes` : 8 tuiles (`Tiles.Tile1..8`) et une ligne `Hint`. Les 7 autres : « COMING SOON » et une phrase |
+
+Le code : `client/Controllers/Lobby/LobbyController.luau` retrouve ces objets, les remplit (argent, classes et cadenas d'après le profil), les montre et les anime. Il est lancé par `LoadoutUI` quand `COHUE_Lobby` existe ; sans gabarits, l'ancien écran de choix reste.
+
+| Action | Effet aujourd'hui (une seule place) |
+| --- | --- |
+| PLAY (ou ENTRÉE) | Ouvre « PLAY WITH... » |
+| SOLO | Décompte de 3 s (CANCEL possible), puis `SelectLoadout(classe, compagnon)` |
+| PUBLIC | `SelectLoadout` tout de suite ; « WAITING FOR PLAYERS... » s'il y a d'autres joueurs |
+| FRIENDS | Invitation Roblox (`SocialService:PromptGameInvite`) ; on lance ensuite avec PUBLIC |
+| Classes | Choisir une classe débloquée ; elle part avec PLAY. Classe verrouillée : cadenas et phrase d'aide |
+| Les 7 autres boutons | Fenêtre provisoire de la couleur du menu |
+| Engrenage | `SettingsUI.open()` (A08) |
+
+Le serveur décide de tout : `SelectLoadout` dit seulement « prêt, avec cette classe ». Tant que A04 n'a pas fait la demande du §10, le serveur garde le comportement d'avant le lobby : la run démarre quand **tous** les joueurs du serveur sont prêts, et un joueur qui n'a rien choisi est déclaré prêt au bout de 45 s (5 s dans Studio). À la fin de la run, personne ne revient au lobby.
+
+Point d'apparition : `Workspace.SpawnLocation` est posé sur l'arrivée du lobby (meule de foin, rôle `Arrival`). Clément peut le déplacer où il veut sur sa carte.
 
 ---
 
@@ -282,7 +310,7 @@ Ouvert par PLAY. Trois cartes de mode : **Solo**, **Friends**, **Public**. Group
 
 ## 9. Ce qui reste à faire (vague 2, après validation)
 
-- **A09-04** : `LobbyController` côté client (HUD du hub : PLAY, barre, zones de porte `Door_<Menu>`), sur la carte de Clément. Plus de blockout du village par A09.
+- **A09-04** : `LobbyController` côté client (HUD du hub : PLAY, barre, zones de porte `Door_<Menu>`), sur la carte de Clément. Plus de blockout du village par A09. **En cours (5 nov.)** : HUD, choix du mode, menu Classes et menus provisoires (§2.3) ; restent les portes `Door_<Menu>` (quand la carte aura ses bâtiments), les pastilles et l'aperçu de l'avatar dans Classes (§6.2).
 - **A09-05** : Queue & Party, file et téléportation (avec MatchService).
 - **A09-06** : tableaux 3D du bâtiment RANKS.
 - **A09-07** : Critters, Shop, Upgrades, Inventory, Pass.
@@ -290,10 +318,17 @@ Ouvert par PLAY. Trois cartes de mode : **Solo**, **Friends**, **Public**. Group
 
 ## 10. Demandes de contrat (pour la vague 2)
 
+**Contract request (A04, run — 5 nov., pour que PLAY lance vraiment la run depuis le lobby, dans la place unique COHUE)** :
+1. **Pas de « prêt » automatique au lobby.** En phase `Loadout`, ne plus déclarer prêt un joueur au bout de `LoadoutTimeout` / `StudioLoadoutTimeout` quand le lobby est dans la place (réglage proposé `Config.Run.LobbyInPlace = true`). Le joueur reste au lobby tant qu'il n'a pas appuyé sur PLAY.
+2. **La run part avec les joueurs prêts, pas avec tout le serveur.** `startRun` ne prend que les joueurs qui ont envoyé `SelectLoadout`. Départ proposé : `Run.LobbyStartDelay` s (3) après le premier prêt ; ceux qui sont prêts pendant ce délai partent ensemble. Les autres restent au lobby et entrent ensuite comme retardataires (c'est déjà le cas avec `onReady`).
+3. **Retour au lobby en fin de run.** Après le résumé (Replay non choisi, ou bouton « Back to lobby » de l'EndScreen), téléporter les joueurs de la run au point d'apparition du lobby (`Workspace.SpawnLocation`, ou la Part qui porte l'attribut `LobbyRole = "Arrival"`), avec l'exemption de `MovementGuard`, puis repasser en `Loadout` avec les drapeaux « prêt » remis à zéro.
+4. **Qui est dans la run.** Poser l'attribut `InRun` (booléen) sur chaque joueur. Aujourd'hui l'UI (HUD de A08, LobbyController) déduit « en run » de la phase globale ; un joueur resté au lobby pendant la run d'un autre verrait le HUD de run.
+
 | Domaine | Demande |
 | --- | --- |
-| lead (ARCHITECTURE) | Périmètre A09 : `client/Controllers/Lobby/*`, `server/Services/LobbyService.luau`, et les modèles d'UI du lobby dans COHUE (rien construit par script) |
-| data (A12) | `MatchRequest` : un groupe et un mode `Solo` / `Party` / `Public` ; reformer le groupe au retour ; `getParty(player)` ; données du pass saisonnier (paliers, piste gratuite et payante, XP gagnée en jouant) ; texte de la quête de déblocage de chaque classe |
+| lead (ARCHITECTURE) | Périmètre A09 : `client/Controllers/Lobby/*`, `server/Services/LobbyService.luau`, et les modèles d'UI du lobby dans COHUE (rien construit par script). Ajouter `"LobbyController"` à l'ordre de `client/Main.client.luau`, après `LoadoutUI` (en attendant, `LoadoutUI` le lance ; un double lancement est sans effet) |
+| ui (A08) | `HUD` et `UITheme.inRun()` : lire l'attribut `InRun` du joueur (demande A04 n° 4) plutôt que la phase globale |
+| data (A12) | `SelectLoadout` / `setLoadout` : accepter les ids de classe v2 (`Knight`, `Archer`...) ; le profil et `Progression.Unlocks` sont encore en ids v1 (`Cornu`...), alors le menu Classes envoie l'id v1. `MatchRequest` : un groupe et un mode `Solo` / `Party` / `Public` ; reformer le groupe au retour ; `getParty(player)` ; données du pass saisonnier (paliers, piste gratuite et payante, XP gagnée en jouant) ; texte de la quête de déblocage de chaque classe |
 | classes (A04) | `applyClass(player, classId)` utilisable dans le lobby (palier 1) |
 | companion (A05) | Mode lobby de `CompanionRenderer` : le compagnon équipé suit son joueur ; la collection se promène dans l'enclos (client seul) |
 | ui (A08) | Style du bouton PLAY et des boutons de la barre (icône + mot, pastille de nombre) ; **8 icônes de barre** (Classes, Critters, Upgrades, Inventory, Quests, Ranks, Pass, Shop) ; icônes des classes et de Solo / Friends / Public ; `SettingsUI` d'après la maquette n° 7 ; variables `zone/*` : faites et reliées |
