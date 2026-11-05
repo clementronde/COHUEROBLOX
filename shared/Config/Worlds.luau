@@ -21,9 +21,10 @@ export type World = {
 	id: string,
 	name: Types.LocalizedText,
 	size: number, -- square side, centred on the origin
-	roster: { Swarm: number, Jumper: number, Shooter: number, Armored: number },
-	swarmVariant: number?,
-	armoredVariant: number?,
+	-- Une espèce par famille (EnemyService.pickKind). Swarm obligatoire, les autres facultatives.
+	roster: { Swarm: number, Jumper: number?, Shooter: number?, Armored: number?, Support: number?, Kamikaze: number? },
+	-- Variante d'une famille : remplace l'espèce du roster avec la probabilité `chance`.
+	variants: { [string]: { kind: number, chance: number } }?,
 	miniBoss: number,
 	boss: string, -- Bosses id (stage 1 and Enraged stage 2)
 	finalBoss: string, -- stage 3 of Tier 3
@@ -58,9 +59,9 @@ local Worlds: { [string]: World } = {
 		id = "BoisGrognon",
 		name = { en = "Grumpy Woods", fr = "Grumpy Woods" },
 		size = 560,
-		roster = { Swarm = 1, Jumper = 2, Shooter = 3, Armored = 4 },
-		swarmVariant = 21,
-		armoredVariant = 22,
+		-- Gobelins + faune de la forêt (dossier 13 §3.1). Pas de blindé : le Bomber tient le rôle du gros.
+		roster = { Swarm = 21, Jumper = 2, Shooter = 22, Support = 4, Kamikaze = 23 },
+		variants = { Swarm = { kind = 1, chance = 0.35 }, Shooter = { kind = 3, chance = 0.35 } },
 		miniBoss = 13,
 		boss = "GrandCheneRonchon",
 		finalBoss = "GrandBrouhaha",
@@ -95,7 +96,9 @@ local Worlds: { [string]: World } = {
 		id = "DunesCroustillantes",
 		name = { en = "Crunchy Dunes", fr = "Crunchy Dunes" },
 		size = 640,
-		roster = { Swarm = 5, Jumper = 6, Shooter = 7, Armored = 8 },
+		-- Monde 2 v2 : zombies (dossier 13 §3.2). Le reste de ce monde (nom, carte, aléa, mini-boss, boss)
+		-- est encore celui du désert v1 : A02 (monde) et A03-05/06 (mini-boss, boss).
+		roster = { Swarm = 5, Jumper = 6, Shooter = 7, Kamikaze = 8 },
 		miniBoss = 14,
 		boss = "PharaonGrillePain",
 		finalBoss = "GrandBrouhaha",
@@ -131,8 +134,9 @@ local Worlds: { [string]: World } = {
 		id = "RecreFantome",
 		name = { en = "Haunted Recess", fr = "Haunted Recess" },
 		size = 520,
-		roster = { Swarm = 9, Jumper = 10, Shooter = 11, Armored = 12 },
-		swarmVariant = 20,
+		-- Fantômes (dossier 13 §3.3). Pas de sauteur ; le Surveillant est la variante du soutien.
+		roster = { Swarm = 9, Shooter = 10, Armored = 12, Support = 20 },
+		variants = { Support = { kind = 11, chance = 0.35 } },
 		miniBoss = 15,
 		boss = "DirectriceEternelle",
 		finalBoss = "GrandBrouhaha",

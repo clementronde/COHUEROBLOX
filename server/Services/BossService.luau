@@ -299,7 +299,8 @@ local function resolveTelegraph(b: BossRuntime, t: Telegraph, targets: { { playe
 			local a = k / (attack.count or 4) * math.pi * 2
 			local x, z = b.x + math.cos(a) * 9, b.z + math.sin(a) * 9
 			if attack.summonKind == 0 then
-				local kind = if k % 2 == 0 then world.roster.Armored else world.roster.Jumper
+				local roster = world.roster
+				local kind = (if k % 2 == 0 then roster.Armored or roster.Kamikaze else roster.Jumper or roster.Shooter) or roster.Swarm
 				enemies.spawnAt(kind, x, z, { elite = true })
 			else
 				enemies.spawnAt(attack.summonKind or world.roster.Swarm, x, z)

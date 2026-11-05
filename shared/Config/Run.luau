@@ -106,7 +106,7 @@ local Run = {
 
 
 	-- Spawn mix (seconds since stage start)
-	FamilyUnlock = { Swarm = 0, Jumper = 30, Shooter = 120, Armored = 210 } :: { [string]: number },
+	FamilyUnlock = { Swarm = 0, Jumper = 30, Support = 75, Shooter = 120, Kamikaze = 150, Armored = 210 } :: { [string]: number },
 	EliteFirstAt = 90,
 	EliteEvery = 75,
 	EliteChance = 0.005, -- part d'élites de base (hors Overtime)

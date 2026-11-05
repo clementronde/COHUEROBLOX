@@ -373,7 +373,7 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 
 | ID | Tâche | Livrable | Dépend de | Priorité | Statut |
 | --- | --- | --- | --- | --- | --- |
-| A03-01 | Familles d'ennemis v2 : gobelins, zombies, fantômes | Config/Enemies | A01-04 | P0 — bloquant | À faire |
+| A03-01 | Familles d'ennemis v2 : gobelins, zombies, fantômes | Config/Enemies | A01-04 | P0 — bloquant | Fait (branche claude/a03-familles-comportements, à tester en Play) : roster v2 de 16 ennemis, champ `asset` cherché dans Assets puis EnemyVisualRigs, repli bloc si absent |
 | A03-02 | Escalade d'Overtime sans plafond visible, avec le plafond technique | EnemyService | A04-02, A13-01 | P0 — bloquant | À faire |
 | A03-03 | Variantes capturables : taux d'apparition, aura, cage | EnemyService + API pour A05 | A05-01 | P0 — bloquant | À faire |
 | A03-04 | Comportements spéciaux (shaman qui soigne, bomber qui vole l'XP, banshee qui ralentit…) | EnemyService | A03-01 | P1 — lancement | À faire |

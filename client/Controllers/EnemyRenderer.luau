@@ -120,6 +120,54 @@ local function newPart(shape: string, size: Vector3, color: Color3, neon: boolea
 	return part
 end
 
+-- Gabarit visuel d'une espèce (Config/Enemies.asset, A03-01) : ReplicatedStorage.Assets (récursif),
+-- puis ReplicatedStorage.EnemyVisualRigs. Cherché une fois par espèce ; s'il manque, on le dit une
+-- fois et buildModel retombe sur le repli (Parts v1 ou bloc de couleur).
+local templateCache: { [number]: Instance | false } = {}
+
+local function findTemplate(kind: number): Instance?
+	local hit = templateCache[kind]
+	if hit ~= nil then
+		return if hit then hit else nil
+	end
+	local def = Enemies[kind]
+	local name = def.asset or ("Enemy_" .. def.name)
+	local found = ArtLibrary.find(name)
+	if not found then
+		local rigs = ReplicatedStorage:FindFirstChild("EnemyVisualRigs")
+		found = if rigs then rigs:FindFirstChild(name) or rigs:FindFirstChild(def.name) else nil
+	end
+	if not found then
+		warn(`[EnemyRenderer] gabarit manquant : {name} (Assets ou EnemyVisualRigs) ; repli provisoire`)
+	end
+	templateCache[kind] = found or false
+	return found
+end
+
+-- Une maille du gabarit, mise à l'échelle pour mesurer `height` studs.
+local function cloneMesh(template: Instance, height: number): BasePart?
+	local source: BasePart? = nil
+	if template:IsA("BasePart") then
+		source = template
+	elseif template:IsA("Model") then
+		source = template:FindFirstChildWhichIsA("BasePart", true)
+	end
+	if not source then
+		return nil
+	end
+	local part = source:Clone()
+	part:ClearAllChildren()
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	if height > 0 and part.Size.Y > 0 then
+		part.Size = part.Size * (height / part.Size.Y)
+	end
+	return part
+end
+
 local function poolKey(kind: number, lod: number, elite: boolean): number
 	return kind * 16 + lod * 2 + (if elite then 1 else 0)
 end
@@ -133,10 +181,9 @@ local function buildModel(kind: number, lod: number, elite: boolean): Model
 		table.insert(m.offsets, offset)
 		table.insert(m.colors, part.Color)
 	end
-	local assetName = "Enemy_" .. def.name
-	local template = if lod <= 2 then ArtLibrary.find(assetName) else nil
+	local template = if lod <= 2 then findTemplate(kind) else nil
 	local hasRig = template and template:IsA("Model") and template:FindFirstChildWhichIsA("Bone", true) ~= nil
-	local mesh = if lod <= 2 and not hasRig then ArtLibrary.clonePart(assetName, def.height * ART_SCALE * s) else nil
+	local mesh = if template and not hasRig then cloneMesh(template, def.height * ART_SCALE * s) else nil
 	local source = if lod == 1 and hasRig and template and template:IsA("Model")
 		then template:FindFirstChildWhichIsA("MeshPart", true) else nil
 	if source and template then

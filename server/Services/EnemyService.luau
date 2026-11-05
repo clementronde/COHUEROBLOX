@@ -348,9 +348,22 @@ local function desiredAlive(elapsed: number, n: number): number
 	return math.min(math.floor(scaled), Balance.MaxEnemies)
 end
 
+-- Familles tirées hors essaim, dans l'ordre de Run.FamilyUnlock. Une famille absente du roster du
+-- monde est ignorée. Tampons réutilisés (pas d'allocation par apparition).
+local SPAWN_FAMILIES = { "Jumper", "Shooter", "Armored", "Support", "Kamikaze" }
+local optionKinds: { number } = {}
+local optionFamilies: { string } = {}
+
+local function withVariant(world: Worlds.World, family: string, kind: number): number
+	local variant = world.variants and world.variants[family]
+	if variant and math.random() < variant.chance then
+		return variant.kind
+	end
+	return kind
+end
+
 local function pickSwarm(world: Worlds.World): number
-	local variant = world.swarmVariant
-	return if variant and math.random() < .5 then variant else world.roster.Swarm
+	return withVariant(world, "Swarm", world.roster.Swarm)
 end
 
 local function pickKind(elapsed: number): number
@@ -358,21 +371,21 @@ local function pickKind(elapsed: number): number
 	if math.random() < Balance.SwarmShare then
 		return pickSwarm(world)
 	end
-	local options: { number } = {}
-	for _, family in { "Jumper", "Shooter", "Armored" } do
-		if elapsed >= Run.FamilyUnlock[family] * director.familyUnlockScale then
-			table.insert(options, (world.roster :: any)[family])
+	local n = 0
+	for _, family in SPAWN_FAMILIES do
+		local kind = (world.roster :: any)[family]
+		local unlock = Run.FamilyUnlock[family]
+		if type(kind) == "number" and unlock and elapsed >= unlock * director.familyUnlockScale then
+			n += 1
+			optionKinds[n] = kind
+			optionFamilies[n] = family
 		end
 	end
-	if #options == 0 then
+	if n == 0 then
 		return pickSwarm(world)
 	end
-	local kind = options[math.random(#options)]
-	local armoredVariant = world.armoredVariant
-	if kind == world.roster.Armored and armoredVariant and math.random() < .35 then
-		return armoredVariant
-	end
-	return kind
+	local k = math.random(n)
+	return withVariant(world, optionFamilies[k], optionKinds[k])
 end
 
 local function spawnScaled(kind: number, x: number, z: number, elite: boolean, hpMult: number, noLoot: boolean?): number?
