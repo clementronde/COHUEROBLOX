@@ -27,7 +27,9 @@ local KIND = Codec.Kind
 local PROJ_HEIGHT = 2.5
 local FALL_HEIGHT = 18
 local HELD_SCALE = 1.4 -- l'arme tenue un peu surdimensionnée reste lisible à la caméra dézoomée
-local DEFAULT_HOLD = CFrame.Angles(-math.pi / 2, 0, 0) -- pointe de l'arme vers l'avant de la main
+-- Dans la poignée R15, +Y pointe vers l'avant et +Z vers le haut : 70° autour de X dressent l'arme
+-- (lame vers le haut, un peu en avant) et tournent sa face de sprite vers l'arrière, côté caméra.
+local DEFAULT_HOLD = CFrame.Angles(math.rad(70), 0, 0)
 
 type Tier = {
 	maxProj: number,
