@@ -70,7 +70,7 @@ Une chose à savoir sur « aucun ennemi max » : pour le joueur, la horde ne pla
 | --- | --- | --- | --- | --- | --- | --- |
 | A00 | Chef de projet | Doc de suivi, dossier, intégration des branches, place Studio partagée, portes de vague | Studio, git, Docs | 0 | En cours | Conversation principale |
 | A01 | DA et modeling | Guide de style voxel, équipement des 8 classes, créatures, boss, props | Blender, Meshy, Asset Pack, make-model, blender-modeling | 1 | En cours | a01-da-voxel |
-| A02 | Mondes et level design | Tuiles voxel des 3 mondes, assemblage semi-procédural, autels, lumière | Studio, make-map, worldbuilding | 2 | À faire | À lancer |
+| A02 | Mondes et level design | Tuiles voxel des 3 mondes, assemblage semi-procédural, autels, lumière | Studio, make-map, worldbuilding | 2 | En cours | Code A02-01 et A02-08 sur claude/a02-assemblage, attend les tuiles de Clément |
 | A03 | Ennemis et boss | Familles d'ennemis, IA, Overtime, variantes capturables, 3 mini-boss, 3 boss | Studio, systems | 2 | À faire | Cantin (dev) |
 | A04 | Gameplay | 8 classes, 16 armes, 14 Runes, 40 objets, cartes, fusion, run de 3 mondes, compteur de KO | Studio, system-builder | 1 | En cours | Cantin (dev) |
 | A05 | Compagnons et capture | Capture, collection, IA des compagnons, personnalisation | Studio, systems | 2 | À faire | Cantin (dev) |
@@ -174,7 +174,7 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 | Monde 1 — Bois Grognon | Tuiles de forêt, falaises, autels, arène du boss | A02, A01 | À faire |
 | Monde 2 — cimetière ou marais | Tuiles, tombes, brume, arène du boss | A02, A01 | À faire |
 | Monde 3 — Récré Fantôme | École hantée la nuit, toits, préaux, arène du boss | A02, A01 | À faire |
-| Portails entre mondes | Transition, écran de chargement | A02, A07, A08 | À faire |
+| Portails entre mondes | Transition, écran de chargement | A02, A07, A08 | Code fait (A02-08), attend les gabarits |
 | Lumière diorama | Bloom, profondeur de champ, lumière chaude par monde | A02, A07 | À faire |
 
 ### Écrans
@@ -360,14 +360,14 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 
 | ID | Tâche | Livrable | Dépend de | Priorité | Statut |
 | --- | --- | --- | --- | --- | --- |
-| A02-01 | Format des tuiles et règles d'assemblage semi-procédural | Note + prototype | A01-01 | P0 — bloquant | À faire |
+| A02-01 | Format des tuiles et règles d'assemblage semi-procédural | Note + prototype | A01-01 | P0 — bloquant | Fait (note 21 + WorldBuilder, branche claude/a02-assemblage) |
 | A02-02 | Monde 1 : 12 tuiles, arène du boss, point d'apparition | Monde 1 jouable | A01-06 | P0 — bloquant | À faire |
 | A02-03 | Environ 15 autels par monde, en hauteur et en recoins | Placement | A02-02 | P1 — lancement | À faire |
-| A02-04 | Heightmap des tuiles pour la horde | Heightmap | A02-02 | P0 — bloquant | À faire |
+| A02-04 | Heightmap des tuiles pour la horde | Heightmap | A02-02 | P0 — bloquant | Code fait (TileLayout), à tester avec les tuiles |
 | A02-05 | Lumière diorama par monde | Réglages Lighting | A02-02 | P1 — lancement | À faire |
 | A02-06 | Monde 2 | Monde 2 jouable | A02-02, A01-08 | P1 — lancement | À faire |
 | A02-07 | Monde 3 | Monde 3 jouable | A02-06 | P1 — lancement | À faire |
-| A02-08 | Portails entre mondes | Portails | A04-02 | P1 — lancement | À faire |
+| A02-08 | Portails entre mondes | Portails | A04-02 | P1 — lancement | Code fait (WorldPortals + WorldTransition), attend les gabarits |
 
 ### A03 — Ennemis et boss (vague 2)
 

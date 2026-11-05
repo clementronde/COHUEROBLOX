@@ -16,6 +16,7 @@ local Workspace = game:GetService("Workspace")
 local Config = script.Parent:WaitForChild("Config")
 local Worlds = require(Config:WaitForChild("Worlds"))
 local Run = require(Config:WaitForChild("Run"))
+local TileLayout = require(script.Parent:WaitForChild("TileLayout"))
 
 local CELL = 2
 local ATTRIBUTE = "CohueStageKey"
@@ -45,6 +46,9 @@ export type Layout = {
 	pillars: { { x: number, z: number, r: number, h: number } },
 	weakPoints: { Point },
 	spawnPoints: { [string]: { Point } },
+	-- Mondes en tuiles (A02, dossier 21) : disposition publiée et point du portail de l'arène.
+	tiles: string?,
+	portal: Point?,
 }
 
 local Heightmap = {}
@@ -416,7 +420,11 @@ function Heightmap.getLayout(): Layout?
 	return current
 end
 
-function Heightmap.makeKey(worldId: string, stage: number, seed: number, bossId: string): string
+-- tiles : disposition des tuiles (A02, TileLayout.encode). Sans elle, ancienne carte générée.
+function Heightmap.makeKey(worldId: string, stage: number, seed: number, bossId: string, tiles: string?): string
+	if tiles then
+		return `{worldId}|{stage}|{seed}|{bossId}|{tiles}`
+	end
 	return `{worldId}|{stage}|{seed}|{bossId}`
 end
 
@@ -430,7 +438,14 @@ function Heightmap.load(key: string): Layout?
 	if not (worldId and stage and seed and bossId) then
 		return nil
 	end
-	local layout = generate(worldId, stage, seed, bossId)
+	local tiles = parts[5]
+	local layout: Layout? = if tiles and tiles ~= ""
+		then TileLayout.build(worldId, stage, seed, bossId, tiles, Heightmap)
+		else generate(worldId, stage, seed, bossId)
+	if not layout then
+		Heightmap.clear()
+		return nil
+	end
 	layout.key = key
 	current = layout
 	return layout
