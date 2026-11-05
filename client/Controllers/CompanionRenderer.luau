@@ -8,6 +8,10 @@
 -- FX_CompanionStun, FX_CompanionHit (noms dans Config/Companions.Render).
 -- Interpolation entre deux échantillons serveur, un seul BulkMoveTo par frame.
 -- HUD : CompanionRenderer.getState() / onStateChanged(fn) (payload CompanionState).
+--
+-- Mode lobby (65-lobby.md §10, dossier 40 §8.1), client seul : hors run, le(s) compagnon(s) équipé(s)
+-- (Profile.companions.equipped) suivent le joueur local et le reste de sa collection se promène dans
+-- l'enclos (LobbyRole = "CritterPen"). Positions locales, aucun remote envoyé.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -24,6 +28,8 @@ local ArtLibrary = require(Shared:WaitForChild("ArtLibrary"))
 
 local NET = Companions.Net
 local R = Companions.Render
+local LOBBY = Companions.Lobby
+local FOLLOW = Companions.Follow
 local HIDDEN = CFrame.new(0, -10000, 0)
 local TWO_PI = math.pi * 2
 
@@ -60,6 +66,22 @@ type CageView = {
 
 type Fx = { visual: Visual, untilT: number, cf: CFrame }
 
+-- Créature du lobby : suiveur (slot 1 ou 2) ou promeneur de l'enclos (slot nil).
+type LobbyPet = {
+	species: string,
+	body: Visual?,
+	slot: number?,
+	flying: boolean,
+	pos: Vector3,
+	yaw: number,
+	goal: Vector3?,
+	waitUntil: number,
+	moving: boolean,
+	phase: number,
+}
+
+type Roam = { cf: CFrame, halfX: number, halfZ: number, center: Vector3 }
+
 local CompanionRenderer = {}
 
 local container: Folder
@@ -74,6 +96,16 @@ local warned: { [string]: boolean } = {}
 
 local moveParts: { BasePart } = {}
 local moveCFrames: { CFrame } = {}
+
+-- Lobby
+local speciesKind: { [string]: number } = {}
+local runPhase = "Loadout"
+local collection: { owned: { [string]: any }, equipped: { string } }? = nil
+local lobbyPets: { LobbyPet } = {}
+local lobbySignature = ""
+local lobbyShown = false
+local roam: Roam? = nil
+local nextPenSearch = 0
 
 local function warnOnce(name: string)
 	if not warned[name] then
@@ -280,9 +312,256 @@ local function onCageState(payload: any)
 	end
 end
 
+-- Lobby ------------------------------------------------------------------------------------------
+
+-- En run : phase de jeu, attribut InRun du joueur (s'il existe), ou compagnon local dans le snapshot.
+local function localInRun(now: number): boolean
+	local player = Players.LocalPlayer
+	local attr = player:GetAttribute("InRun")
+	if type(attr) == "boolean" then
+		if attr then
+			return true
+		end
+	elseif Companions.Capture.Phases[runPhase] then
+		return true
+	end
+	local myId = player.UserId
+	for _, e in entries do
+		if e.key // 4 == myId and now - e.lastSeen <= R.StaleSeconds then
+			return true
+		end
+	end
+	return false
+end
+
+local function findRoam(): Roam?
+	local village = Workspace:FindFirstChild("HubbubVillage")
+	for _, inst in (village or Workspace):GetDescendants() do
+		if inst:GetAttribute("LobbyRole") == LOBBY.PenRole and (inst:IsA("Model") or inst:IsA("BasePart")) then
+			for _, name in LOBBY.RoamPartNames do
+				local part = inst:FindFirstChild(name, true)
+				if part and part:IsA("BasePart") then
+					local cf = part.CFrame * CFrame.new(0, part.Size.Y / 2, 0)
+					return { cf = cf, halfX = part.Size.X / 2, halfZ = part.Size.Z / 2, center = cf.Position }
+				end
+			end
+			local cf: CFrame, size: Vector3
+			if inst:IsA("Model") then
+				cf, size = inst:GetBoundingBox()
+			else
+				local p = inst :: BasePart
+				cf, size = p.CFrame, p.Size
+			end
+			local floor = cf * CFrame.new(0, -size.Y / 2, 0)
+			return { cf = floor, halfX = size.X / 2, halfZ = size.Z / 2, center = floor.Position }
+		end
+	end
+	return nil
+end
+
+local function randomRoamPoint(r: Roam): Vector3
+	local hx = math.max(0, r.halfX - LOBBY.Margin)
+	local hz = math.max(0, r.halfZ - LOBBY.Margin)
+	return (r.cf * CFrame.new((math.random() * 2 - 1) * hx, 0, (math.random() * 2 - 1) * hz)).Position
+end
+
+local function clearLobby()
+	for _, pet in lobbyPets do
+		destroyVisual(pet.body)
+	end
+	table.clear(lobbyPets)
+	lobbySignature = ""
+end
+
+local function newPet(species: string, slot: number?, pos: Vector3): LobbyPet?
+	local kind = speciesKind[species]
+	if not kind then
+		return nil -- espèce inconnue (ancien id v1) : ignorée
+	end
+	local override = Companions.Species[species]
+	return {
+		species = species,
+		body = bodyFor(kind),
+		slot = slot,
+		flying = override ~= nil and override.flying == true,
+		pos = pos,
+		yaw = math.random() * TWO_PI,
+		goal = nil,
+		waitUntil = os.clock() + math.random() * LOBBY.WaitMax,
+		moving = false,
+		phase = math.random() * TWO_PI,
+	}
+end
+
+-- (Re)crée les créatures du lobby quand la collection ou l'équipement change.
+local function rebuildLobby()
+	local c = collection
+	local equipped: { string } = if c and type(c.equipped) == "table" then c.equipped else {}
+	local owned: { [string]: any } = if c and type(c.owned) == "table" then c.owned else {}
+	-- Promeneurs : espèces possédées non équipées, les plus récentes d'abord.
+	local pen: { string } = {}
+	for species in owned do
+		if type(species) == "string" and speciesKind[species] and not table.find(equipped, species) then
+			table.insert(pen, species)
+		end
+	end
+	table.sort(pen, function(a, b)
+		local ea, eb = owned[a], owned[b]
+		local ta = if type(ea) == "table" then tonumber(ea.at) or 0 else 0
+		local tb = if type(eb) == "table" then tonumber(eb.at) or 0 else 0
+		if ta ~= tb then
+			return ta > tb
+		end
+		return a < b
+	end)
+	while #pen > LOBBY.MaxPenPets do
+		table.remove(pen)
+	end
+	local signature = table.concat(equipped, ",") .. "|" .. table.concat(pen, ",") .. "|" .. (if roam then "pen" else "")
+	if signature == lobbySignature then
+		return
+	end
+	clearLobby()
+	lobbySignature = signature
+	local character = Players.LocalPlayer.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local start = if root and root:IsA("BasePart") then root.Position - Vector3.new(0, 3, 0) else Vector3.zero
+	for slot, species in equipped do
+		if slot <= 2 and type(species) == "string" then
+			local pet = newPet(species, slot, start)
+			if pet then
+				table.insert(lobbyPets, pet)
+			end
+		end
+	end
+	local r = roam
+	if r then
+		for _, species in pen do
+			local pet = newPet(species, nil, randomRoamPoint(r))
+			if pet then
+				table.insert(lobbyPets, pet)
+			end
+		end
+	end
+end
+
+local function hopOffset(pet: LobbyPet, now: number): number
+	return if pet.moving then math.abs(math.sin(now * R.HopHz * math.pi + pet.phase)) * R.HopHeight else 0
+end
+
+local function stepFollower(pet: LobbyPet, root: BasePart, dt: number)
+	local p = root.Position
+	local look = root.CFrame.LookVector
+	local fx, fz = look.X, look.Z
+	local len = math.sqrt(fx * fx + fz * fz)
+	if len < 1e-3 then
+		fx, fz = 0, -1
+	else
+		fx, fz = fx / len, fz / len
+	end
+	local side = if pet.slot == 1 then -1 else 1
+	local y = p.Y - 3 + (if pet.flying then FOLLOW.FlyHeight else 0)
+	local goal = Vector3.new(p.X - fx * FOLLOW.Behind + (-fz) * FOLLOW.Side * side, y, p.Z - fz * FOLLOW.Behind + fx * FOLLOW.Side * side)
+	local delta = goal - pet.pos
+	local flat = Vector3.new(delta.X, 0, delta.Z)
+	local d = flat.Magnitude
+	if d > FOLLOW.SnapDistance then
+		pet.pos = goal
+		pet.moving = false
+		return
+	end
+	if d > 0.05 then
+		local stepLen = math.min(d, FOLLOW.Speed * dt)
+		local nx, nz = pet.pos.X + flat.X / d * stepLen, pet.pos.Z + flat.Z / d * stepLen
+		pet.pos = Vector3.new(nx, pet.pos.Y + math.clamp(delta.Y, -30 * dt, 30 * dt), nz)
+		if d > 0.5 then
+			pet.yaw = math.atan2(-flat.X, -flat.Z)
+		end
+	else
+		pet.pos = Vector3.new(pet.pos.X, pet.pos.Y + math.clamp(delta.Y, -30 * dt, 30 * dt), pet.pos.Z)
+	end
+	pet.moving = d > 0.3
+end
+
+local function stepWanderer(pet: LobbyPet, r: Roam, dt: number, now: number)
+	if not pet.goal then
+		if now >= pet.waitUntil then
+			pet.goal = randomRoamPoint(r)
+		end
+		pet.moving = false
+		return
+	end
+	local goal = pet.goal :: Vector3
+	local flat = Vector3.new(goal.X - pet.pos.X, 0, goal.Z - pet.pos.Z)
+	local d = flat.Magnitude
+	if d < 0.2 then
+		pet.goal = nil
+		pet.waitUntil = now + LOBBY.WaitMin + math.random() * (LOBBY.WaitMax - LOBBY.WaitMin)
+		pet.moving = false
+		return
+	end
+	local stepLen = math.min(d, LOBBY.WanderSpeed * dt)
+	pet.pos = Vector3.new(pet.pos.X + flat.X / d * stepLen, goal.Y, pet.pos.Z + flat.Z / d * stepLen)
+	pet.yaw = math.atan2(-flat.X, -flat.Z)
+	pet.moving = true
+end
+
+local function stepLobby(dt: number, now: number)
+	local show = collection ~= nil and not localInRun(now)
+	if not show then
+		if lobbyShown then
+			clearLobby()
+			lobbyShown = false
+		end
+		return
+	end
+	if not roam and now >= nextPenSearch then
+		nextPenSearch = now + LOBBY.PenSearchSeconds
+		roam = findRoam()
+		if roam then
+			lobbySignature = "" -- l'enclos vient d'apparaître : refaire les promeneurs
+		end
+	end
+	if not lobbyShown or lobbySignature == "" then
+		rebuildLobby()
+		lobbyShown = true
+	end
+	local character = Players.LocalPlayer.Character
+	local rootInst = character and character:FindFirstChild("HumanoidRootPart")
+	local root: BasePart? = if rootInst and rootInst:IsA("BasePart") then rootInst else nil
+	local r = roam
+	local penAwake = r ~= nil and root ~= nil and (root.Position - r.center).Magnitude <= LOBBY.PauseDistance
+	for _, pet in lobbyPets do
+		if pet.slot then
+			if root then
+				stepFollower(pet, root, dt)
+				place(pet.body, CFrame.new(pet.pos.X, pet.pos.Y + hopOffset(pet, now), pet.pos.Z) * CFrame.Angles(0, pet.yaw, 0))
+			end
+		elseif penAwake and r then
+			-- Loin de l'enclos : rien ne bouge (les pièces restent où elles sont, aucun déplacement).
+			stepWanderer(pet, r, dt, now)
+			place(pet.body, CFrame.new(pet.pos.X, pet.pos.Y + hopOffset(pet, now), pet.pos.Z) * CFrame.Angles(0, pet.yaw, 0))
+		end
+	end
+end
+
+local function onProfile(profile: any)
+	if type(profile) ~= "table" or type(profile.companions) ~= "table" then
+		return
+	end
+	local c = profile.companions
+	collection = {
+		owned = if type(c.owned) == "table" then c.owned else {},
+		equipped = if type(c.equipped) == "table" then c.equipped else {},
+	}
+	if lobbyShown then
+		rebuildLobby()
+	end
+end
+
 -- Frame ------------------------------------------------------------------------------------------
 
-local function render()
+local function render(dt: number)
 	table.clear(moveParts)
 	table.clear(moveCFrames)
 	local now = os.clock()
@@ -320,6 +599,7 @@ local function render()
 			place(fx.visual, fx.cf)
 		end
 	end
+	stepLobby(math.min(dt, 0.1), now)
 	if #moveParts > 0 then
 		Workspace:BulkMoveTo(moveParts, moveCFrames, Enum.BulkMoveMode.FireCFrameChanged)
 	end
@@ -343,6 +623,12 @@ function CompanionRenderer.start()
 	container.Name = "COHUE_Companions"
 	container.Parent = Workspace
 
+	for kind, def in Enemies do
+		if type(kind) == "number" and def.family ~= "Boss" and def.isBoss ~= true then
+			speciesKind[def.name] = kind
+		end
+	end
+
 	for _ = 1, R.HitPool do
 		local v = cloneVisual(R.HitTemplate)
 		if not v then
@@ -354,6 +640,15 @@ function CompanionRenderer.start()
 
 	Net.unreliable("CompanionSnapshot").OnClientEvent:Connect(onSnapshot)
 	Net.event("CageState").OnClientEvent:Connect(onCageState)
+	Net.event("Profile").OnClientEvent:Connect(onProfile)
+	Net.event("RunState").OnClientEvent:Connect(function(payload: any)
+		if type(payload) == "table" and type(payload.phase) == "string" then
+			runPhase = payload.phase
+		end
+	end)
+	Net.event("RunSummary").OnClientEvent:Connect(function()
+		runPhase = "Ended"
+	end)
 	Net.event("CompanionState").OnClientEvent:Connect(function(payload: any)
 		if type(payload) ~= "table" then
 			return
@@ -363,6 +658,23 @@ function CompanionRenderer.start()
 			task.spawn(fn, payload)
 		end
 	end)
+	-- Profile et RunState ont pu arriver avant nous (un événement en file ne va qu'au premier écouteur) :
+	-- on relit la dernière valeur gardée par UITheme, s'il est là (lecture seule).
+	local ui = script.Parent:FindFirstChild("UI")
+	local themeModule = ui and ui:FindFirstChild("UITheme")
+	if themeModule and themeModule:IsA("ModuleScript") then
+		local ok, theme = pcall(require, themeModule)
+		if ok and type(theme) == "table" and type((theme :: any).last) == "function" then
+			local okP, profile = pcall((theme :: any).last, "Profile")
+			if okP and collection == nil then
+				onProfile(profile)
+			end
+			local okR, runState = pcall((theme :: any).last, "RunState")
+			if okR and type(runState) == "table" and type(runState.phase) == "string" then
+				runPhase = runState.phase
+			end
+		end
+	end
 	RunService.RenderStepped:Connect(render)
 end
 

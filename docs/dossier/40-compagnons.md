@@ -228,6 +228,16 @@ Règle « rien n'est construit par script » (`01-decisions-v2.md` §12) : `Comp
 
 La cage clignote (transparence) pendant ses 3 dernières secondes. Le compagnon sautille (procédural, aucune Instance créée) et s'oriente vers sa cible.
 
+### 8.1 Mode lobby (client seul, fait le 5 nov. ; `65-lobby.md` §10)
+
+Hors run, `CompanionRenderer` affiche la collection du joueur local, sans rien demander au serveur ni lui envoyer :
+
+- **Suiveurs** : les espèces de `Profile.companions.equipped` (1, ou 2 pour le Tamer) suivent le joueur local comme en run (`Companions.Follow` : 5 studs derrière, 2,5 sur le côté, 24 studs/s, téléportés au-delà de 60 studs).
+- **Enclos** : le reste de `Profile.companions.owned` (au plus `Lobby.MaxPenPets = 12`, les plus récentes d'abord) se promène dans l'objet qui porte `LobbyRole = "CritterPen"` (`Workspace.HubbubVillage`). Zone de promenade : la Part `CritterRoam` de l'enclos si elle existe, sinon la Part `Meadow`, sinon la boîte de l'enclos, moins 3 studs de bord. Trajets à 6 studs/s, pauses de 1 à 4 s. Joueur à plus de 120 studs de l'enclos : plus rien ne bouge.
+- **Qui le voit** : chacun ne voit que les siens (positions locales). Les compagnons équipés des autres joueurs ne sont pas visibles au lobby : il faudrait que le serveur les publie (par exemple un attribut joueur), à décider plus tard.
+- **En run ou pas** : l'attribut joueur `InRun` s'il existe (contract request de `65-lobby.md` §10 n° 4), sinon la phase de `RunState` (`Capture.Phases`), et dans tous les cas « en run » dès que le snapshot serveur contient un compagnon du joueur local. En run, les créatures du lobby sont détruites.
+- Mêmes gabarits qu'en run (`Companion_<espèce>`, repli `Enemy_<espèce>`) ; rien n'est construit.
+
 ## 9. Clés de quêtes
 
 `ProgressionService.recordStat(player, key, n)` : `CompanionsCaptured` (1 par capture), `CompanionNewSpecies` (1 par nouvelle espèce), `CompanionKills` (n), `CompanionTreats` (1). `CompanionTechsLearned` (1 par technique apprise, §5.2). Les clés v1 `CompanionEvolved`, `CompanionStage3`, `UltimatesUsed` ne sont plus envoyées.

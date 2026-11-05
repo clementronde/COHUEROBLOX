@@ -407,6 +407,22 @@ Companions.QuestKeys = {
 	Techs = "CompanionTechsLearned", -- 1 par technique apprise (niveau 1)
 }
 
+-- Lobby (client seul, CompanionRenderer ; 65-lobby.md §10) --------------------------------------------
+-- Hors run : le(s) compagnon(s) équipé(s) suivent le joueur local, le reste de sa collection se promène
+-- dans l'enclos. Chacun ne voit que les siens ; positions locales, rien n'est envoyé au serveur.
+Companions.Lobby = {
+	PenRole = "CritterPen", -- attribut LobbyRole de l'enclos (Workspace.HubbubVillage)
+	-- Zone de promenade : la 1re Part de ce nom dans l'enclos, sinon la boîte de l'enclos entière.
+	RoamPartNames = { "CritterRoam", "Meadow" },
+	Margin = 3, -- studs gardés le long des bords
+	MaxPenPets = 12, -- créatures de la collection dans l'enclos (les plus récentes d'abord)
+	WanderSpeed = 6, -- studs/s
+	WaitMin = 1, -- pause entre deux trajets (s)
+	WaitMax = 4,
+	PauseDistance = 120, -- joueur plus loin de l'enclos : les créatures ne bougent plus
+	PenSearchSeconds = 5, -- enclos pas encore trouvé (streaming) : nouvelle recherche
+}
+
 -- Tests en Studio seulement (RunService:IsStudio()), jamais en jeu publié.
 Companions.Debug = {
 	-- Joueur sans compagnon valide équipé : reçoit cette espèce (nil = rien). Pour voir le suivi.
