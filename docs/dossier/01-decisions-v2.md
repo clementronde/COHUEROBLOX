@@ -167,3 +167,18 @@ Une liste répétée (cartes, lignes du classement, emplacements) se fait avec u
 | `DebugHud` | texte de debug | A08, en dernier |
 
 Chaque agent convertit ses modules à son tour, un seul agent à la fois. Un module pas encore converti continue de marcher tel quel. Une fois converti, il ne fabrique plus rien : si un modèle manque, il le signale dans la sortie au lieu de le recréer.
+
+## 13. Partage du travail : créatif ici, mécanique et technique chez Ironix (5 nov. 2026)
+
+Clément, le 5 nov. : « On arrête le dev, on s'occupe seulement de l'UI et du design et des models, on ne dev plus les méca et la technique, c'est seulement Ironix. »
+
+| Côté créatif (Clément et ses agents) | Côté technique (Ironix seulement) |
+| --- | --- |
+| DA, maquettes Figma, planches concept | Mécaniques de jeu : run, armes, dégâts, cartes, classes, compagnons |
+| Modèles 3D (armes, ennemis, boss, équipement, kit de décor) posés dans COHUE | Serveur, remotes, données, progression, monétisation |
+| Effets visuels posés en objets (`Assets.FX`) | Mouvement, caméra, anti-triche, performance |
+| Écrans d'UI posés en objets (StarterGui, `Assets.UI`) et leurs scripts d'affichage côté client | Branchement des modèles et des effets dans les renderers et contrôleurs, assemblage des mondes, son |
+
+- Les agents créatifs (A01, A03, A08, A09, A14) ne touchent plus au code serveur ni aux mécaniques. Les scripts qu'ils touchent encore se limitent à l'affichage des écrans d'UI. Pour tout le reste, ils écrivent une « Contract request » adressée à **Ironix**, plus à A04.
+- Les agents techniques (A04, A06, A11, et A02 et A10 lancés par Ironix) ne sont plus relancés de ce côté.
+- Les noms des modèles et des effets dans COHUE sont le contrat entre les deux côtés : chaque agent créatif les note dans son dossier.
