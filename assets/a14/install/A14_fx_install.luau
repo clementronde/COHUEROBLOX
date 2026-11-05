@@ -59,8 +59,12 @@ local FX = folder(assets, "FX")
 local SHAPES = folder(FX, "Shapes")
 
 -- 1. Formes lisses importées (FX_Ring, FX_RingThick, FX_RingDashed, FX_Disc, FX_ArcHalo*, FX_ArcCore*)
+local nodes: { [Instance]: boolean } = {}
 for _, d in workspace:GetDescendants() do
 	if d:IsA("MeshPart") and string.sub(d.Name, 1, 3) == "FX_" then
+		if d.Parent and d.Parent ~= workspace then
+			nodes[d.Parent] = true
+		end
 		local old = SHAPES:FindFirstChild(d.Name)
 		if old then
 			old:Destroy()
@@ -77,6 +81,21 @@ for _, d in workspace:GetDescendants() do
 			d:SetAttribute("C", ARC_CENTERS[d.Name])
 		end
 		d.Parent = SHAPES
+	end
+end
+-- ménage de l'Import 3D : les Models "<Nom>_Node" vidés, puis le Model "Scene" s'il ne contient plus rien
+local parents: { [Instance]: boolean } = {}
+for n in nodes do
+	if n.Parent and #n:GetDescendants() == 0 then
+		if n.Parent ~= workspace then
+			parents[n.Parent] = true
+		end
+		n:Destroy()
+	end
+end
+for p in parents do
+	if p.Parent and p:IsA("Model") and #p:GetDescendants() == 0 then
+		p:Destroy()
 	end
 end
 

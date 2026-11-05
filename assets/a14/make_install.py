@@ -71,18 +71,28 @@ for _, it in ITEMS do
 	if old and old:GetAttribute("A14") then
 		old:Destroy()
 	end
+	-- l'Import 3D range chaque maille dans un Model "<Nom>_Node" dont le pivot est l'origine du nœud
+	-- glTF, c'est-à-dire le point de prise ; la MeshPart elle-même a son pivot au centre de sa boîte
+	local grip = body.CFrame
 	if body.Parent and body.Parent ~= workspace then
 		containers[body.Parent] = true
+		if body.Parent:IsA("Model") then
+			grip = (body.Parent :: Model):GetPivot()
+		end
 	end
 	local model = Instance.new("Model")
 	model.Name = it.name
 	prep(body, false)
 	body.Name = "Body"
+	body.PivotOffset = body.CFrame:ToObjectSpace(grip)
 	body.Parent = model
 	model.PrimaryPart = body
 	if it.neon then
 		local neon = findImported(it.name .. "_Neon")
 		if neon then
+			if neon.Parent and neon.Parent ~= workspace then
+				containers[neon.Parent] = true
+			end
 			prep(neon, true)
 			neon.Name = "Neon"
 			neon.Parent = model
@@ -94,7 +104,7 @@ for _, it in ITEMS do
 	model:SetAttribute("Kind", it.kind)
 	model:SetAttribute("WeaponId", it.weapon)
 	model:SetAttribute("Dominant", it.dominant)
-	model:SetAttribute("GripOffset", Vector3.zero) -- le pivot du modèle est déjà le point de prise
+	model:SetAttribute("GripOffset", Vector3.zero) -- le pivot du modèle est le point de prise (PivotOffset)
 	model:PivotTo(CFrame.new())
 	model.Parent = weapons
 	table.insert(report, string.format("%s;%s;%s", it.name, body.MeshId, tostring(body.Size)))
