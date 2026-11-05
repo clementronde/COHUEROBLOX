@@ -73,7 +73,7 @@ Une chose à savoir sur « aucun ennemi max » : pour le joueur, la horde ne pla
 | A02 | Mondes et level design | Tuiles voxel des 3 mondes, assemblage semi-procédural, autels, lumière | Studio, make-map, worldbuilding | 2 | À faire | À lancer |
 | A03 | Ennemis et boss | Familles d'ennemis, IA, Overtime, variantes capturables, 3 mini-boss, 3 boss | Studio, systems | 2 | À faire | Cantin (dev) |
 | A04 | Gameplay | 8 classes, 16 armes, 14 Runes, 40 objets, cartes, fusion, run de 3 mondes, compteur de KO | Studio, system-builder | 1 | En cours | Cantin (dev) |
-| A05 | Compagnons et capture | Capture, collection, IA des compagnons, personnalisation | Studio, systems | 2 | À faire | Cantin (dev) |
+| A05 | Compagnons et capture | Capture, collection, IA des compagnons, personnalisation | Studio, systems | 2 | En cours | Cantin (dev) |
 | A06 | Mouvement et caméra | Caméra 3e personne, bunny-hop, glissade, contrôles tactiles, MovementGuard | Studio, make-anim | 1 | En cours | Cantin (dev) |
 | A07 | VFX | Armes, impacts, KO, capture, télégraphes de boss, ambiance Overtime | Studio, fwjelaa-vfx, VFX de l'Asset Pack | 2 | À faire | À lancer |
 | A08 | UI et HUD | Maquettes Figma puis HUD de run, cartes, chrono, compteur de KO, écran de fin | Figma, Studio, fwjelaa-ui, ui-builder | 1 | En cours | a08-ui-hud |
@@ -384,8 +384,8 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 
 | ID | Tâche | Livrable | Dépend de | Priorité | Statut |
 | --- | --- | --- | --- | --- | --- |
-| A05-01 | Règles de la capture : cage, 2 s, interruption, sauvegarde | Note |  | P0 — bloquant | À faire |
-| A05-02 | Refaire CompanionService : capture, collection, équipement, suivi et attaque | CompanionService | A05-01, A03-03 | P0 — bloquant | À faire |
+| A05-01 | Règles de la capture : cage, 2 s, interruption, sauvegarde | Note : `docs/dossier/40-compagnons.md` (APIs pour A03 §6.1 et A12 §3.2) |  | P0 — bloquant | À valider |
+| A05-02 | Refaire CompanionService : capture, collection, équipement, suivi et attaque | CompanionService | A05-01, A03-03 | P0 — bloquant | En cours |
 | A05-03 | Une attaque et 2 à 3 cartes de technique par espèce | Config/Companions | A05-02 | P1 — lancement | À faire |
 | A05-04 | Tamer : 2 compagnons, capture plus rapide | CompanionService | A04-10 | P1 — lancement | À faire |
 | A05-05 | Emplacements de personnalisation : chapeaux, couleurs, auras | CompanionRenderer | A12-04 | P1 — lancement | À faire |

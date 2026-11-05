@@ -1,230 +1,225 @@
-# 40 — Compagnons (domaine companion)
+# 40 — Compagnons et capture (domaine companion, A05)
 
-Chaque joueur emmène un Compagnon original qui le suit, attaque seul la cible la plus proche, apprend des techniques via les cartes de niveau, évolue deux fois pendant la run et déclenche un Ultime quand sa jauge est pleine. Tous les nombres ci-dessous vivent dans `shared/Config/Companions.luau` ; ce document en est la référence de conception.
+Réécrit le 5 nov. 2026 par l'agent A05 pour la v2 (`01-decisions-v2.md` §5, `docs/security/regles-v2.md` §3). **Remplace entièrement** la version v1 (6 lignées, évolutions, Ultime) : il n'y a plus d'évolution, un compagnon se gagne en **battant puis en capturant** une créature pendant une run.
 
-Fichiers du domaine : `server/Services/CompanionService.luau`, `shared/Config/Companions.luau`, `client/Controllers/CompanionRenderer.luau`, ce dossier. (`shared/NetDefs/Companion.luau` n'est pas utilisé : les trois remotes du contrat suffisent.)
+Fichiers du domaine : `server/Services/CompanionService.luau`, `shared/Config/Companions.luau`, `shared/NetDefs/Companion.luau`, `client/Controllers/CompanionRenderer.luau`, ce dossier. Tous les nombres vivent dans `shared/Config/Companions.luau` ; ce document en est la référence.
 
-## 1. Ce qu'on prend à PokeBonk (et ce qu'on ne prend pas)
+## 0. En bref
 
-- **Pris** : un partenaire qui attaque tout seul, des cartes « nouvelle technique / renforcer / friandise », deux évolutions dans la run, un Ultime sur jauge. Ce sont des mécaniques, non protégeables.
-- **Pas pris** : aucune créature, aucun nom, cri, type ou silhouette Pokémon. Pas de trio plante/feu/eau : six **affinités** maison, des silhouettes en blocs low-poly construites en code (aucun asset importé), des noms français/anglais inventés. Les silhouettes ci-dessous évitent volontairement les archétypes connus (pas de souris jaune à joues rouges, pas de tortue-volcan, pas de lézard à flamme au bout de la queue).
+1. Certains ennemis apparaissent en **variante capturable** (aura + icône, plus résistante). C'est **A03** qui décide lesquels et à quel taux, dans `EnemyService`.
+2. Battue, la variante laisse une **cage au sol pendant 10 s**.
+3. Un joueur qui reste **2 s dans la cage sans être touché** capture la créature, **à 100 %**. Pas de hasard, pas d'objet, rien de payant. Le Tamer capture **50 % plus vite** (2 s ÷ 1,5 ≈ 1,33 s).
+4. La créature rejoint la **collection** du joueur, sauvée dans son profil (**A12**).
+5. Avant une run, le joueur **équipe 1 compagnon** de sa collection (**2 pour le Tamer**). En run, le compagnon suit son joueur et attaque seul.
+6. Pas d'évolution, pas de renommage. Les cartes de technique par espèce viennent avec A05-03 ; la personnalisation (chapeaux, couleurs, auras, Robux, purement visuelle) avec A05-05.
 
-## 2. Les 6 affinités et leurs effets
+## 1. Espèces
 
-L'attaque de base de chaque Compagnon applique l'effet de son affinité. Les effets passent par `EnemyService.applyStatus(id, status, params)` ; les paramètres envoyés sont listés dans la colonne « params ».
+- **Id d'espèce = le champ `name` de l'ennemi dans `shared/Config/Enemies.luau`** (domaine run, A03). Exemple : `GoblinGrunt` quand A03 aura renommé les ennemis v2. Le numéro `kind` peut changer d'une version à l'autre, le `name` non : la collection stocke donc toujours le **nom**, jamais le numéro.
+- **Capturables** : toutes les familles sauf les boss (`family ~= "Boss"` et `isBoss ~= true`). Ennemis de base, élites et mini-boss ont donc une variante capturable possible ; les boss non, au lancement.
+- Une élite capturée donne **la même espèce** que sa version normale (pas de doublon « doré » au lancement).
+- Nom affiché : `Enemies[kind].label` (anglais), le même que l'ennemi.
+- Attaque : par défaut celle de sa **famille** (section 5). `Companions.Species[name]` peut la surcharger espèce par espèce (A05-03).
 
-| Affinité (id) | FR / EN | Effet (attaque de base) | Stade 1 / 2 / 3 | params `applyStatus` |
-| --- | --- | --- | --- | --- |
-| `Braise` | Braise / Ember | **Brûlure** | 2 / 4 / 7 dégâts/s pendant 3 s | `Burn { dps, duration, source }` |
-| `Ronce` | Ronce / Bramble | **Poison** + **Ralenti** | poison 1,5 / 3 / 5 dps 4 s ; ralenti ×0,75 2 s | `Poison { dps, duration, source }`, `Slow { mult, duration, source }` |
-| `Maree` | Marée / Tide | **Recul** (+ soin d'équipe via techniques/Ultime) | recul 4 / 5 / 6 studs | `Knockback { fromX, fromZ, distance, source }` |
-| `Volt` | Volt / Volt | **Chaîne** : le coup rebondit | 1 / 2 / 3 rebonds à 60 % des dégâts, portée 10 studs | (dégâts directs, pas de statut) |
-| `Givre` | Givre / Frost | **Ralenti**, puis **Gel** au 4e coup sur la même cible ; **Fragile** : +30 % de dégâts du Compagnon sur une cible gelée | ralenti ×0,7 2 s ; gel 1 / 1,25 / 1,5 s | `Slow`, `Freeze { duration, source }` |
-| `Echo` | Écho / Echo | **Étourdit** (chance par coup) ; révèle les coffres (voir 13, demande de contrat) | 15 % / 20 % / 25 % d'étourdir 0,8 s | `Stun { duration, source }` |
+## 2. La cage
 
-`Fragile` (Givre) est calculé côté CompanionService (il garde l'heure de fin de gel de chaque cible qu'il a gelée), pour ne pas dépendre d'un statut que l'EnemyService n'a pas.
+| Règle | Valeur (`Companions.Capture`) |
+| --- | --- |
+| Création | **Uniquement côté serveur**, quand `EnemyService` appelle `CompanionService.onCapturableDefeated` pour un ennemi marqué capturable **à son apparition** (jamais sur un `clearAll`, un changement de monde, une fin de run ou un dépop) |
+| Durée de vie | `CageSeconds = 10` s après la mort. Le compte à rebours s'arrête pendant un gel coop (`RunManager.isFrozen`, si A04 l'expose) |
+| Rayon « dedans » | `Radius = 6` studs, test 2D, plus une tolérance verticale de `VerticalTolerance = 6` studs entre les pieds du joueur et le sol de la cage |
+| Durée de capture | `HoldSeconds = 2` s ; Tamer : `HoldSeconds ÷ Passives.Tamer.captureSpeed` (1,5) |
+| Coop | **Une cage commune, une capture par joueur** : chaque joueur de la run peut capturer la créature dans la même cage, chacun avec sa propre barre. Personne ne vole la créature d'un coéquipier (recommandation A11 §3.3, à confirmer par Clément). La cage disparaît à 10 s, ou plus tôt si tous les joueurs de la run l'ont capturée |
+| Plafond | `MaxPerRun = 5` captures par joueur et par run (anti-farm, à régler). Au-delà, la cage reste visible mais refuse avec un message |
+| Cages simultanées | `MaxCages = 12` dans la run ; au-delà, la plus ancienne disparaît |
 
-## 3. Les 6 lignées × 3 stades
+### 2.1 Progression (10 Hz, serveur)
 
-Noms FR du dossier de vision, noms EN proposés ici (à vérifier en marque). Taille = hauteur approximative du modèle en studs.
+À chaque tic, pour chaque joueur de la run, le serveur prend la cage la plus proche qu'il n'a pas encore capturée et dont il est dedans. La barre **avance** seulement si **toutes** ces conditions sont vraies :
 
-| Lignée | Stade 1 | Stade 2 | Stade 3 |
+- le joueur est actif (`RunManager.isActive` : ni à terre, ni fantôme) ;
+- la phase de la run est une phase de jeu (`Companions.Capture.Phases`) ;
+- il n'est pas en train de choisir une carte (`CardService.isChoosing`) : la barre **se met en pause** sans retomber ;
+- il n'a pas pris de strike MovementGuard depuis le début de sa tentative (`MovementGuard.getRunStrikes` n'a pas bougé).
+
+La barre **retombe à 0** si :
+
+- **le joueur est touché** (voir 2.2) : état `Interrupted` (« OUCH! CAPTURE RESET »), puis nouvel essai possible après `InterruptLockout = 0,5` s s'il reste dans la cage ;
+- il sort de la cage : état `Idle` ;
+- il prend un strike MovementGuard, ou passe à terre ;
+- la cage expire.
+
+À `HoldSeconds`, la capture est accordée (section 3).
+
+### 2.2 « Sans être touché »
+
+Touché = **tout coup reçu** : contact, projectile, attaque de boss, **même bloqué** par l'invulnérabilité, l'esquive, le bouclier ou la parade (`regles-v2.md` §3.1.4). L'invulnérabilité ne doit pas aider à capturer.
+
+- Source voulue : un événement `Bus.PlayerHit(player, source)` tiré par `RunManager.damagePlayer` **avant** les tests d'invulnérabilité, de parade et d'esquive (contract request, section 10).
+- Repli tant qu'il n'existe pas : `Bus.PlayerDamaged` (ne voit que les coups qui font des dégâts : un coup bloqué n'interrompt pas encore la capture, trou connu).
+
+### 2.3 Rien côté client
+
+**Aucun remote n'accorde une créature, aucun remote ne démarre une capture.** Le client ne fait que rester dans la cage. Le bouton Capture du HUD mobile (A08) n'envoie rien au serveur : il peut être retiré ou servir d'indice visuel.
+
+## 3. Collection et sauvegarde (A12)
+
+### 3.1 Données dans le profil (proposition à A12)
+
+```lua
+profile.companions = {
+	v = 1,
+	owned = { [speciesId] = { n = number, at = number } }, -- n = nombre de captures, at = 1re capture (os.time)
+	equipped = { speciesId?, speciesId? },                 -- emplacement 1, emplacement 2 (Tamer seulement)
+	keys = { [captureKey] = number },                      -- idempotence : clé -> os.time, garder les 200 plus récentes
+}
+```
+
+- `captureKey = "<JobId>:<runSerial>:<cageId>"`, construite par CompanionService. Elle est unique par serveur, par run et par cage ; comme elle est rangée dans le profil du joueur, elle identifie une capture par joueur.
+- Une espèce déjà possédée peut être recapturée : `n` augmente (statistique, quêtes), rien d'autre. Elle compte dans le plafond de 5.
+- Migration v1 → v2 : les anciennes lignées (`unlocks.Companion.Braise`…) n'existent plus comme espèces. A12 peut les supprimer ; CompanionService ignore tout id qui n'est pas une espèce capturable.
+- Pas de compagnon de départ (collection vide à la première run) : **question pour Clément**, section 11.
+
+### 3.2 API que A12 implémente dans `ProgressionService`
+
+| Fonction | Rôle |
+| --- | --- |
+| `grantCapture(player, speciesId: string, captureKey: string) -> (result: "Granted" \| "AlreadyGranted" \| "Unavailable", isNew: boolean)` | Un seul `DataService.mutate` : si `keys[captureKey]` existe → `"AlreadyGranted"` sans rien changer ; sinon ajoute la clé, crée ou incrémente `owned[speciesId]`, puis `saveSoon`. Profil non modifiable (téléport, session perdue) → `"Unavailable"` : la capture est **refusée**, jamais mise de côté. `isNew` = première capture de cette espèce. Peut céder (yield) : CompanionService l'appelle dans un thread à part |
+| `getCompanionLoadout(player) -> { string }` | Les espèces équipées, déjà validées : possédées, capturables (`CompanionService.isSpecies`), au plus `CompanionService.slotsFor(classId)` |
+| `hasCompanion(player, speciesId) -> boolean` | Pour l'écran de collection et `SelectLoadout` |
+
+Et côté remotes (A12) :
+
+- `SelectLoadout(classId, companionId, companionId2?)` : chaque id doit être possédé ; `companionId2` accepté seulement si `CompanionService.slotsFor(classId) == 2` ; pas deux fois la même espèce. Même contrôle à l'arrivée sur le serveur de run (`MatchService.applyArrivalLoadout`).
+- Payload `Profile` : ajouter `companions = { owned, equipped }` (pas `keys`) pour l'écran de collection (A09-07).
+- Clés de quêtes (section 9) à ajouter à `Config/Quests`.
+
+### 3.3 Repli (Studio, A12 pas encore livré)
+
+Si `ProgressionService.grantCapture` n'existe pas, CompanionService garde la collection **en mémoire** (perdue au départ du joueur) et avertit une fois dans la sortie. Si `getCompanionLoadout` n'existe pas, il lit le 2e retour de `ProgressionService.getLoadout` (un seul compagnon), s'il désigne une espèce, sinon la dernière espèce capturée en mémoire.
+
+## 4. Équipement
+
+- Emplacements : `CompanionService.slotsFor(classId)` = `Weapons.Passives[classId].companionSlots` ou 1. Tamer = 2. La classe vient toujours du serveur (`RunManager.getLoadout`), jamais d'un attribut client.
+- Au `Bus.RunStarted` (et pour un joueur qui arrive en cours de run, via `CompanionService.ensure`), CompanionService crée un compagnon par espèce équipée.
+- Capturer pendant la run **n'ajoute pas** de compagnon à la run en cours : la créature attend dans la collection. (Exception de test : avec le repli en mémoire de 3.3, un joueur sans aucun compagnon reçoit tout de suite sa capture, pour voir le suivi en Studio.)
+
+## 5. En run : suivi et attaque
+
+- **Ne peut pas mourir, ne prend pas de dégâts.** Propriétaire à terre : compagnon **sonné 5 s**, puis il garde le joueur à terre en attaquant autour de lui. Relevé : sonné annulé. Mort définitive : sonné jusqu'à la fin de la run.
+- **Suivi** : 5 studs derrière le joueur, 2,5 studs sur le côté (gauche pour l'emplacement 1, droite pour le 2), 24 studs/s, téléporté derrière le joueur au-delà de 60 studs. S'écarte au plus de 14 studs de ce point pour aller frapper une cible.
+- **Cible** : l'ennemi le plus proche à portée ; en coop, une cible déjà prise par un autre compagnon est évitée s'il en existe une autre.
+- **Kills crédités au propriétaire** : `EnemyService.damage(id, n, owner)`. XP, butin, KO et quêtes vont au joueur.
+
+### 5.1 Attaque par famille (défaut, `Companions.Families`)
+
+| Famille | Attaque | Dégâts | Intervalle | Portée | Zone | Effet |
+| --- | --- | --- | --- | --- | --- | --- |
+| `Swarm` | Morsure (va au contact) | 8 | 0,9 s | 5 | — | — |
+| `Jumper` | Bond | 14 | 1,6 s | 14 | 4 | — |
+| `Shooter` | Tir | 7 | 1,1 s | 24 | — | — |
+| `Armored` | Charge | 10 | 1,3 s | 5 | 3 | Recul 4 studs |
+| `MiniBoss` | Coup lourd | 24 | 1,4 s | 8 | 6 | Étourdit 0,5 s |
+
+**Dégâts finaux** = base × (1 + 0,5 × `Damage` du propriétaire) × (1 + 0,04 × (niveau de run − 1)) × (1 + Friandise Puissance) × (1 + bonus Tamer 0,2). Le niveau de run remplace l'ancienne évolution : le compagnon grandit avec son joueur sans changer de forme.
+
+### 5.2 Cartes (en attendant A05-03)
+
+`getCardOptions` propose encore les **Friandises** génériques (cumulables 10 fois, Commune 60 % / Rare 30 % / Épique 10 %), qui touchent tous les compagnons du joueur :
+
+| id | Nom (EN) | Commune / Rare / Épique |
+| --- | --- | --- |
+| `TreatPower` | Hearty Biscuit | +8 % / +12 % / +18 % dégâts |
+| `TreatHaste` | Fizzy Candy | +6 % / +9 % / +14 % vitesse d'attaque |
+| `TreatReach` | Spyglass Berry | +8 % / +12 % / +18 % portée et zones |
+
+A05-03 ajoutera 2 à 3 cartes de technique par espèce.
+
+### 5.3 Pas d'Ultime
+
+Les décisions v2 ne gardent ni évolution ni Ultime. Le remote `CompanionUltimate` (déclaré dans `shared/Net`, domaine lead) n'est plus écouté ; `CompanionState.ultimateCharge` vaut toujours 0. **Question pour Clément** (section 11).
+
+## 6. API de CompanionService
+
+### 6.1 Pour A03 (`EnemyService`)
+
+| Fonction | Quand l'appeler |
+| --- | --- |
+| `CompanionService.isSpecies(kind: number) -> boolean` | Au spawn, avant de marquer un ennemi capturable : vrai si l'espèce existe dans `Config/Enemies` et n'est pas un boss. Ne pas marquer si faux |
+| `CompanionService.onCapturableDefeated(kind: number, x: number, z: number, killer: Player?) -> number?` | **Une fois**, dans `EnemyService.damage`, quand un ennemi marqué capturable **meurt sous les coups** (juste après `Bus.EnemyKilled`). Jamais pour `clearAll`, `clearNonBoss`, `_remove`, dépop ou fin de run. Renvoie l'id de cage (ou nil si refusée : phase hors jeu, espèce inconnue). Ne cède jamais |
+
+Le reste est à A03 : taux d'apparition, PV en plus (« plus résistante »), marquage serveur au spawn (jamais lu chez le client), aura et icône sur l'ennemi (`ArtLibrary.cloneCaptureMarker`, bit « capturable » dans `EnemyCodec`). Appel conseillé : `Registry.find("CompanionService")` dans la fonction, protégé par `pcall`.
+
+### 6.2 Pour A12 (`ProgressionService`, `DataService`)
+
+| Fonction | Rôle |
+| --- | --- |
+| `CompanionService.slotsFor(classId: string) -> number` | 1, ou 2 pour le Tamer (règle unique, lue dans `Config/Weapons.Passives`) |
+| `CompanionService.isSpecies(speciesId: string \| number) -> boolean` | Valider un id d'espèce (nom) ou un `kind` |
+| `CompanionService.speciesName(speciesId: string) -> LocalizedText?` | Nom affichable |
+
+Et CompanionService appelle chez A12 : `grantCapture`, `getCompanionLoadout` (section 3.2), `recordStat` (section 9).
+
+### 6.3 Pour les autres
+
+| Fonction | Pour | Rôle |
+| --- | --- | --- |
+| `getCardOptions(player) -> {Card}` · `applyCard(player, card)` | CardService (A04) | Contrat inchangé |
+| `getState(player) -> { line, stage, level }?` | RunManager (résumé) | `line` = espèce du 1er compagnon, `stage` = 1 toujours |
+| `ensure(player)` | RunManager | Arrivée en cours de run |
+| `chargeUltimate(player, n)` | autels, objets | Gardé pour le contrat ; sans effet (pas d'Ultime) |
+| `getCages() -> {{ id, species, x, z, expiresAt }}` | Minimap (A08) | Cages vivantes |
+
+## 7. Remotes (`shared/NetDefs/Companion.luau`)
+
+| Remote | Sens | Payload |
+| --- | --- | --- |
+| `CaptureState` | serveur → le joueur qui capture | `{ state = "Idle" \| "Capturing" \| "Interrupted" \| "Captured" \| "Refused", progress: 0..1, holdSeconds: number, name: LocalizedText?, isNew: boolean?, reason: string? }` — forme déjà lue par `CaptureUI` (A08). Au plus 10/s, envoyé seulement quand l'état ou la barre (au 1/10) change. `reason` (Refused) : `"Cap"` (5 captures) ou `"Unavailable"` (profil non modifiable) |
+| `CageState` | serveur → tous | `{ cages = {{ id, species, kind, x, y, z, expiresIn, done = { userId } }} }` — à chaque création, capture ou disparition |
+| `CompanionState` (existant) | serveur → propriétaire | `{ line, stage = 1, level, name, ultimateCharge = 0, stunned, techs = {}, companions = {{ species, name, slot }} }` |
+| `CompanionSnapshot` (existant, non fiable) | serveur → tous | 10 Hz. En-tête 5 octets (`tick u32`, `count u8`) + 25 octets par compagnon : `userId f64`, `slot u8`, `kind u8`, `x/y/z i16` au 1/4 de stud, `yaw u8`, `flags u8` (bit 0 sonné), `evSeq u8`, `evKind u8`, `evX/evZ i16`, `evRadius u8`. 35 compagnons par paquet ≤ 900 octets |
+
+## 8. Rendu (client) et gabarits visuels
+
+Règle « rien n'est construit par script » (`01-decisions-v2.md` §12) : `CompanionRenderer` **clone des gabarits** de `ReplicatedStorage.Assets` (recherche par nom, `ArtLibrary.find`) et, si un gabarit manque, **ne fabrique rien** : il l'écrit une fois dans la sortie et n'affiche rien à la place.
+
+| Gabarit (nom exact) | Rangé dans | Utilisé pour | Si absent |
 | --- | --- | --- | --- |
-| `Braise` | **Tisonnet** / Tinderling — lézard-allumette : corps orange trapu, tête ronde avec une « tête d'allumette » rouge vif sur le crâne, petite queue ; 2 studs | **Fournaïde** / Furnacid — lézard debout, ventre en porte de four qui rougeoie, deux cheminées sur les épaules ; 3 studs | **Volcarapace** / Volcashell — gros lézard à quatre pattes, dos couvert de plaques sombres d'où sortent trois évents rougeoyants ; 4,5 studs |
-| `Ronce` | **Pousseron** / Sproutlet — gland qui marche : corps ovale brun, chapeau de gland, deux pieds et une pousse verte ; 2 studs | **Ronciflore** / Bramblebloom — gland fendu d'où sort une couronne de ronces fleuries, bras-lianes ; 3 studs | **Sylvogarde** / Sylvaward — souche-gardienne trapue, bras de ronces épais, couronne de fleurs roses ; 4,5 studs |
-| `Maree` | **Gouttelot** / Dropple — têtard dans une bulle d'eau transparente, petite queue qui dépasse ; 2 studs (flotte) | **Ondelin** / Wavelin — amphibien rond à crête en forme de vague, nageoires-mains ; 3 studs | **Abyssale** / Abyssa — raie flottante bleu nuit, ailes larges, petite lanterne turquoise ; 4,5 studs (flotte) |
-| `Volt` | **Grésillon** / Fizzlet — souris-pile : corps cylindrique sarcelle à bandes cuivre, borne sur la tête, queue-câble ; 2 studs | **Ampérat** / Amperat — rat plus long, queue en bobine de cuivre, oreilles-condensateurs ; 3 studs | **Fulgurex** / Fulgurex — furet long sur quatre pattes, deux antennes-paratonnerres, dos à arcs lumineux ; 4,5 studs |
-| `Givre` | **Flocon** / Flurry — boule de neige à pattes de pingouin, bec orange, écharpe bleue ; 2 studs | **Stalagmo** / Stalagmo — pingouin trapu, dos hérissé de stalactites ; 3 studs | **Glaciarque** / Glaciarch — pingouin-chevalier massif, couronne et épaulières de glace ; 4,5 studs |
-| `Echo` | **Pipistrou** / Pipistrill — chauve-souris ronde dont le ventre est un haut-parleur (cône), grandes oreilles ; 2 studs (vole) | **Résonar** / Resonar — chauve-souris à ailes-pavillons, deux haut-parleurs ; 3 studs (vole) | **Tonnerlune** / Thundermoon — grande chauve-souris à croissant de lune sur le front, ailes-caissons de basse ; 4,5 studs (vole) |
+| `Companion_<espèce>` | `Assets.Creatures` | Le compagnon (maille unique, mise à la hauteur de l'ennemi × 0,8) | Repli sur `Enemy_<espèce>` (la maille de l'ennemi) |
+| `Enemy_<espèce>` | `Assets.Creatures` (déjà fourni par A01/A03) | Repli du compagnon | Compagnon invisible + avertissement |
+| `FX_CaptureCage` | `Assets.FX` | La cage au sol (modèle, mis à l'échelle du rayon 6) | Cage invisible ; la barre de CaptureUI reste |
+| `FX_CaptureSuccess` | `Assets.FX` | Éclat de réussite, 1,5 s | Rien |
+| `FX_CompanionStun` | `Assets.FX` | Étoiles au-dessus d'un compagnon sonné | Rien |
+| `FX_CompanionHit` | `Assets.FX` | Impact d'une attaque (petite pièce, pool de 24) | Rien |
 
-### 3.1 Stats de base par stade (attaque de base)
+La cage clignote (transparence) pendant ses 3 dernières secondes. Le compagnon sautille (procédural, aucune Instance créée) et s'oriente vers sa cible.
 
-Dégâts finaux = base × (1 + 0,5 × Dégâts du propriétaire) × (1 + Friandise Puissance) × (1 + bonus Lien) × (1 + synergie). La moitié du stat `Damage` du joueur est héritée pour que le Compagnon reste utile en fin de run sans voler la vedette aux armes.
+## 9. Clés de quêtes
 
-| Lignée | Stade 1 dégâts / intervalle / portée | Stade 2 | Stade 3 | Rôle |
-| --- | --- | --- | --- | --- |
-| Braise | 7 / 1,0 s / 22 | 16 / 0,9 s / 24 | 34 / 0,8 s / 26 | Zone (éclaboussure 3 / 4 / 5 studs) |
-| Ronce | 5 / 1,0 s / 22 | 12 / 0,9 s / 24 | 26 / 0,8 s / 26 | Contrôle, poison |
-| Maree | 5 / 1,1 s / 24 | 12 / 1,0 s / 26 | 25 / 0,9 s / 28 | Soutien, recul |
-| Volt | 6 / 0,9 s / 22 | 13 / 0,8 s / 24 | 27 / 0,7 s / 26 | Chaîne |
-| Givre | 6 / 1,2 s / 22 | 14 / 1,1 s / 24 | 30 / 1,0 s / 26 | Gel, défense |
-| Echo | 5 / 0,9 s / 26 | 11 / 0,8 s / 28 | 24 / 0,7 s / 30 | Utilitaire (portée longue) |
+`ProgressionService.recordStat(player, key, n)` : `CompanionsCaptured` (1 par capture), `CompanionNewSpecies` (1 par nouvelle espèce), `CompanionKills` (n), `CompanionTreats` (1). Les clés v1 `CompanionEvolved`, `CompanionStage3`, `UltimatesUsed`, `CompanionTechsLearned` ne sont plus envoyées.
 
-Vitesse de suivi : 1,5 × la vitesse de marche de base (16) = 24 studs/s, téléportation derrière le joueur au-delà de 60 studs. Distance de suivi : 5 studs derrière, 2 studs sur le côté.
+## 10. Contract requests
 
-## 4. Évolutions : niveau du joueur (décision)
-
-**Décision : le Compagnon n'a pas d'XP propre ; son niveau = niveau de run du propriétaire** (`StatsService.getLevel`, mis à jour par `Bus.PlayerLeveledUp`). Évolution au **niveau 8** (stade 2) et au **niveau 20** (stade 3).
-
-Pourquoi : une seule barre d'XP à lire sur mobile ; l'évolution tombe sur un moment déjà fort (le level-up) ; en coop, le Compagnon ne peut pas prendre de retard parce qu'il a moins tué ; la courbe d'XP est déjà équilibrée par le domaine combat (10 min ≈ niveau 25-30). Les Friandises compensent le manque de progression propre.
-
-Moment d'évolution (fiche vault « Reward Moments and Celebrations » : anticipation puis révélation, sans bloquer le jeu) : flash blanc 0,5 s qui gonfle, anneau de couleur d'affinité, le nouveau modèle apparaît avec un « pop » d'échelle (0,6 → 1,1 → 1) ; pendant 1,5 s le Compagnon est invulnérable de toute façon (il ne peut pas mourir) et continue d'attaquer. `Bus.CompanionEvolved(player, stage)` est tiré à chaque évolution.
-
-## 5. Techniques (max 3 par Compagnon)
-
-- Chaque lignée a **4 techniques**. Le Compagnon en connaît **1 au départ** (technique de départ, choisie via le Lien, voir 9) et peut en apprendre **2 de plus** par cartes : 3 au maximum.
-- Niveau 1 à 5. Formes : `Target` (cible la plus proche, éclaboussure optionnelle), `Nova` (zone autour du Compagnon), `Aura` (zone autour du propriétaire), `Chain` (rebonds), `Heal` (soin d'équipe dans un rayon).
-- Les dégâts des techniques suivent la même formule que l'attaque de base.
-
-Valeurs par niveau (1 → 5). « dmg » = dégâts, « cd » = recharge (s), « r » = rayon (studs).
-
-### Braise
-| id | FR / EN | Forme | dmg | cd | r | Effet |
-| --- | --- | --- | --- | --- | --- | --- |
-| `EmberSpit` | Crachat de braise / Ember Spit | Target | 12 / 16 / 21 / 27 / 35 | 3,0 / 2,8 / 2,6 / 2,4 / 2,2 | éclab. 5 | Brûlure 4 / 5 / 6 / 8 / 10 dps 3 s |
-| `FlameRing` | Cercle de flammes / Flame Ring | Nova | 10 / 14 / 18 / 23 / 30 | 6 / 5,5 / 5 / 4,5 / 4 | 8 / 9 / 10 / 11 / 12 | Brûlure 3 / 4 / 5 / 6 / 8 dps 3 s |
-| `CinderTrail` | Cendres chaudes / Cinder Trail | Aura (joueur) | 4 / 5 / 7 / 9 / 12 | 1,0 | 6 / 6,5 / 7 / 7,5 / 8 | dégâts par tic autour du joueur |
-| `FireComet` | Comète de feu / Fire Comet | Target | 40 / 55 / 70 / 90 / 120 | 9 / 8,5 / 8 / 7,5 / 7 | éclab. 8 | Brûlure 6 / 8 / 10 / 12 / 15 dps 3 s |
-
-### Ronce
-| id | FR / EN | Forme | dmg | cd | r | Effet |
-| --- | --- | --- | --- | --- | --- | --- |
-| `ThornShot` | Tir d'épines / Thorn Shot | Target | 8 / 11 / 14 / 18 / 23 | 2,5 / 2,4 / 2,3 / 2,2 / 2,0 | — | Poison 3 / 4 / 5 / 6 / 8 dps 4 s |
-| `BrambleField` | Champ de ronces / Bramble Field | Nova | 6 / 8 / 10 / 13 / 16 | 7 / 6,5 / 6 / 5,5 / 5 | 9 / 10 / 11 / 12 / 13 | Ralenti ×0,6 3 s + poison 2 / 3 / 4 / 5 / 6 dps |
-| `SporePuff` | Bouffée de spores / Spore Puff | Aura (joueur) | 3 / 4 / 5 / 6 / 8 | 1,5 | 6 / 6,5 / 7 / 7,5 / 8 | Poison 2 / 2,5 / 3 / 4 / 5 dps 3 s |
-| `RootSnare` | Piège racine / Root Snare | Target | 15 / 20 / 26 / 33 / 42 | 8 / 7,5 / 7 / 6,5 / 6 | éclab. 6 | Étourdit 1,0 / 1,2 / 1,4 / 1,6 / 2,0 s |
-
-### Marée
-| id | FR / EN | Forme | dmg | cd | r | Effet |
-| --- | --- | --- | --- | --- | --- | --- |
-| `BubbleShot` | Tir de bulle / Bubble Shot | Target | 9 / 12 / 16 / 20 / 26 | 2,5 / 2,4 / 2,3 / 2,2 / 2,0 | — | Recul 6 studs |
-| `TideRing` | Anneau de marée / Tide Ring | Nova | 8 / 11 / 14 / 18 / 23 | 6 / 5,5 / 5 / 4,5 / 4 | 9 / 10 / 11 / 12 / 13 | Recul 8 studs |
-| `Spring` | Source fraîche / Spring | Heal | — | 12 / 11 / 10 / 9 / 8 | 30 | Soigne chaque coéquipier actif dans le rayon de 4 / 5 / 6 / 7 / 8 % PV max |
-| `Geyser` | Geyser / Geyser | Target | 30 / 40 / 52 / 66 / 85 | 9 / 8,5 / 8 / 7,5 / 7 | éclab. 7 | Recul 10 studs |
-
-### Volt
-| id | FR / EN | Forme | dmg | cd | r | Effet |
-| --- | --- | --- | --- | --- | --- | --- |
-| `Spark` | Étincelle / Spark | Chain | 8 / 10 / 13 / 17 / 22 | 2,5 / 2,4 / 2,3 / 2,2 / 2,0 | saut 10 | 3 / 3 / 4 / 4 / 5 cibles |
-| `StaticField` | Champ statique / Static Field | Aura (joueur) | 4 / 5 / 7 / 9 / 12 | 1,0 | 6 / 6,5 / 7 / 7,5 / 8 | dégâts par tic |
-| `ThunderPounce` | Bond tonnerre / Thunder Pounce | Target | 25 / 34 / 44 / 56 / 72 | 7 / 6,5 / 6 / 5,5 / 5 | éclab. 5 | Étourdit 0,6 / 0,7 / 0,8 / 0,9 / 1,0 s |
-| `BallLightning` | Boule d'éclair / Ball Lightning | Chain | 18 / 24 / 31 / 40 / 52 | 8 / 7,5 / 7 / 6,5 / 6 | saut 12 | 6 / 7 / 8 / 9 / 10 cibles |
-
-### Givre
-| id | FR / EN | Forme | dmg | cd | r | Effet |
-| --- | --- | --- | --- | --- | --- | --- |
-| `FrostShard` | Éclat de givre / Frost Shard | Target | 10 / 13 / 17 / 22 / 28 | 2,5 / 2,4 / 2,3 / 2,2 / 2,0 | — | Ralenti ×0,6 2 s |
-| `IceRing` | Anneau de glace / Ice Ring | Nova | 8 / 11 / 14 / 18 / 23 | 8 / 7,5 / 7 / 6,5 / 6 | 8 / 9 / 10 / 11 / 12 | Gel 1,0 / 1,2 / 1,4 / 1,6 / 2,0 s |
-| `HailVeil` | Voile de grêle / Hail Veil | Aura (joueur) | 3 / 4 / 5 / 7 / 9 | 1,0 | 6 / 6,5 / 7 / 7,5 / 8 | Ralenti ×0,7 1,5 s |
-| `GlacierSpike` | Pic glaciaire / Glacier Spike | Target | 35 / 48 / 62 / 80 / 100 | 9 / 8,5 / 8 / 7,5 / 7 | éclab. 6 | Gel 1,5 / 1,7 / 1,9 / 2,1 / 2,5 s |
-
-### Écho
-| id | FR / EN | Forme | dmg | cd | r | Effet |
-| --- | --- | --- | --- | --- | --- | --- |
-| `SonicPing` | Ping sonique / Sonic Ping | Target | 8 / 11 / 14 / 18 / 23 | 2,0 / 1,9 / 1,8 / 1,7 / 1,5 | — | Étourdit 0,5 s |
-| `Screech` | Cri perçant / Screech | Nova | 8 / 11 / 14 / 18 / 23 | 7 / 6,5 / 6 / 5,5 / 5 | 10 / 11 / 12 / 13 / 14 | Étourdit 1,0 / 1,1 / 1,2 / 1,4 / 1,6 s |
-| `Ricochet` | Ricochet / Ricochet | Chain | 10 / 13 / 17 / 22 / 28 | 3 / 2,9 / 2,8 / 2,7 / 2,5 | saut 12 | 3 / 4 / 4 / 5 / 6 cibles |
-| `Resonance` | Résonance / Resonance | Aura (joueur) | 4 / 5 / 7 / 9 / 12 | 1,0 | 7 / 7,5 / 8 / 8,5 / 9 | dégâts par tic |
-
-## 6. Friandises (cartes `CompanionTreat`)
-
-Bonus additifs pour la run, cumulables jusqu'à 10 fois chacune. Rareté tirée : Commune 60 %, Rare 30 %, Épique 10 %.
-
-| id | FR / EN | Commune / Rare / Épique |
-| --- | --- | --- |
-| `TreatPower` | Biscuit costaud / Hearty Biscuit | +8 % / +12 % / +18 % dégâts du Compagnon |
-| `TreatHaste` | Bonbon pétillant / Fizzy Candy | +6 % / +9 % / +14 % vitesse d'attaque (intervalle et recharges ÷) |
-| `TreatReach` | Baie longue-vue / Spyglass Berry | +8 % / +12 % / +18 % portée et rayons |
-| `TreatSpirit` | Miel d'étoile / Star Honey | +8 % / +12 % / +18 % gain de jauge d'Ultime |
-
-## 7. Ultimes
-
-Jauge de 0 à 100. Gains (multipliés par Miel d'étoile et la synergie) :
-
-| Source | Gain |
+| Pour | Demande |
 | --- | --- |
-| Passif | 0,5 / s (Compagnon non sonné, run en cours) |
-| Ennemi tué par le propriétaire | 0,25 |
-| Ennemi tué par le Compagnon | 1 |
-| Élite tuée (propriétaire ou Compagnon) | +5 |
-| Dégâts encaissés par le propriétaire | 0,2 par PV perdu |
-| Level-up du propriétaire | +5 |
-| `CompanionService.chargeUltimate(player, n)` | n (objets, autels…) |
+| Lead (`server/Bus.luau`) + A04 (`RunManager.damagePlayer`) | `Bus.PlayerHit(player, source: string)`, tiré au début de `damagePlayer` pour tout coup reçu par un joueur actif, **avant** invulnérabilité, parade, esquive et bouclier |
+| A04 (`RunManager`) | `RunManager.isFrozen() -> boolean` pendant le gel coop du choix de carte (les cages et les compagnons se mettent en pause) |
+| A03 (`EnemyService`) | Appeler `isSpecies` au spawn et `onCapturableDefeated` à la mort d'un capturable (6.1) |
+| A12 (`ProgressionService`) | `grantCapture`, `getCompanionLoadout`, `hasCompanion`, `profile.companions`, `SelectLoadout` à 2 compagnons, payload `Profile`, clés de quêtes (sections 3 et 9) |
+| A08 (`CaptureUI`) | Gérer l'état `Refused` (`reason = "Cap"` : « Collection full for this run », `"Unavailable"` : « Can't save right now ») et `isNew` (« NEW! ») ; le bouton Capture mobile n'envoie rien |
+| A08 (`Minimap`) | Les cages via le remote `CageState` ou `CompanionService.getCages` |
+| Lead (`ARCHITECTURE.md` §3, §4, §6) | Remplacer les lignées par « espèce = `Enemies[].name` », ajouter les APIs de 6.1 et 6.2 et les remotes de la section 7 |
 
-Objectif : un Ultime toutes les 60-90 s en milieu de run. Utilisation refusée si : jauge < 100, Compagnon sonné, propriétaire à terre ou fantôme (`RunManager.isActive` faux), phase hors `Running`/`Boss`/`BossDefeated`/`FinalWave`, ou moins de 1 s depuis le dernier.
+## 11. Questions pour Clément
 
-| Lignée | Ultime FR / EN | Effet (dégâts × formule de 3.1) |
-| --- | --- | --- |
-| Braise | Pluie de cendres / Ash Rain | 6 s, zone de 18 studs qui suit le propriétaire : 4 tics/s de 10 dégâts + Brûlure 8 dps 3 s |
-| Ronce | Racines géantes / Giant Roots | Tous les ennemis à 60 studs (« l'écran ») étourdis (immobilisés) 3 s + poison 6 dps 4 s |
-| Maree | Grande vague / Great Wave | Soigne chaque coéquipier actif de 40 % de ses PV max (toute l'équipe) ; recul 12 studs + 30 dégâts à 20 studs |
-| Volt | Orage / Thunderstorm | Jusqu'à 30 cibles à 60 studs frappées en 1,5 s, 80 dégâts chacune |
-| Givre | Blizzard / Blizzard | Ennemis à 50 studs gelés 4 s + 20 dégâts |
-| Echo | Cri lunaire / Moon Howl | Ennemis à 45 studs étourdis 2,5 s + 25 dégâts ; révèle le boss (demande de contrat, section 13) |
+1. **Compagnon de départ** : collection vide à la première run (on capture son premier compagnon pendant la run) ou une espèce offerte ? Par défaut : collection vide.
+2. **Ultime** : on le supprime (par défaut) ou on garde une jauge et un gros coup par espèce ?
+3. **Coop** : une capture par joueur dans la même cage (par défaut, recommandé par A11) ou « le premier qui tient 2 s la prend » ?
+4. **Tamer** : « 50 % plus rapide » = 1,33 s (par défaut, `captureSpeed = 1,5`) ; `regles-v2.md` disait 1 s (= 2× plus rapide).
 
-Contrôle (dossier vision 10) : **E** au clavier, bouton **Ultime** sur mobile (jauge circulaire dessinée par l'UI), **Y** à la manette. Le domaine avatar déclare l'`InputAction` `"Ultimate"` ; le Compagnon l'écoute (section 12).
+## 12. Sources
 
-## 8. Synergies Classe × affinité (+10 %)
-
-Quand l'affinité du Compagnon correspond à la classe : **+10 % dégâts du Compagnon et +10 % de gain de jauge**. Jamais obligatoire.
-
-| Classe | Affinité en synergie | Raison |
-| --- | --- | --- |
-| `Cornu` | Braise | cornes en flammes au niveau 30 |
-| `Plumeline` | Maree | oiseau marin, vent et embruns |
-| `Mecano` | Volt | bras mécanique (dossier vision) |
-| `Felyne` | Volt | griffes éclair |
-| `Rocailleux` | Ronce | plaques couvertes de mousse |
-| `Sporelin` | Ronce | spores et poison (dossier vision) |
-| `Ecaille` | Braise | souffle de braise (dossier vision) |
-| `Astrel` | Echo | lune et étoiles (Tonnerlune) |
-| `Cristallin` | Givre | cristaux de glace |
-| `Tentaculos` | Maree | créature des profondeurs |
-
-## 9. Lien (méta-progression 1-30)
-
-Stocké par le domaine data (`profile.bond[line]`, défaut 1). Gain proposé au domaine data : +1 par run terminée avec ce Compagnon, +1 si stade 3 atteint (`RunSummary.companionStage == 3`), +1 si victoire, plafond 30.
-
-| Niveau | Récompense |
-| --- | --- |
-| 3, 6, 9 … 30 | +1 % dégâts du Compagnon par palier → **+10 % maximum** au niveau 30 (règle : jamais plus de +10 % de stats brutes) |
-| 1 | Technique de départ n° 1 |
-| 5 | Technique de départ alternative n° 2 |
-| 15 | Technique de départ alternative n° 3 |
-| 25 | Technique de départ alternative n° 4 |
-| 4 / 10 / 20 / 28 | Teintes 1 / 2 / 3 / 4 (cosmétique pur) |
-| 12 | Pose de victoire du Compagnon |
-| 30 | Titre « Inséparable » / "Inseparable" |
-
-La technique de départ est lue dans `profile.companionStartTech[line]` si elle existe et si le Lien la débloque, sinon technique n° 1 (demande de contrat au domaine data).
-
-## 10. Coop et règle « sonné »
-
-- Le Compagnon **ne peut pas mourir**. Quand son propriétaire est mis à terre (`Bus.PlayerDowned`), il est **sonné 5 s** (n'attaque pas, ne charge pas, reste près du joueur, étoiles au-dessus de la tête), puis il **garde** son propriétaire à terre en attaquant autour de lui. Relevé (`Bus.PlayerRevived`) : sonné annulé. Mort définitive (`Bus.PlayerDied`) : le Compagnon reste sonné jusqu'à la fin de la run.
-- Les kills du Compagnon sont crédités au propriétaire (`EnemyService.damage(id, n, owner)`), donc XP, butin et quêtes lui reviennent.
-- À plusieurs, les Compagnons se répartissent les cibles : à chaque tic, une cible déjà prise par un autre Compagnon est évitée s'il existe une autre cible à portée.
-- Grande vague (Marée) soigne **toute l'équipe** ; Spring soigne les coéquipiers dans 30 studs : la lignée soutien a de la valeur en coop.
-
-## 11. Collection et œufs gratuits
-
-- Départ : **Braise, Ronce, Maree** débloqués. **Volt, Givre, Echo** par quêtes ou œufs.
-- **Œuf de Compagnon** : gagné uniquement en jouant (1 par quête compagnon terminée, 1 au premier boss de chaque monde, 1 tous les 10 niveaux de maîtrise cumulés). Jamais vendu en Robux, jamais achetable avec une monnaie achetable en Robux (ni Étoiles d'argent si un jour elles deviennent achetables) : sinon c'est un **objet aléatoire payant** (règle Roblox citée par le vault : un résultat aléatoire acheté directement ou indirectement en Robux, y compris via une monnaie payante ; les récompenses gagnées sans Robux ni monnaie payante en sont exemptées).
-- **Taux affichés** quand même (bonne pratique, et prêts si la règle change) : sur les Compagnons non encore possédés, chance égale : 3 restants → 33,33 % chacun, 2 → 50 %, 1 → 100 %. Si tous sont possédés : l'œuf donne +3 niveaux de Lien au Compagnon choisi (pas de doublon inutile). La table affichée et la table tirée sont **la même** (`Companions.Eggs`). Le tirage est fait par le domaine data.
-- Pas de « luck boost » payant, pas de pitié payante.
-
-## 12. Réseau, rendu et contrôle de l'Ultime
-
-- **Serveur** : simulation à 10 Hz (`Companions.SimHz`), positions en données (aucune Instance serveur par Compagnon). Cibles via `EnemyService.queryRadius` + `getPosition`.
-- **CompanionSnapshot (non fiable)** : 10 Hz, à tous les clients. Format maison : en-tête 5 octets (`tick u32`, `count u8`) + 23 octets par Compagnon (`userId f64`, `x/y/z i16` au 1/4 de stud, `yaw u8`, `flags u8` = lignée 3 bits | stade 2 bits | sonné | ultime actif, `evSeq u8`, `evKind u8`, `evX/evZ i16`, `evRadius u8`). 38 Compagnons par paquet ≤ 900 octets (limite vault : au-delà de 1 000 octets un paquet non fiable est perdu). Encodage dans le service, décodage dans le renderer, constantes partagées dans la config.
-- **CompanionState (fiable)** : au propriétaire, à chaque changement (jauge arrondie à l'entier, max 4/s).
-- **Client** : modèles low-poly en Parts ancrées sans collision ni requête, construits par stade, interpolés entre deux échantillons (fiche « Snapshot Interpolation »), un seul `BulkMoveTo` par frame. Sautillement procédural, VFX de projectiles / anneaux / flash d'évolution / Ultime en pools bornés.
-- **Déclencher l'Ultime** :
-  - Clavier / manette : le domaine avatar expose `InputController.onAction("Ultimate", fn)` ; `CompanionRenderer.start()` s'y abonne.
-  - Bouton UI : le domaine ui appelle `Registry.get("CompanionRenderer").requestUltimate()` (client). L'état pour la jauge : `CompanionRenderer.getState()` et `CompanionRenderer.onStateChanged(fn)` (payload `CompanionState`).
-  - Les deux chemins font `Net.event("CompanionUltimate"):FireServer()` ; le serveur valide (limite 2/s).
-
-## 13. Clés de quêtes rapportées
-
-`ProgressionService.recordStat(player, key, n)` : `CompanionEvolved` (1 par évolution), `CompanionStage3` (1 au stade 3), `UltimatesUsed` (1), `CompanionKills` (n), `CompanionTechsLearned` (1 par nouvelle technique), `CompanionTreats` (1).
-
-## 14. Sources vault
-
-- *Pet Hatching and Following End to End* — modèles de suivi côté client uniquement, pas de modèles serveur avec `AlignPosition`, parts ancrées `CanQuery=false`, téléportation au-delà d'une distance.
-- *Snapshot Interpolation for Custom Replication* — interpolation entre échantillons, non fiable pour l'état, fiable pour les événements.
-- *RemoteEvent - Engine Reference Card* et *RemoteEvents RemoteFunctions and Unreliable Remotes* — 1 000 octets max par paquet non fiable (Roblox docs), ~500 appels/s par client et par type, validation + limite de débit sur chaque remote C→S.
-- *NPC AI and Behaviour* / *Luau Performance and Native Codegen* — cerveaux à 10 Hz, une boucle partagée, aucune allocation par frame.
-- *VFX Performance Budgets and Culling*, *Juice on a Budget*, *Particle Emitters In Depth* — pools bornés, effets créés côté client, pas de création/destruction par coup.
-- *Reward Moments and Celebrations* — anticipation puis révélation pour l'évolution, sans bloquer.
-- *Roblox Policies Ratings and Compliance* et *Paid Random Items and Odds Disclosure in Practice* (Roblox docs, oct. 2026) — définition d'objet aléatoire payant, exemption des récompenses gagnées sans Robux, une seule table pour l'affichage et le tirage.
-- *Rebinding Controls with the Input Action System*, *Input - UserInputService and ContextActionService* — une `InputAction` par mécanique, nom stable, `Pressed` ; un bouton tactile se lie à l'action.
-- *Case Study - Adopt Me* — la progression visible sur la créature elle-même (stade, lueur) fidélise.
+- `01-decisions-v2.md` §3 (Tamer), §5 (capture), §12 (rien construit par script).
+- `docs/security/regles-v2.md` §0 et §3 (cage serveur, touché même bloqué, idempotence, plafond, aucun remote).
+- `docs/dossier/13-ennemis-boss.md` (roster v2, noms de mailles `Enemy_<nom>`, marqueur de capture d'A01).
+- Vault : *Pet Hatching and Following End to End* (suivi client, parts ancrées sans requête), *Snapshot Interpolation for Custom Replication*, *Paid Random Items and Odds Disclosure in Practice* (capture sans hasard ni paiement : hors du champ des objets aléatoires payants).
