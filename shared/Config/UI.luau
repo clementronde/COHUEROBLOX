@@ -315,6 +315,7 @@ UI.Strings = {
 	LevelN = { fr = "NV {n}", en = "LV {n}" },
 	New = { fr = "NOUVEAU", en = "NEW" },
 	Companion = { fr = "Compagnon", en = "Companion" },
+	CompanionTag = { fr = "PET", en = "PET" }, -- short: fits next to LEGENDARY in a 150 px card header
 	Stunned = { fr = "sonné", en = "stunned" },
 	Tier = { fr = "Tier {n}", en = "Tier {n}" },
 	Stage = { fr = "Stage {n}", en = "Stage {n}" },

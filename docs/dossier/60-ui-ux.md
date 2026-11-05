@@ -13,7 +13,151 @@ Objectif : un écran lisible au milieu de 200 ennemis sur un téléphone de 6 po
 
 **Fichier Figma** : [COHUE — UI Design System & Run Screens](https://www.figma.com/design/0Yq5m1skq5dzgOQXZ9bG6D). Pages : Cover, Foundations, Icons, Components, Run — Phone landscape (L01-L11), Run — Phone portrait (P01-P11), Run — PC (C01-C11). Statut : **à valider par Clément** (A08-03). Rien n'est intégré dans Roblox avant son accord.
 
-### 0.1 Le style
+### 0.0 Virage « studs » et UI en dur (5 nov. 2026)
+
+Clément a demandé deux changements après la v1 vernie :
+
+1. **DA en studs.** Tout bloc coloré porte une texture de tenons, dans l'esprit des packs d'UI Roblox « stud ». La texture vient de `kek_stud.png` (pack KekUIEssentials fourni par Clément). Le pack ne contient pas de fichier de licence : Clément confirme le droit d'usage.
+2. **UI en dur.** Les `ScreenGui` seront montés comme instances dans le place COHUE, pas générés par le code au lancement. Les scripts de `client/Controllers/UI/*` se brancheront sur des instances nommées et ne feront que cloner ou mettre à jour.
+
+Ordre retenu par Clément : d'abord Figma en studs, il valide, puis montage dans Studio.
+
+Règles du style studs (elles remplacent la brillance et les reflets de 0.1) :
+
+| Élément | Règle |
+| --- | --- |
+| Texture | Tuile transparente de 128 px (2 × 2 studs) tirée de `kek_stud.png` : clair → blanc translucide, sombre → noir translucide. Affichée à 12 px par stud. Fichier versionné : `docs/dossier/ui-assets/stud_tile_128.png`, refait par `make_stud_tile.py` (Python, PIL). |
+| Styles Figma | `Studs/On color` (60 %) sur les faces colorées ; `Studs/On dark` (28 %) sur les plaques sombres désactivées. |
+| Où | Boutons, barres de titre, badges de niveau, barres de vie, bouclier, capture, relève et boss, bandeaux de rareté des cartes, annonces, marqueurs et roue de ping. **Jamais** sur les corps de texte sombres, ni sur les touches clavier (`KeyHint`). La barre d'XP (10 px) reste sans studs. |
+| Forme | Bloc à contour encre 3 px, lèvre 6 px, biseau clair de 3 px en haut (`Bevel/Stud top`). Plus de bande brillante ni de reflets carrés. Rayons : 8 (boutons L), 7 (M), 12 (fenêtres), 7 (pastilles, qui ne sont plus en pilule). |
+| Boutons tactiles | Jump, Slide, Ping, Capture deviennent des **carrés arrondis** à studs, libellé dessous. Anneau doré « Ready » conservé. |
+| Fenêtres | Nouveau composant `WindowHeader` (6 tons : Play, Go, Premium, Danger, Info, Neutral) : barre colorée à studs, titre blanc en Luckiest Guy contour encre, croix rouge carrée `CloseButton` de 44 px en option. Il se pose sur un corps sombre, chevauchement de 10 px. Utilisé par Victory (Premium, titre centré), À terre (Danger « DOWNED! », Neutral « GHOST MODE ») et Fin de run (Play « RUN OVER »). Aucune de ces trois fenêtres n'a de croix : elles ne se ferment pas. |
+
+Côté Roblox (montage en dur, après validation) : la tuile est envoyée sur le compte de Clément (accord donné : « Je crée et j'upload »), puis posée comme `ImageLabel` `ScaleType = Tile`, `TileSize = 24 × 24`, `ImageTransparency = 0.4` au-dessus de la face. Les coins passent par `UICorner`, le contour par `UIStroke` de 3 px encre.
+
+Captures v2 studs : planches L01-L11, P01-P11, C01-C11 et règles, envoyées à Clément le 5 nov. 2026.
+
+### 0.0 bis Concept v3.1 « vraies briques » (5 nov. 2026, après le refus de la v2)
+
+Clément a jugé la v2 studs « encore trop AI slop » : c'était la v1 repeinte, avec une texture collée partout. Le concept v3.1 repart de ses 9 références et du monde en tenons d'A01. Il ne couvre pour l'instant que le HUD et Victory en téléphone paysage, page Figma **Concept v3 — briques**.
+
+| Élément | Règle v3.1 |
+| --- | --- |
+| Police | **Fredoka One** partout (titres, chiffres, libellés), blanc, contour Ink épais (≈ 13 % de la taille) et ombre portée dure de 2 px. 15 px au minimum. |
+| Chiffres du HUD | Posés **directement sur le monde**, sans pastille : chrono, KO, record, Silver. |
+| Briques | Contour Ink 3 px, rayon 6 (8 pour les grands blocs), lèvre basse en ton `.dd`, biseau haut en ton `.l`. Tenons seulement sur les boutons principaux, les barres de titre, la barre de vie et la mini-carte, en tenons entiers (pas de 12 px), opacité 0,22 à 0,45. |
+| Icônes | **Montées en vraies briques** avec les outils d'A01, rendues dans Blender, contour Ink : `docs/dossier/ui-assets/icons/`. Elles débordent du cadre (trophée, coffre, flamme). |
+| Fenêtres | Barre de titre dorée à tenons et reflets en biais, titre centré de 40 px. Corps brun foncé (`Bark.dd`) cerclé d'or. Choix présentés en **cartes de couleur** qui disent l'enjeu (« End the run, keep all loot », « Loot is safe. More KO! »). La pastille rouge de compte à rebours prend la place d'une croix. |
+| Cases d'inventaire | Claires (Cream), contour Ink, étiquette de niveau dorée « Lv4 ». |
+| Boutons tactiles | Tuiles carrées à tenons, grosse icône claire, libellé à cheval sur le bord bas. Capture en Bubblegum avec une cage crème. |
+| Marges | 44 px de chaque côté en paysage (encoche des deux côtés selon le sens du téléphone). |
+| Animations | « Clic de brique » : la brique s'enfonce de sa lèvre et remonte avec un rebond, les fenêtres tombent et s'écrasent de 4 % en se posant, les tampons claquent avec des tenons qui jaillissent. Recettes TweenService et aperçu jouable : `docs/dossier/ui-assets/concept/preview/` (page « Clic de brique »). Réglage « animations réduites » : fondu de 0,12 s, sans secousse, sans particules, sans pulsation. |
+
+Fond des maquettes : `docs/dossier/ui-assets/concept/run_scene.py`, une arène en tenons avec une horde de gobelins d'A01, rendue dans Blender. Ce n'est pas un décor du jeu.
+
+**v3.2 (même jour)** : corrections de la relecture à l'aveugle (3 relecteurs sur la v3.1 : médiane 6,7/10, plafonnée à 5,0 par 3 px de marge manquants à droite ; « encore du modèle ? » 1/2 pour les trois) et nouvel écran de passage de niveau demandé par Clément. Captures : `docs/dossier/ui-assets/concept/captures/`.
+
+| Écran | v3.2 |
+| --- | --- |
+| HUD | Marges de 44 px des deux côtés, libellés au-dessus de la barre du bas de l'écran. Une seule plaque de vitals (niveau, vie, XP, Silver). Équipiers en portraits (en jeu : vignette Roblox du joueur dans un cadre à sa couleur), sous la plaque, loin du joystick. Barre d'armes en bas au centre, case verrouillée avec un cadenas. KO (34 px) plus gros que le chrono (28 px). Réglages en brique grise à tenons. Cage de capture avec un gobelin dedans. |
+| Victory | L'enjeu est écrit : « Your loot is safe. Pick one: », « Leave now with your loot », « Overtime: more KO! ». Plus de pastille dans le coin (elle ressemblait à une croix) : une barre « AUTO CASH OUT IN 12s » se vide en bas, Cash out par défaut à 0 (proposition, à valider). Le joueur peut changer d'avis tant que la barre n'est pas vide. Portraits des équipiers sur la carte choisie. |
+| **Niveau gagné** (nouveau) | Le jeu se fige et pâlit, des rayons tournent derrière. Fenêtre au centre « LEVEL 13! » : 3 offres en cartes de rareté (icône, nom, effet, étiquette NEW! ou Lv 2 → 4, rareté écrite), Reroll / Skip / Banish avec leurs compteurs. Inventaire à gauche (armes, Runes, objets, avec leur niveau), stats à droite : la stat que l'offre sélectionnée change s'allume en vert avec sa future valeur. Choisir une offre fait voler son icône dans la case d'inventaire, puis le jeu reprend. |
+
+**v3 étendue à tous les écrans (5 nov. 2026, direction validée par Clément : « Oui, étends-la »)**
+
+Figma, nouvelles pages :
+- **Components v3 — briques** : la bibliothèque, réutilisable par A09 pour les menus.
+  - Bases : Button (8 couleurs × 2 tailles, compteur en option), Tile (tuiles tactiles, 3 couleurs × 3 tailles), Tag, Slot, Portrait.
+  - Fenêtres et cartes : Window (5 couleurs, titre en propriété), OfferCard (4 raretés), ChoiceCard, Bar (6 sortes).
+  - Blocs du HUD : Vitals, Team, Timer (normal, alerte, Overtime), KO (normal, record), Minimap, Settings, Hotbar, KeyHint, PadGlyph.
+  - Overlays : Banner, BossBar, BossArrow, CapturePrompt (3 états), PingMarker (6), PingWheel, PingFeed, Downed (à terre, fantôme), ReviveMarker.
+  - Trois HUD de base : téléphone paysage, téléphone portrait et PC.
+- **Run v3 — Phone landscape**, **Run v3 — Phone portrait**, **Run v3 — PC** : 13 écrans chacun (L01 à L11, plus L04b et L04c pour le passage de niveau en coop), avec leurs notes.
+- Les anciennes pages v2 sont renommées « Archive v2 — … ».
+
+Règles propres à chaque format :
+- **Portrait** : le chrono et le KO passent sous l'encoche, puis viennent les vitals et la mini-carte, puis les équipiers. Les armes sont au-dessus des boutons. Le passage de niveau met les offres en haut, l'inventaire et les stats côte à côte en bas (6 stats principales, plus « +6 more »). Victory empile les deux cartes. L'écran de fin tient en une colonne.
+- **PC** : l'UI est posée sur 1200 × 675 logiques puis agrandie ×1,6, avec 24 px de marge et sans boutons tactiles. La légende des touches est en bas à droite (clavier et manette).
+  - Raccourcis : 1, 2, 3 pour les offres ; R, X et B pour reroll, skip et banish ; C et K pour Victory ; Entrée et L pour l'écran de fin.
+  - C06 devient la fenêtre CONTROLS, avec un exemple de focus manette (contour crème de 4 px).
+
+**Relecture à l'aveugle (3 relecteurs, deux passes).** Plusieurs relecteurs ont noté la même chose :
+- Passe 1 : 5,8 / 6,7 / 7,5. Les défauts bloquants étaient des marges de 3 px et des chevauchements.
+- Passe 2 : 6,7 / 7,5 / 7,5, médiane 7,5. Il restait deux défauts bloquants : un texte qui débordait sur P04, et les fenêtres sans boutons de manette sur PC.
+- Pour les trois relecteurs, la v3 n'est « plus de l'AI slop, mais pas encore au niveau des références ».
+
+Corrigé après la passe 2, sans nouvelle notation :
+- débordements et marges ;
+- barres de dégâts à l'échelle ;
+- tuile Capture grisée hors cage ;
+- portrait décalé sous une barre Roblox de 150 px ;
+- légendes de manette sur les fenêtres PC ;
+- texte « Team is frozen. Auto-pick at 0 » ;
+- HUD figé visible derrière la fenêtre d'attente ;
+- carte de victoire « YOU: pick one! » ;
+- panneaux à 12 px des tuiles.
+
+Ce qui reste demande un choix de Clément :
+1. **Formes de fenêtres variées.** Les références ont des titres décalés, des onglets en biais et des plaques épaisses ; chez nous, toutes les fenêtres ont la même forme.
+2. **Moins de chiffres.** Stats et récompenses sous forme de tuiles à icône, plutôt qu'en listes.
+3. **Corps de fenêtre plus colorés.** Ils sont désormais teintés de leur couleur, mais restent sombres.
+
+Fonds : `concept/run_scene.py` rend maintenant les trois formats (`run_landscape.png`, `run_portrait.png`, `run_pc.png`). Planches : `concept/captures/v3-planche-*.png` et `v3-composants.png`.
+
+**Lobby piloté par l'interface (décision de Clément du 5 nov. 2026, transmise par le lead)**
+
+Le lobby est piloté par l'interface : un gros bouton **PLAY** au centre bas, et une **barre de boutons** en bas de l'écran. Le village reste du décor. Page Figma **Lobby v3 — barre et Play** : LB01 (paysage), LB02 (choix du mode), LB03 (portrait), LB04 (PC). Captures : `concept/captures/lobby-*.png`. Fond : `concept/lobby_scene.py` (lobby en tenons d'A01, rendu Blender).
+
+Composants ajoutés à « Components v3 — briques » :
+
+| Composant | Règle |
+| --- | --- |
+| `Lobby/PlayButton` | Brique verte de 280 × 76 à tenons, avec deux tenons qui dépassent sur le dessus. « PLAY » en 44 px. Elle ouvre `Lobby/ModeChoice`. |
+| `Lobby/ModeChoice` | « PLAY WITH… » : trois briques SOLO (bleu, 1 portrait), FRIENDS (vert, 2) et PUBLIC (or, 3). Le flux est d'A09. |
+| `Lobby/BarButton` | Tuile sombre cerclée d'une couleur par menu. Grosse icône 3D en briques qui dépasse en haut, libellé de 15 px, badge rouge avec le nombre de nouveautés. |
+| `Lobby/Currency` | Plaque de Silver en haut à gauche. |
+
+Barre alignée sur A09 (`docs/dossier/65-lobby.md` §2 de sa branche) : 8 boutons dans son ordre. Les libellés « Classes » et « Critters » attendent la réponse de Clément ; ce sont des propriétés, donc faciles à changer. Le liseré prend la couleur de zone du menu (variables `zone/*`) : c'est la même couleur que l'en-tête du menu et le bâtiment.
+
+| Bouton | Icône | Liseré | Pastille |
+| --- | --- | --- | --- |
+| Classes | Casque de chevalier d'A01 | zone/classes (turquoise) | non |
+| Critters | Gland à frimousse | zone/critters (vert) | oui |
+| Upgrades | Enclume | violet (pas de zone) | oui |
+| Inventory | Sac à dos | acier (pas de zone) | non |
+| Quests | Parchemin | zone/quests (bleu) | oui |
+| Ranks | Trophée | zone/ranks (or) | non |
+| Pass | Ticket | ciel (pas de zone) | **jamais** |
+| Shop | Bourse | zone/shop (orange) | **jamais** |
+
+Pas de pastille sur Shop ni Pass : on ne pousse pas à l'achat un public de 9 à 15 ans.
+
+Placement selon le format :
+- **Paysage** : une rangée de 8 boutons espacés de 14 px, au-dessus de la barre du bas de l'écran.
+- **Portrait** : deux rangées de 4.
+- **PC** : Entrée lance PLAY, et les touches 1 à 8 ouvrent les menus.
+
+PLAY reste vert : c'est le rôle « Go » partout dans le jeu. La variable `zone/play` (violette) sert au portail. Si A09 veut la même couleur partout, c'est `zone/play` qui passe au vert.
+
+Corrections demandées par A09 :
+- Button M fait maintenant 44 px de haut.
+- Le libellé des tuiles peut faire jusqu'à 9 lettres à 16 px.
+- Les pastilles sont rentrées dans les boutons de la barre.
+- Nouveau **CloseButton v3** : brique rouge de 46 px avec une croix blanche, réservé aux menus du lobby.
+
+**Icônes d'armes** : A14 passe les armes en pixel art extrudé et livrera les PNG. Ces sprites remplaceront mes icônes d'armes en briques (épée, chaîne d'éclairs, bâton de feu, haches) dans la barre d'armes, l'inventaire et le passage de niveau. Les effets restent lisses et lumineux, c'est le domaine d'A14.
+
+**Décision de Clément (5 nov. 2026)** : au passage de niveau, le jeu se met en pause, **pour tout le monde en coop**. Cela remplace « cartes sans pause, 8 s » de la section 4.
+
+Pour qu'un joueur ne bloque pas l'équipe, l'interface prévoit en coop :
+- pour celui qui choisit, un compte à rebours dans la barre de titre (« 12s », horloge, barre qui se vide) et la ligne « Everyone is frozen while you choose » ;
+- pour les autres, le monde figé et une fenêtre « SAM LEVELED UP! » avec son portrait, « Everyone is frozen. Back in 12s » et la même barre.
+
+Captures : `concept/captures/v32-niveau-gagne-coop-choix.png` et `v32-niveau-gagne-coop-attente.png`. En solo : ni compte à rebours, ni fenêtre d'attente.
+
+**Contract request (A04, serveur)** : pause globale de la run au passage de niveau (ennemis, projectiles, chrono, autels, compte à rebours de Victory figés). Propositions à valider par Clément : 15 s de choix en coop ; à 0, l'offre sélectionnée (la première par défaut) est prise ; si plusieurs joueurs montent de niveau en même temps, ils choisissent en parallèle et la run reprend quand le dernier a fini. Côté client : un remote `LevelUpPause` (qui choisit, fin du délai) pour afficher les deux vues.
+
+### 0.1 Le style (v1 vernie, remplacé par 0.0 pour la brillance et les reflets)
 
 Chaque élément pressable ou important ressemble à un **bloc de jouet verni** :
 
@@ -64,7 +208,7 @@ Plancher technique 12 px après échelle ; le plus petit style est à **14 px** 
 
 **Échelle** : téléphone 1 ; PC et tablette `clamp(petit côté / 420, 1, 1,6)` (le plafond passe de 1,4 à 1,6 : à 1,4 le HUD était trop petit sur un écran 1080p).
 
-**Manette et clavier** : composant `FocusRing` (anneau or 4 px + halo encre, 6 px autour du bouton ; c'est le `SelectionImageObject`), focus par défaut sur la carte 1, Cash out et Play again. Glyphes `PadGlyph` (A, B, X, Y, croix haut) pour les maquettes ; en jeu, glyphes de la plateforme via `UserInputService:GetImageForKeyCode`. Touches : 1/2/3 cartes, R/S/B Relancer/Passer/Bannir, C/K Victory, Entrée/Échap écran de fin, Espace/Maj/E/G en run (à valider).
+**Manette et clavier** : composant `FocusRing` (anneau or 4 px + halo encre, 6 px autour du bouton ; c'est le `SelectionImageObject`), focus par défaut sur la carte 1, Cash out et Play again. Glyphes `PadGlyph` (A, B, X, Y, croix haut) pour les maquettes ; en jeu, glyphes de la plateforme via `UserInputService:GetImageForKeyCode`. Touches : 1/2/3 cartes, R / X / B Relancer / Passer / Bannir (pas S : le joueur marche encore en ZQSD/WASD pendant l'offre), C / K Victory, Entrée / L écran de fin (Échap est réservé au menu Roblox), Espace / Maj / F / G en run (les touches affichées sont lues dans `InputController.getHint` : la Capture est sur F chez A06).
 
 ### 0.4 Composants (page Components)
 
@@ -107,11 +251,44 @@ Positions de référence (pixels logiques, échelle 1) :
 
 Planche « États, mouvement et son » de la page Foundations. Cinq états par bouton : Default, Hover (PC : `UIScale` 1,04, 0,10 s), Pressed (face qui s'enfonce, 0,05 s), Disabled (neutre, sans reflets, texte atténué), Focus (`FocusRing`). Popups : ouverture 0,9 → 1 en 0,18 s Back Out, fermeture 1 → 0,92 en 0,12 s Quad In ; cartes distribuées une par une, la carte choisie vole vers sa case du build. Chaque interaction a un emplacement de son (`ui_press`, `ui_open`, `card_deal`, `card_pick`, `timer_warn`, `overtime_horn`, `record_fanfare`, `capture_tick/ok/fail`) que A10 remplit avec la bibliothèque sous licence du Creator Store. Vibration courte à la manette (capture, record), désactivable. « Réduire les flashs » : fondus seuls, pas de pop, pas de secousse, halos fixes.
 
-### 0.7 Note qualité (skill quality-score, 3 relecteurs à l'aveugle)
+### 0.7 Note qualité des maquettes (skill quality-score, 3 relecteurs à l'aveugle)
 
-Premier jet 5,0 (plafonné : boutons du plateau jugés < 44 px, chevauchements, pas de manette), 2e tour 7,1 (médiane), corrections : boutons 100×48, roue de pings qui masque les boutons, bannières dans un couloir central, texte 14 px, contours ≤ 8 %, PC à 1,6, focus et glyphes manette, Keep going en vert, planche d'états et de sons. Note finale : voir le rapport A08.
+Premier jet 5,0 (plafonné : boutons du plateau jugés < 44 px, chevauchements, pas de manette), 2e tour 7,1 (médiane), corrections : boutons 100×48, roue de pings qui masque les boutons, bannières dans un couloir central, texte 14 px, contours ≤ 8 %, PC à 1,6, focus et glyphes manette, Keep going en vert, planche d'états et de sons. Note finale : **7,9 / 10** (médiane du 3e tour), critères bloquants OK ; il manquait la lisibilité des petits libellés sur la horde et la densité du HUD. Clément a validé les maquettes le 4 nov. 2026.
 
-### 0.8 Questions ouvertes pour Clément
+### 0.8 Intégration Roblox (A08-04 à A08-06, 4 nov. 2026)
+
+| Module | Ce qu'il fait | Données |
+| --- | --- | --- |
+| `shared/Config/UI.luau` | Jetons Figma (modes Default / Colorblind), polices, tailles, textes anglais, réglages des écrans | — |
+| `UITheme` | Builders glossy (`glossy` : bloc ou bouton avec Pressed, survol 1,04, Disabled, anneau de focus or), `chip`, `popup`, `glossBar`, `pill`, `keycap`, icônes dessinées en code (KO, cœur, horloge), drapeaux partagés (`cardsOpen`, `captureAvailable`...), anglais forcé, forçage d'appareil en Studio (`UIDebugDevice`) | — |
+| `HUD` | Vitaux, build, équipe, fil de pings, chrono → Overtime, compteur de KO + record, flèche et barre du boss, annonces, écran à terre / fantôme | `RunState` v2 (A04), `PlayerProgress.kills`, attribut `RunKills`, `PlayerVitals`, `Build`, `Coins`, `Profile.bestKills` |
+| `VictoryBanner` (nouveau, démarré par HUD) | Bannière Victory. Keep going ferme ; Cash out ferme et guide vers le portail doré (flèche, distance, barre de maintien d'équipe) | `RunState.victory`, `cashOutPosition`, `cashOutProgress` |
+| `CaptureUI` (nouveau, démarré par HUD) | Panneau de capture 2 s, reset si touché, nom de la créature | remote optionnel `CaptureState` ou `CaptureUI.set(payload)` |
+| `CardUI` | Cartes glossy, lignes en portrait, plaque, Relancer / Passer / Bannir 100×48, anneau 8 s, touches 1/2/3 et R/X/B, 0,4 s inertes | `CardOffer` |
+| `MobileButtons` | Saut, Glisser, Ping, Capture (anneau or) ; légende clavier sur PC | drapeaux UI, `InputController.bindButton` |
+| `EndScreen` | Résultat, KO, record, rang hebdo, dégâts par arme, gains, Play again, Lobby si le remote existe | `RunSummary` |
+| `Minimap`, `SettingsUI` | Positions des maquettes (rangée de la barre Roblox, engrenage à gauche de la mini-carte en paysage) | — |
+
+**Écarts assumés par rapport aux maquettes**
+
+- Victory : A04 a codé le Cash out comme un portail doré (toute l'équipe 2 s dedans). Les deux boutons restent, mais « Cash out » guide vers le portail au lieu d'envoyer un remote ; la ligne d'équipe de la maquette n'est pas affichée (aucune donnée serveur).
+- Raccourcis PC : Passer = X (S sert à marcher pendant l'offre), Lobby = L (Échap est réservé à Roblox).
+- Carte venant du compagnon : pastille « PET » (« Companion » ne tient pas à côté de LEGENDARY dans 150 px).
+- Icônes : formes dessinées en code et initiales en attendant A08-07, qui demande de téléverser des images (permission de Clément).
+
+**Test** : place `COHUE-A08.rbxlx` construite avec rojo depuis la branche (`tools/test.project.json`). Run réelle (cartes, fin de run, dégâts par arme) + script de test serveur propre à la place (Overtime, record battu, Victory, capture, à terre). Profil téléphone vérifié avec l'attribut joueur `UIDebugDevice = "phone"` (Studio seulement).
+
+**Contract requests**
+
+| Domaine | Demande |
+| --- | --- |
+| data | `Profile.bestKills` (record perso de KO en une run) ; `RunSummary.weeklyRank` ; remote `ReturnToLobby` (bouton Lobby) |
+| companion (A05) | Remote `CaptureState { state = "Idle" \| "Available" \| "Capturing" \| "Interrupted" \| "Captured", progress, holdSeconds, name }` dans `shared/NetDefs/Companion.luau`, et `RunSummary.captured` |
+| avatar (A06) | Fait : l'action `Capture` (touche F, X à la manette) est dans main depuis la fusion A06 |
+| combat (A04) | Renommer `Build.grimoires` / `grimoireSlots` en `runes` / `runeSlots` quand le contenu v2 arrive (le HUD lit les deux) |
+| lead | Ajouter `VictoryBanner` et `CaptureUI` à la liste des modules UI (modules simples démarrés par HUD, pas de nom de boot) |
+
+### 0.9 Questions ouvertes pour Clément
 
 1. **Victory en coop** : chacun choisit Cash out ou Keep going pour lui-même (proposition des maquettes), ou un vote d'équipe ?
 2. **Fantôme** : que devient un joueur fantôme (retour au monde suivant ? au prochain autel ? spectateur jusqu'à la fin) ? Les maquettes écrivent « BACK AT THE NEXT WORLD » en attendant.
