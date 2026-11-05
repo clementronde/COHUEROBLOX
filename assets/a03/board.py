@@ -76,8 +76,8 @@ def main():
     d.text((60, y), "En noir, de face et de profil, à 64 px (taille réelle)", font=NAME, fill=C.INK)
     y += 60
     x = 60
-    for key, name in (("goblin_grunt", "T, grandes oreilles"), ("zombie_runner", "Γ, bras tendus"),
-                      ("ghost_poltergeist", "cloche, sans pieds"), ("boss_hungry_coffin", "cercueil sur mains")):
+    for key, name in (("goblin_grunt", "Grunt : T, oreilles"), ("zombie_runner", "Runner : Γ, bras"),
+                      ("ghost_poltergeist", "Poltergeist : cloche"), ("boss_hungry_coffin", "Coffin : cercueil")):
         d.rounded_rectangle((x, y, x + 545, y + 170), radius=20, fill=(255, 250, 240))
         front, side = silhouette(key, 64), silhouette(key + "_side", 64)
         im.paste(front, (x + 36, y + 100 - front.height), front)
@@ -90,17 +90,17 @@ def main():
     y = section(d, y, "2. Le boss du monde 2 : The Hungry Coffin")
     box = C.paste_fit(im, r("a03_boss.png"), (60, y, W - 60, y + 1283))
     y = C.wrap(d, (60, box[3] + 20),
-               "Un cercueil affamé en bois clair, debout sur quatre mains de zombie. Le haut du couvercle se "
-               "soulève : dans le noir, deux gros yeux et des dents ; la langue pend sur une serviette à carreaux. "
-               "Fourchette et couteau. 17 studs, briques de 0,5. Au sol, son attaque Lid Chomp : le télégraphe "
+               "Un cercueil affamé en bois clair, debout sur quatre mains de zombie. Le couvercle s'ouvre sur ses "
+               "charnières dorées : dans le noir, deux gros yeux et des dents ; la langue pend sur une serviette nouée. "
+               "Fourchette et couteau. 16 studs, briques de 0,5. Au sol, son attaque Lid Chomp : le télégraphe "
                "ennemi, rouge mat, se remplit jusqu'au coup (le rouge est réservé aux ennemis, règle de A14).",
                TEXT, C.INK, W - 120) + 50
 
     # 3. Gobelins
     y = section(d, y, "3. Les 4 gobelins d'A01, refaits dans la DA actuelle")
     box = C.paste_fit(im, r("a03_goblins.png"), (60, y, W - 60, y + 855))
-    y = labels_under(d, box, [("Grunt", "mêlée : cocotte rouge, louche", 0.165),
-                              ("Archer", "tireur : capuche verte, arc", 0.42),
+    y = labels_under(d, box, [("Grunt", "mêlée : cocotte, louche", 0.165),
+                              ("Archer", "tireur : capuche à plume, arc", 0.42),
                               ("Shaman", "soutien : théière violette", 0.635),
                               ("Bomber", "kamikaze : bonnet orange, bombe", 0.835)])
     box = C.paste_fit(im, r("a03_compare.png"), (360, y, W - 360, y + 630))
@@ -125,15 +125,22 @@ def main():
     labels_under(d, (60 + cw + gap, y - ch - 80, W - 60, y - 80), [("Sur le sable", "", 0.5)])
     y = C.wrap(d, (60, y),
                "70 gobelins des 4 rôles (34 Grunts, 14 Archers, 10 Shamans, 12 Bombers) en maille du jeu, dont 2 "
-               "élites (anneau et couronne or) et 1 capturable (anneau rose), avec de l'XP au sol et deux tirs "
-               "ennemis. Caméra de Config/Movement : 32 studs derrière le joueur, 42° sous l'horizon, champ vertical "
-               "de 70°. Le rôle se lit sur le dessus : cocotte rouge, capuche verte, théière violette, bonnet orange.",
+               "élites (anneau et couronne or) et 1 capturable (anneau et cage roses, devant le joueur), avec de "
+               "l'XP au sol et deux tirs ennemis à liseré crème. Caméra de Config/Movement : 32 studs derrière le joueur, 42° sous l'horizon, champ vertical "
+               "de 70°. Le rôle se lit sur le dessus : cocotte rouge, capuche vert sombre à pointe, théière "
+               "violette, bonnet orange à lunettes.",
                TEXT, C.INK, W - 120) + 30
+    box = C.paste_fit(im, r("a03_horde_w23.png"), (60, y, 60 + cw, y + ch))
+    C.wrap(d, (box[2] + 40, y + 10),
+           "Mondes 2 et 3 sur leurs sols. À gauche, 30 Poltergeists sur le bitume de la cour, près d'une "
+           "marelle crème ; à droite, 30 Zombie Runners (peau grise) sur l'herbe sombre du cimetière.",
+           TEXT, C.INK, W - box[2] - 100)
+    y = box[3] + 40
     d.text((60, y), "À la taille d'un écran de téléphone (640 px de large, sans agrandissement) :", font=NAME,
            fill=C.INK)
     y += 60
     x = 60
-    for name in ("a03_horde_grass.png", "a03_horde_sand.png"):
+    for name in ("a03_horde_grass.png", "a03_horde_sand.png", "a03_horde_w23.png"):
         small = Image.open(r(name)).convert("RGB").resize((640, 360), Image.LANCZOS)
         im.paste(small, (x, y))
         d.rectangle((x - 3, y - 3, x + 643, y + 363), outline=C.INK, width=3)
@@ -146,13 +153,15 @@ def main():
     rules = [
         ("Horde : briques de 0,25 stud, une maille fusionnée par ennemi (moins de 800 triangles), tenons en "
          "texture (Resurface en jeu). Mini-boss et boss : briques de 0,5.", "Lime"),
-        ("Gros yeux lisses sur une MeshPart à part, sans tenons : blancs à pupille Ink ; ovales Ink à reflet "
-         "blanc sur les fantômes (un oeil blanc disparaît sur le corps crème).", "Ink"),
+        ("Gros yeux lisses sur une MeshPart à part, sans tenons : blancs à pupille Ink ; cerclés d'Ink sur "
+         "les fantômes, pour qu'ils se détachent du corps crème.", "Ink"),
         ("La famille se lit à la silhouette (T, Γ, cloche), le rôle à la couleur et à la forme du dessus : "
          "rouge mêlée et sauteur, vert tireur, violet soutien, orange kamikaze.", "Tomato"),
         ("Un gag par ennemi, montré par un objet : cocotte et louche, théière, tutu et chaussons, pile de "
-         "livres, serviette et couverts. Les zombies passent au vert éteint : en bleu, ils rappelaient un "
-         "monstre connu.", "Grape"),
+         "livres, serviette et couverts.", "Grape"),
+        ("Écarts au guide DA à valider : peau des zombies grise (Stone.d) au lieu de Sky.d (en bleu, le zombie "
+         "rappelait un monstre bleu connu ; en vert, un dinosaure connu) ; théière violette du Shaman au lieu du "
+         "champignon (le chapeau-champignon à pois rappelait un personnage connu).", "Stone"),
         ("Pas de Neon sur un ennemi ordinaire : il est réservé aux élites (or), à la capture (rose) et aux "
          "effets.", "Gold"),
     ]

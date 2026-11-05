@@ -132,7 +132,7 @@ Le code : `client/Controllers/Lobby/LobbyController.luau` retrouve ces objets, l
 | Les 7 autres boutons | Fenêtre provisoire de la couleur du menu |
 | Engrenage | `SettingsUI.open()` (A08) |
 
-Le serveur décide de tout : `SelectLoadout` dit seulement « prêt, avec cette classe ». Tant que A04 n'a pas fait la demande du §10, le serveur garde le comportement d'avant le lobby : la run démarre quand **tous** les joueurs du serveur sont prêts, et un joueur qui n'a rien choisi est déclaré prêt au bout de 45 s (5 s dans Studio). À la fin de la run, personne ne revient au lobby.
+Le serveur décide de tout : `SelectLoadout` dit seulement « prêt, avec cette classe ». Côté serveur (Ironix, décisions v2 §13), état au 5 nov. après le commit de Codex aa4ce33 : quand `COHUE_Lobby` est dans StarterGui, plus personne n'est déclaré prêt d'office, il faut appuyer sur PLAY ; la run démarre quand **tous** les joueurs du serveur sont prêts ; après une **défaite**, retour au lobby au bout de 5 s (ou par le bouton Lobby de l'écran de fin). Après une victoire ou un Cash out, on reste sur Replay. Le reste est demandé à Ironix (§10).
 
 Point d'apparition : `Workspace.SpawnLocation` est posé sur l'arrivée du lobby, `Workspace.HubbubVillage.Ground.ArrivalPad` (rôle `Arrival`), en (0 ; 16,8 ; 901). Ancienne place notée dans son attribut `PrevPosition`. Clément peut le déplacer où il veut sur sa carte.
 
@@ -144,8 +144,8 @@ Point d'apparition : `Workspace.SpawnLocation` est posé sur l'arrivée du lobby
 | ENTRÉE puis 3 (PUBLIC) | `SelectLoadout("Cornu", "Braise")` reçu par le serveur à 1,95 s ; la run démarre à 2,19 s (avant le prêt automatique) ; téléportation dans la zone de run, HUD du lobby caché, HUD de run affiché |
 | Menu Classes (touche 1) | Knight « PICKED », 3 classes libres en bleu, 5 au cadenas en gris, icône de l'arme de départ |
 | Choix du mode (ENTRÉE) | SOLO / FRIENDS / PUBLIC avec leurs silhouettes et touches 1-3 |
-| Retour au lobby en fin de run | **Pas testable** : à faire par A04 (§10, demande n° 3) |
-| Sans PLAY | Le serveur lance la run seul au bout de 5 s dans Studio (demande A04 n° 1) |
+| Retour au lobby en fin de run | Pas testé le 5 nov. Codex l'a ajouté ensuite pour la défaite (aa4ce33) : à vérifier au prochain Play |
+| Sans PLAY | Le 5 nov., le serveur lançait la run seul au bout de 5 s dans Studio. Réglé par Codex (aa4ce33) : avec `COHUE_Lobby` posé, il attend PLAY |
 
 Console : aucune erreur des scripts du lobby.
 
@@ -331,20 +331,21 @@ Ouvert par PLAY. Trois cartes de mode : **Solo**, **Friends**, **Public**. Group
 
 ## 10. Demandes de contrat (pour la vague 2)
 
-**Contract request (A04, run — 5 nov., pour que PLAY lance vraiment la run depuis le lobby, dans la place unique COHUE)** :
-1. **Pas de « prêt » automatique au lobby.** En phase `Loadout`, ne plus déclarer prêt un joueur au bout de `LoadoutTimeout` / `StudioLoadoutTimeout` quand le lobby est dans la place (réglage proposé `Config.Run.LobbyInPlace = true`). Le joueur reste au lobby tant qu'il n'a pas appuyé sur PLAY.
-2. **La run part avec les joueurs prêts, pas avec tout le serveur.** `startRun` ne prend que les joueurs qui ont envoyé `SelectLoadout`. Départ proposé : `Run.LobbyStartDelay` s (3) après le premier prêt ; ceux qui sont prêts pendant ce délai partent ensemble. Les autres restent au lobby et entrent ensuite comme retardataires (c'est déjà le cas avec `onReady`).
-3. **Retour au lobby en fin de run.** Après le résumé (Replay non choisi, ou bouton « Back to lobby » de l'EndScreen), téléporter les joueurs de la run au point d'apparition du lobby (`Workspace.SpawnLocation`, ou la Part qui porte l'attribut `LobbyRole = "Arrival"`), avec l'exemption de `MovementGuard`, puis repasser en `Loadout` avec les drapeaux « prêt » remis à zéro.
-4. **Qui est dans la run.** Poser l'attribut `InRun` (booléen) sur chaque joueur. Aujourd'hui l'UI (HUD de A08, LobbyController) déduit « en run » de la phase globale ; un joueur resté au lobby pendant la run d'un autre verrait le HUD de run.
+**Contract request (Ironix — 5 nov., d'abord adressée à A04 ; le serveur est chez Ironix depuis les décisions v2 §13)**, pour que PLAY lance la run depuis le lobby dans la place unique COHUE :
+1. **Pas de « prêt » automatique au lobby.** *Fait par Codex (aa4ce33)* : avec `StarterGui.COHUE_Lobby` posé, `RunManager` attend `SelectLoadout`.
+2. **La run part avec les joueurs prêts, pas avec tout le serveur.** *À faire.* Aujourd'hui la run attend que **tous** les joueurs du serveur soient prêts : en multijoueur, un joueur qui reste au lobby bloque les autres, et Solo n'est pas vraiment solo. Demande : que `startRun` ne prenne que les joueurs qui ont envoyé `SelectLoadout`. Départ proposé : `Run.LobbyStartDelay` s (3) après le premier prêt ; ceux qui sont prêts pendant ce délai partent ensemble. Les autres restent au lobby et entrent ensuite comme retardataires (c'est déjà le cas avec `onReady`).
+3. **Retour au lobby en fin de run.** *Fait pour la défaite par Codex (aa4ce33)* : 5 s après le résumé, ou bouton Lobby, téléportation au `SpawnLocation` et retour en `Loadout`. *Reste à faire* : la même chose après une victoire ou un Cash out. Demande d'origine : après le résumé (Replay non choisi, ou bouton « Back to lobby » de l'EndScreen), téléporter les joueurs de la run au point d'apparition du lobby (`Workspace.SpawnLocation`, ou la Part qui porte l'attribut `LobbyRole = "Arrival"`), avec l'exemption de `MovementGuard`, puis repasser en `Loadout` avec les drapeaux « prêt » remis à zéro.
+4. **Qui est dans la run.** *À faire.* Poser l'attribut `InRun` (booléen) sur chaque joueur. Aujourd'hui l'UI (HUD de A08, LobbyController) déduit « en run » de la phase globale ; un joueur resté au lobby pendant la run d'un autre verrait le HUD de run.
 
 | Domaine | Demande |
 | --- | --- |
-| lead (ARCHITECTURE) | Périmètre A09 : `client/Controllers/Lobby/*`, `server/Services/LobbyService.luau`, et les modèles d'UI du lobby dans COHUE (rien construit par script). Ajouter `"LobbyController"` à l'ordre de `client/Main.client.luau`, après `LoadoutUI` (en attendant, `LoadoutUI` le lance ; un double lancement est sans effet) |
-| ui (A08) | `HUD` et `UITheme.inRun()` : lire l'attribut `InRun` du joueur (demande A04 n° 4) plutôt que la phase globale |
-| data (A12) | `SelectLoadout` / `setLoadout` : accepter les ids de classe v2 (`Knight`, `Archer`...) ; le profil et `Progression.Unlocks` sont encore en ids v1 (`Cornu`...), alors le menu Classes envoie l'id v1. `MatchRequest` : un groupe et un mode `Solo` / `Party` / `Public` ; reformer le groupe au retour ; `getParty(player)` ; données du pass saisonnier (paliers, piste gratuite et payante, XP gagnée en jouant) ; texte de la quête de déblocage de chaque classe |
-| classes (A04) | `applyClass(player, classId)` utilisable dans le lobby (palier 1) |
-| companion (A05) | Mode lobby de `CompanionRenderer` : le compagnon équipé suit son joueur ; la collection se promène dans l'enclos (client seul) |
-| ui (A08) | Style du bouton PLAY et des boutons de la barre (icône + mot, pastille de nombre) ; **8 icônes de barre** (Classes, Critters, Upgrades, Inventory, Quests, Ranks, Pass, Shop) ; icônes des classes et de Solo / Friends / Public ; `SettingsUI` d'après la maquette n° 7 ; variables `zone/*` : faites et reliées |
+| lead (ARCHITECTURE) | Périmètre A09 : `client/Controllers/Lobby/*` et les modèles d'UI du lobby dans COHUE (rien construit par script). Plus de `LobbyService` côté A09 : le serveur est chez Ironix |
+| Ironix (démarrage client) | Ajouter `"LobbyController"` à l'ordre de `client/Main.local.luau`, après `LoadoutUI` (en attendant, `LoadoutUI` le lance ; un double lancement est sans effet) |
+| ui (A08) | `HUD` et `UITheme.inRun()` : lire l'attribut `InRun` du joueur (demande Ironix n° 4) plutôt que la phase globale |
+| Ironix (données, ex-A12) | `SelectLoadout` / `setLoadout` : accepter les ids de classe v2 (`Knight`, `Archer`...) ; le profil et `Progression.Unlocks` sont encore en ids v1 (`Cornu`...), alors le menu Classes envoie l'id v1. `MatchRequest` : un groupe et un mode `Solo` / `Party` / `Public` ; reformer le groupe au retour ; `getParty(player)` ; données du pass saisonnier (paliers, piste gratuite et payante, XP gagnée en jouant) ; texte de la quête de déblocage de chaque classe |
+| Ironix (classes, ex-A04) | `applyClass(player, classId)` utilisable dans le lobby (palier 1) |
+| Ironix (compagnons, ex-A05) | Mode lobby de `CompanionRenderer` : le compagnon équipé suit son joueur ; la collection se promène dans l'enclos (client seul) |
+| ui (A08) | Style du bouton PLAY et des boutons de la barre (icône + mot, pastille de nombre) ; **8 icônes de barre** (faites : helm, acorn, anvil, backpack, scroll, trophy, ticket, coinbag) ; icônes des classes et de Solo / Friends / Public ; `SettingsUI` d'après la maquette n° 7 ; variables `zone/*` : faites et reliées |
 | art (A01) | Dans le kit : lettres en briques pour les noms de bâtiments (CLASSES, CRITTERS, UPGRADES, INVENTORY, QUESTS, RANKS, PASS, SHOP) et une façade par menu |
 | VFX (A07) | Tourbillon du portail, pop d'équipement, éclat de l'enclume quand une amélioration est abordable |
 
@@ -357,7 +358,7 @@ Ouvert par PLAY. Trois cartes de mode : **Solo**, **Friends**, **Public**. Group
 | 4 | Aucune sortie brute | Composants A08 ; pas de texte d'aide sous les boutons |
 | 5 | Humour | Gob le chapelier, le Hibou Plongeur des quêtes, l'enclume qui brille, le podium |
 | 6 | quality-score | Auto-évaluation 7,9 / 10 (mouvement des menus non spécifié) : brouillon |
-| 7 | Vérifié en jeu | Oui pour le HUD, le choix du mode, le menu Classes et PLAY → run (Play Studio, 5 nov., §2.3). Retour au lobby : en attente d'A04 |
+| 7 | Vérifié en jeu | Oui pour le HUD, le choix du mode, le menu Classes et PLAY → run (Play Studio, 5 nov., §2.3). Retour au lobby après une défaite : ajouté par Codex, à vérifier |
 
 ## 12. Décisions de Clément
 

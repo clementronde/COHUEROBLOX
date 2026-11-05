@@ -139,6 +139,9 @@ def build_template(fn, fused=False):
             parts.append(("glint", r * 0.13, (1, 0.5, 1), center + Vector((0.2 * r, -r * d * 0.9, 0.0)),
                           "FFF8EC"))
         else:
+            if e.get("rim"):
+                parts.append(("rim", r * 1.14, (1, d * 0.8, sz), center + Vector((0, r * d * 0.25, 0)),
+                              cv.PALETTE["Ink"]))
             parts.append(("sclera", r, (1, d, sz), center, "FFF8EC"))
             lx, lz = e["look"]
             pr = r * e["p"]
@@ -335,10 +338,11 @@ def view_horde(out, kind, fused=True):
         elite = k in (5, 23)
         place(kinds[k], (x, y, 0), rot_z=face + rnd.uniform(-0.3, 0.3), scale=1.3 if elite else 1.0, elite=elite,
               fused=fused)
-        if k == 11:                                   # un capturable : anneau rose au sol (Bubblegum, réservé)
-            A14.disc((x, y), 2.0, 0.07, cv.PALETTE["Bubblegum"], 2.4,
-                     [(0.0, 0.0), (0.74, 0.0), (0.8, 1.0), (0.93, 1.0), (1.0, 0.0)])
-    # Ce qui entoure la horde en jeu : XP au sol (Neon cyan), deux tirs ennemis (Tomato mat)
+    # Ce qui entoure la horde en jeu : un capturable, de l'XP au sol (Neon cyan), deux tirs ennemis
+    pts = horde_points()
+    front = [(math.hypot(x - player[0], y - player[1]), (x, y)) for (x, y) in pts if y < player[1] - 3]
+    cx, cy = min(front)[1]
+    capture_marker(cx, cy, C_size(C.goblin_grunt)[2])
     xr = random.Random(21)
     for _ in range(14):
         a, rr = xr.uniform(0, math.tau), xr.uniform(2.5, 9.0)
@@ -346,9 +350,62 @@ def view_horde(out, kind, fused=True):
         bpy.context.scene.collection.objects.link(gem)
         gem.data.materials.append(A14._solid_glow(cv.PALETTE["Sky"], 2.2))
         gem.location = (player[0] + math.cos(a) * rr, player[1] - 3 + math.sin(a) * rr, 0.45)
-    for (sx, sy) in ((-7.0, -10.0), (8.0, -12.0)):
-        tx, ty = sx + (player[0] - sx) * 0.55, sy + (player[1] - sy) * 0.55
-        A14.enemy_shot((tx, ty, 2.0), (player[0] - sx, player[1] - sy, 0))
+    for (sx, sy) in ((-5.5, -1.5), (5.0, -2.5)):                  # dans l'espace vide, à côté du joueur
+        enemy_shot((player[0] + sx, player[1] + sy, 2.0), (-sx, -sy, 0))
+    game_camera(sc, player)
+    A14.render(sc, out, res=(1600, 900), samples=48)
+
+
+def capture_marker(x, y, h):
+    """Capturable : anneau carré rose au sol et cage rose au-dessus de la tête (Bubblegum, réservé à la capture,
+    en Neon). Rendu de concept des objets d'A01 (FX_CaptureRing, FX_CaptureIcon)."""
+    A14.disc((x, y), 2.3, 0.08, cv.PALETTE["Bubblegum"], 3.0,
+             [(0.0, 0.0), (0.72, 0.0), (0.78, 1.0), (0.94, 1.0), (1.0, 0.0)])
+    for k in range(4):
+        bar = bpy.data.objects.new("Cage", A14._sphere_mesh("Cage", 0.12, 4, 2))
+        bpy.context.scene.collection.objects.link(bar)
+        bar.data.materials.append(A14._solid_glow(cv.PALETTE["Bubblegum"], 3.0))
+        a = k * math.pi / 2 + math.pi / 4
+        bar.scale = (1, 1, 6)
+        bar.location = (x + math.cos(a) * 0.55, y + math.sin(a) * 0.55, h + 1.3)
+    cap = bpy.data.objects.new("CageTop", A14._sphere_mesh("CageTop", 0.55, 4, 2))
+    bpy.context.scene.collection.objects.link(cap)
+    cap.data.materials.append(A14._solid_glow(cv.PALETTE["Bubblegum"], 3.0))
+    cap.scale = (1.3, 1.3, 0.5)
+    cap.location = (x, y, h + 2.1)
+
+
+def enemy_shot(loc, direction):
+    """Tir ennemi : boule Tomato mate à liseré Cream (le liseré la détache d'une horde rouge)."""
+    A14.glow_ball(loc, 1.2, cv.PALETTE["Cream"], 0.0, matte=True)
+    d = Vector(direction).normalized()
+    A14.enemy_shot(tuple(Vector(loc) - d * 0.35 + Vector((0, 0, 0.0))), direction)
+
+
+def view_horde_w23(out):
+    """Mondes 2 et 3 sur leurs sols, à la caméra du jeu : à gauche 30 Zombie Runners sur l'herbe sombre du
+    cimetière (pierres tombales), à droite 30 Poltergeists sur le bitume de la cour (marelle crème)."""
+    sc = A14.fresh()
+    light(sc)
+    for i in range(-13, 13):
+        for j in range(-16, 13):
+            cx, cy = i * 8 + 4, j * 8 + 4
+            col = "Leaf.dd" if cx < 0 else "Stone.d"
+            S.block(f"G_{i}_{j}", (cx, cy, -0.5), (8, 8, 1), col, jitter=0.03)
+    rnd = random.Random(3)
+    for k in range(12):
+        x, y = -rnd.uniform(6, 40), rnd.uniform(-40, 14)
+        S.block(f"Tomb_{k}", (x, y, 1.2), (2.4, 0.9, 2.6), "Stone.l", rnd.uniform(-0.3, 0.3),
+                ((rnd.random() - 0.5) * 16, (rnd.random() - 0.5) * 10))
+    for k in range(8):
+        S.block(f"Hop_{k}", (6 + (k % 2) * 3.2, -6 - k * 2.6, 0.02), (3, 2.4, 0.1), "Cream", jitter=0.0)
+    player = (0.0, 6.0)
+    BD.dressed("Knight", 3, player[0], y=player[1], rot=0.0)
+    rr = random.Random(9)
+    for k, (x, y) in enumerate(horde_points(n=60, seed=17)):
+        fn = C.zombie_runner if x < player[0] else C.ghost_poltergeist
+        face = math.atan2(player[0] - x, -(player[1] - y))
+        place(fn, (x, y, 0), rot_z=face + rr.uniform(-0.3, 0.3), fused=True)
     game_camera(sc, player)
     A14.render(sc, out, res=(1600, 900), samples=48)
 
@@ -395,7 +452,7 @@ def tris_report(out):
 
 VIEWS = {"lineup": view_lineup, "boss": view_boss, "compare": view_compare, "goblins": view_goblins,
          "horde_grass": lambda o: view_horde(o, "grass"), "horde_sand": lambda o: view_horde(o, "sand"),
-         "horde_bricks": lambda o: view_horde(o, "grass", fused=False),
+         "horde_bricks": lambda o: view_horde(o, "grass", fused=False), "horde_w23": view_horde_w23,
          "silhouettes": view_silhouettes}
 
 
