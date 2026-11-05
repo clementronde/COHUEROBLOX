@@ -59,6 +59,10 @@ type PlayerRun = {
 	lastVitals: number,
 	joinedAt: number,
 	ghostParts: { [BasePart]: number },
+	frozenSlow: { mult: number, untilT: number }?, -- ralenti en cours au début du gel (rendu à la reprise)
+	lobbyAt: number?, -- retour au lobby prévu (os.clock), après la fin de sa run
+	finishedRunId: number, -- run quittée en Cash out : pas de retour en retardataire dans la même run
+	cashOutHold: number, -- secondes passées dans le portail doré (Cash out par joueur)
 }
 
 local RunManager = {}
@@ -97,11 +101,11 @@ local state = {
 	coinsStep = 0, -- dernier palier payé en pièces de survie
 	victory = false, -- boss du dernier monde tué
 	cashOut = nil :: Vector3?, -- portail doré après la victoire
-	cashOutHold = 0,
-	cashedOut = false,
+	cashedOut = false, -- la run s'est finie parce que le dernier joueur a fait Cash out
 	firstReplayAt = nil :: number?,
-	lobbyReturnAt = nil :: number?,
+	firstReadyAt = nil :: number?, -- premier PLAY au lobby (départ Run.Lobby.StartDelay s après)
 	waitForLobbyPlay = false,
+	frozenAt = nil :: number?, -- gel du passage de niveau en cours depuis (os.clock)
 	stateDirty = true,
 	firstJoinAt = nil :: number?,
 }
@@ -243,8 +247,13 @@ local function getRecord(player: Player): PlayerRun
 			lastVitals = 0,
 			joinedAt = now(),
 			ghostParts = {},
+			frozenSlow = nil,
+			lobbyAt = nil,
+			finishedRunId = 0,
+			cashOutHold = 0,
 		}
 		records[player] = r
+		player:SetAttribute("InRun", false)
 	end
 	return r
 end
@@ -310,6 +319,128 @@ local function clearSlow(player: Player)
 	player:SetAttribute("SlowUntil", 0)
 end
 
+-- Gel du passage de niveau (A04-v3, 60-ui-ux 0.0 ter) -------------------------------------------
+-- Tant qu'un joueur choisit sa carte, la run est figée pour tout le monde : stepRun et le contact
+-- ne tournent plus, damagePlayer ne fait rien, le chrono s'arrête (clock()). À la reprise, toutes
+-- les minuteries de la run (os.clock) sont décalées de la durée du gel. Les autres services lisent
+-- RunManager.isFrozen() ou Bus.RunFrozen ; les clients, Workspace.RunFrozen et LevelUpPause.
+
+local choosers: { [Player]: number } = {} -- joueur qui choisit -> fin du délai (os.clock, math.huge = sans limite)
+
+-- Horloge de la run : arrêtée pendant le gel.
+local function clock(): number
+	return state.frozenAt or now()
+end
+
+local function sendPause()
+	local remote = remotes.LevelUpPause
+	if not remote then
+		return
+	end
+	local list, endsAt = {}, 0
+	for p, e in choosers do
+		table.insert(list, p.UserId)
+		endsAt = math.max(endsAt, e)
+	end
+	if #list > 0 then
+		remote:FireAllClients({
+			active = true,
+			choosers = list,
+			endsIn = if endsAt < math.huge then math.max(0, endsAt - now()) else nil,
+		})
+	else
+		remote:FireAllClients({ active = false, choosers = list })
+	end
+end
+
+local function freezePlayer(r: PlayerRun)
+	local player = r.player
+	local serverNow = Workspace:GetServerTimeNow()
+	local mult, untilT = player:GetAttribute("SlowMult"), player:GetAttribute("SlowUntil")
+	r.frozenSlow = if type(mult) == "number" and type(untilT) == "number" and untilT > serverNow
+		then { mult = mult, untilT = untilT }
+		else nil
+	-- Le plus fort ralenti accepté par MovementController et MovementGuard (0,05) ; l'attribut
+	-- Frozen permet au mouvement de s'arrêter tout à fait (contract request A06).
+	player:SetAttribute("SlowMult", 0)
+	player:SetAttribute("SlowUntil", serverNow + 3600)
+	player:SetAttribute("Frozen", true)
+end
+
+local function unfreezePlayer(r: PlayerRun, paused: number)
+	local player = r.player
+	local saved = r.frozenSlow
+	r.frozenSlow = nil
+	player:SetAttribute("Frozen", nil)
+	if saved then
+		player:SetAttribute("SlowMult", saved.mult)
+		player:SetAttribute("SlowUntil", saved.untilT + paused)
+	else
+		clearSlow(player)
+	end
+end
+
+local function freeze()
+	if state.frozenAt then
+		return
+	end
+	state.frozenAt = now()
+	state.stateDirty = true
+	Workspace:SetAttribute("RunFrozen", true)
+	for _, player in runPlayers do
+		local r = records[player]
+		if r then
+			freezePlayer(r)
+		end
+	end
+	Bus.RunFrozen:fire(true, 0)
+end
+
+-- `shift` = false : fin de run, rien à décaler.
+local function unfreeze(shift: boolean)
+	local at = state.frozenAt
+	if not at then
+		return
+	end
+	state.frozenAt = nil
+	state.stateDirty = true
+	Workspace:SetAttribute("RunFrozen", nil)
+	local d = if shift then now() - at else 0
+	if d > 0 then
+		state.stageStart += d
+		state.farmEndsAt += d
+		state.portalOpensAt += d
+		state.boostUntil += d
+		state.arenaEnterAt = if state.arenaEnterAt then state.arenaEnterAt + d else nil
+		state.transitionUntil = if state.transitionUntil then state.transitionUntil + d else nil
+		state.finalWaveStart = if state.finalWaveStart then state.finalWaveStart + d else nil
+	end
+	for _, r in records do
+		if d > 0 then
+			r.downedUntil = if r.downedUntil then r.downedUntil + d else nil
+			r.contactReadyAt += d
+			r.runStart += d -- le gel ne compte pas dans le budget d'invulnérabilité (S-05)
+			for source, untilT in r.invuln do
+				r.invuln[source] = untilT + d
+			end
+		end
+		if r.player:GetAttribute("Frozen") then
+			unfreezePlayer(r, d)
+		end
+	end
+	Bus.RunFrozen:fire(false, d)
+end
+
+-- Fin de run ou retour au choix : plus personne ne choisit, rien à décaler.
+local function clearPause()
+	local had = next(choosers) ~= nil or state.frozenAt ~= nil
+	table.clear(choosers)
+	unfreeze(false)
+	if had then
+		sendPause()
+	end
+end
+
 -- Remotes payloads ---------------------------------------------------------------------------
 
 local function timeLeft(): number
@@ -319,7 +450,7 @@ local function timeLeft(): number
 	if state.phase == "Ended" or state.finalWaveStart ~= nil or state.victory then
 		return 0
 	end
-	return math.max(0, Run.StageSeconds - (now() - state.stageStart))
+	return math.max(0, Run.StageSeconds - (clock() - state.stageStart))
 end
 
 local function worldCount(): number
@@ -344,15 +475,32 @@ local function sendRunState(target: Player?)
 		overtimeStep = state.overtimeStep,
 		victory = state.victory,
 		cashOutPosition = state.cashOut,
-		cashOutProgress = if state.victory then math.clamp(state.cashOutHold / Run.CashOut.HoldSeconds, 0, 1) else nil,
+		cashOutProgress = nil :: number?, -- rempli par joueur (personal)
 		arenaCountdown = if state.arenaEnterAt and not state.bossSpawned
-			then math.max(0, Run.ArenaStartSeconds - (now() - state.arenaEnterAt))
+			then math.max(0, Run.ArenaStartSeconds - (clock() - state.arenaEnterAt))
 			else nil,
-		farmTimeLeft = if state.phase == "BossDefeated" then math.max(0, state.farmEndsAt - now()) else nil,
+		farmTimeLeft = if state.phase == "BossDefeated" then math.max(0, state.farmEndsAt - clock()) else nil,
 		portalPosition = state.portal,
+		frozen = state.frozenAt ~= nil, -- A04-v3 : gel du passage de niveau
 	}
+	-- Après la victoire, chacun a sa propre progression dans le portail doré (Cash out par joueur)
+	-- et son propre choix (attribut VictoryChoice).
+	local function personal(p: Player)
+		local r = records[p]
+		if state.victory and r and r.inRun then
+			payload.cashOutProgress = math.clamp(r.cashOutHold / Run.CashOut.HoldSeconds, 0, 1)
+		else
+			payload.cashOutProgress = nil
+		end
+	end
 	if target then
+		personal(target)
 		remotes.RunState:FireClient(target, payload)
+	elseif state.victory then
+		for _, p in Players:GetPlayers() do
+			personal(p)
+			remotes.RunState:FireClient(p, payload)
+		end
 	else
 		remotes.RunState:FireAllClients(payload)
 	end
@@ -480,8 +628,15 @@ local function initPlayerForRun(r: PlayerRun)
 	r.deathPos = nil
 	grantInvuln(r, 2, "Spawn")
 	r.dirty = true
+	r.lobbyAt = nil
+	r.cashOutHold = 0
+	player:SetAttribute("InRun", true)
+	player:SetAttribute("VictoryChoice", nil)
 	if not table.find(runPlayers, player) then
 		table.insert(runPlayers, player)
+	end
+	if state.frozenAt then
+		freezePlayer(r) -- retardataire arrivé pendant un gel
 	end
 end
 
@@ -659,6 +814,7 @@ local function endRun(victory: boolean)
 		return
 	end
 	setPhase("Ended")
+	clearPause()
 	director({ active = false })
 	local boss = find("BossService")
 	if boss then
@@ -718,6 +874,7 @@ local function resetToLoadout(returnToLobby: boolean?)
 	state.runId += 1
 	state.lobbyReturnAt = nil
 	state.firstReplayAt = nil
+	clearPause()
 	local resetAt = now()
 	local spawn = if returnToLobby then Workspace:FindFirstChildWhichIsA("SpawnLocation") else nil
 	for player, rec in records do
@@ -860,7 +1017,7 @@ end
 
 local function stepContact()
 	local enemies = find("EnemyService")
-	if not enemies or not enemies._contactInfo then
+	if not enemies or not enemies._contactInfo or state.frozenAt then
 		return
 	end
 	local t = now()
@@ -1158,6 +1315,11 @@ local function stepRun(dt: number)
 		return
 	end
 
+	-- Gel du passage de niveau : rien n'avance (chrono, régénération, relève, Overtime, portails).
+	if state.frozenAt then
+		return
+	end
+
 	local t = now()
 	local elapsed = t - state.stageStart
 
@@ -1363,6 +1525,38 @@ function RunManager.getRunPlayers(): { Player }
 	return table.clone(runPlayers)
 end
 
+-- A04-v3 (demande A05) : vrai pendant le gel du passage de niveau. Ennemis, boss, projectiles,
+-- autels, butin et compagnons ne doivent rien faire avancer tant que c'est vrai.
+function RunManager.isFrozen(): boolean
+	return state.frozenAt ~= nil
+end
+
+-- A04-v3, appelé par CardService : `player` commence (on = true) ou finit de choisir sa carte.
+-- `seconds` = délai annoncé aux clients (nil = sans limite). La run se fige au premier joueur qui
+-- choisit et reprend quand le dernier a fini. Renvoie false si la pause est impossible (hors run,
+-- Run.LevelUpPause.Enabled = false) : CardService garde alors l'ancien mode sans pause.
+function RunManager.setChoosing(player: Player, on: boolean, seconds: number?): boolean
+	if not on then
+		if choosers[player] ~= nil then
+			choosers[player] = nil
+			if next(choosers) == nil then
+				unfreeze(true)
+			end
+			sendPause()
+		end
+		return true
+	end
+	local r = records[player]
+	if not Run.LevelUpPause.Enabled or not isActiveRecord(r) or state.phase == "Loadout" or state.phase == "Ended" then
+		return false
+	end
+	local s = if type(seconds) == "number" and seconds == seconds and seconds > 0 then seconds else nil
+	choosers[player] = if s then now() + s else math.huge
+	freeze()
+	sendPause()
+	return true
+end
+
 function RunManager.getLoadout(player: Player): (string, string)
 	local r = records[player]
 	if r then
@@ -1377,6 +1571,12 @@ function RunManager.damagePlayer(player: Player, amount: number, _source: string
 	if not isActiveRecord(r) or type(amount) ~= "number" or amount ~= amount or amount <= 0 then
 		return 0
 	end
+	-- Gel du passage de niveau : aucun coup n'existe (un ennemi pas encore figé par son service).
+	if state.frozenAt then
+		return 0
+	end
+	-- Demande A05 : tout coup reçu, avant invulnérabilité, parade, esquive et bouclier.
+	Bus.PlayerHit:fire(player, _source)
 	local rec = r :: PlayerRun
 	if invulnerableNow(rec, now()) then
 		return 0
@@ -1602,7 +1802,7 @@ local function onReady(player: Player)
 end
 
 function RunManager.init()
-	for _, name in { "RunState", "Announce", "PlayerVitals", "RunSummary" } do
+	for _, name in { "RunState", "Announce", "PlayerVitals", "RunSummary", "LevelUpPause" } do
 		remotes[name] = Net.event(name)
 	end
 
@@ -1695,6 +1895,7 @@ function RunManager.init()
 		task.defer(sendRunState, player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
+		RunManager.setChoosing(player, false)
 		local i = table.find(runPlayers, player)
 		if i then
 			table.remove(runPlayers, i)

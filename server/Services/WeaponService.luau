@@ -1541,6 +1541,12 @@ function WeaponService.start()
 			return
 		end
 		acc = math.min(acc - DT, DT)
+		-- A04-v3 : gel du passage de niveau. Plus aucun tick : armes, projectiles, zones et leur
+		-- horloge interne (clock) s'arrêtent net et reprennent là où elles étaient.
+		local run = Registry.find("RunManager")
+		if run and run.isFrozen and run.isFrozen() then
+			return
+		end
 		local ok, err = pcall(step)
 		if not ok then
 			warn(`[WeaponService] step: {err}`)

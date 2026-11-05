@@ -20,6 +20,10 @@ local DEFINITIONS: { [string]: RemoteClass } = {
 	PlayerVitals = "RemoteEvent",
 	RunSummary = "RemoteEvent",
 	Replay = "RemoteEvent", -- client -> server
+	-- A04-v3 : pause globale au passage de niveau, server -> all { active, choosers = { userId }, endsIn? }
+	LevelUpPause = "RemoteEvent",
+	ReturnToLobby = "RemoteEvent", -- client -> server : bouton Lobby de l'écran de fin
+	VictoryChoice = "RemoteEvent", -- client -> server : ("CashOut" | "KeepGoing"), choix par joueur
 	BossState = "RemoteEvent",
 	-- combat domain
 	PlayerProgress = "RemoteEvent",
