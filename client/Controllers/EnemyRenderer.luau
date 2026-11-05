@@ -137,7 +137,7 @@ local function buildModel(kind: number, lod: number, elite: boolean): Model
 	local template = if lod <= 2 then ArtLibrary.find(assetName) else nil
 	local hasRig = template and template:IsA("Model") and template:FindFirstChildWhichIsA("Bone", true) ~= nil
 	local mesh = if lod <= 2 and not hasRig then ArtLibrary.clonePart(assetName, def.height * ART_SCALE * s) else nil
-	local source = if lod == 1 and hasRig and template and template:IsA("Model")
+	local source = if hasRig and template and template:IsA("Model")
 		then template:FindFirstChildWhichIsA("MeshPart", true) else nil
 	if source and template then
 		local part = source:Clone()
@@ -150,7 +150,13 @@ local function buildModel(kind: number, lod: number, elite: boolean): Model
 		local floor = part.Position - Vector3.yAxis * (part.Size.Y * .5)
 		local yaw = math.rad((template:GetAttribute("FaceYaw") :: number?) or 0)
 		local facing = CFrame.new(floor) * CFrame.Angles(0, -yaw, 0)
-		m.rig = RigMotion.bind(part, facing)
+		local rig = RigMotion.bind(part, facing)
+		if lod == 1 then
+			m.rig = rig
+		else
+			-- Hold a relaxed pose at middle distance, with no per-frame bone updates.
+			RigMotion.apply(rig, def.name, 0, 0, 0, 0, os.clock())
+		end
 		add(part, facing:ToObjectSpace(part.CFrame))
 		part.Name = def.name
 		part.CFrame = HIDDEN

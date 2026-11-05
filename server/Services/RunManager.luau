@@ -14,6 +14,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -30,6 +31,7 @@ local Bus = require(script.Parent.Parent:WaitForChild("Bus"))
 local WorldPortals = require(script.Parent:WaitForChild("WorldPortals")) -- A02-08 (module simple)
 
 local MAIN_DT = 0.1
+local DEFEAT_LOBBY_DELAY = 5
 local CONTACT_DT = 1 / Run.Player.ContactHz
 
 type PlayerRun = {
@@ -98,6 +100,8 @@ local state = {
 	cashOutHold = 0,
 	cashedOut = false,
 	firstReplayAt = nil :: number?,
+	lobbyReturnAt = nil :: number?,
+	waitForLobbyPlay = false,
 	stateDirty = true,
 	firstJoinAt = nil :: number?,
 }
@@ -563,6 +567,7 @@ local function startRun()
 	state.cashOutHold = 0
 	state.cashedOut = false
 	state.firstReplayAt = nil
+	state.lobbyReturnAt = nil
 	table.clear(runPlayers)
 	for _, player in Players:GetPlayers() do
 		local r = getRecord(player)
@@ -697,7 +702,11 @@ local function endRun(victory: boolean)
 			rec.inRun = false -- le choix de classe redevient possible jusqu'au Replay
 		end
 	end
+	if not victory and not Run.UseLobbyPlace then
+		state.lobbyReturnAt = now() + DEFEAT_LOBBY_DELAY
+	end
 	for player, summary in summaries do
+		(summary :: any).returnToLobby = state.lobbyReturnAt ~= nil
 		if player.Parent then
 			remotes.RunSummary:FireClient(player, summary)
 		end
@@ -705,10 +714,34 @@ local function endRun(victory: boolean)
 	state.stateDirty = true
 end
 
-local function resetToLoadout()
+local function resetToLoadout(returnToLobby: boolean?)
 	state.runId += 1
-	for _, rec in records do
+	state.lobbyReturnAt = nil
+	state.firstReplayAt = nil
+	local resetAt = now()
+	local spawn = if returnToLobby then Workspace:FindFirstChildWhichIsA("SpawnLocation") else nil
+	for player, rec in records do
 		rec.inRun = false
+		rec.ready = false
+		rec.replay = false
+		rec.joinedAt = resetAt
+		if returnToLobby and player.Parent == Players then
+			rec.hp = rec.maxHp
+			rec.shield = 0
+			rec.ghost = false
+			rec.downedUntil = nil
+			rec.reviveProgress = 0
+			rec.deathPos = nil
+			setGhostLook(rec, false)
+			clearSlow(player)
+			setLifeAttributes(rec)
+			if spawn then
+				teleport(player, spawn.Position)
+			end
+		end
+	end
+	if returnToLobby then
+		state.waitForLobbyPlay = true
 	end
 	setPhase("Loadout")
 	director({ active = false })
@@ -1067,6 +1100,8 @@ local function stepRun(dt: number)
 		end
 		local timeout = if RunService:IsStudio() then Run.StudioLoadoutTimeout else Run.LoadoutTimeout
 		local allReady = true
+		local requirePlay = not Run.UseLobbyPlace
+			and (state.waitForLobbyPlay or StarterGui:FindFirstChild("COHUE_Lobby") ~= nil)
 		-- Mode lobby : on attend aussi les membres de la config encore en téléportation (S-12).
 		local lobby = lobbyConfig()
 		if lobby and type(lobby.members) == "table" then
@@ -1082,7 +1117,7 @@ local function stepRun(dt: number)
 		end
 		for _, player in players do
 			local r = getRecord(player)
-			if not r.ready and now() - r.joinedAt >= timeout then
+			if not requirePlay and not r.ready and now() - r.joinedAt >= timeout then
 				r.ready = true -- default loadout
 			end
 			if not r.ready then
@@ -1095,6 +1130,13 @@ local function stepRun(dt: number)
 		return
 	end
 	if phase == "Ended" then
+		local returnAt = state.lobbyReturnAt
+		if returnAt then
+			if now() >= returnAt then
+				resetToLoadout(true)
+			end
+			return
+		end
 		if state.firstReplayAt then
 			local all = true
 			for _, player in Players:GetPlayers() do
@@ -1613,6 +1655,10 @@ function RunManager.init()
 
 	Net.onServerEvent("Replay", 2, function(player: Player)
 		if state.phase ~= "Ended" then
+			return
+		end
+		if state.lobbyReturnAt then
+			state.lobbyReturnAt = now()
 			return
 		end
 		getRecord(player).replay = true

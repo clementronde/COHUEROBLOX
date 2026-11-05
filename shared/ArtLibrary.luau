@@ -15,15 +15,32 @@ local function root(): Instance?
 	return ReplicatedStorage:FindFirstChild("Assets")
 end
 
--- Template by exact name (searched once, then cached). Never returns the template itself to
--- callers that intend to modify it: use clonePart / cloneModel.
+-- Authored rigs in the place take priority over same-name test assets.
+local function enemyTemplate(name: string, assets: Instance?): Instance?
+	local prefix, key = name:match("^(%a+)_(.+)$")
+	if prefix == "Enemy" then
+		local rigs = ReplicatedStorage:FindFirstChild("EnemyVisualRigs")
+		local rig = rigs and rigs:FindFirstChild(name)
+		if rig then
+			return rig
+		end
+	end
+	local found = assets and assets:FindFirstChild(name, true)
+	if not found and (prefix == "Enemy" or prefix == "Boss") and key then
+		local meshes = ReplicatedStorage:FindFirstChild("EnemyVisualMeshes")
+		found = meshes and meshes:FindFirstChild(key)
+	end
+	return found
+end
+
+-- Template by exact name. Use the clone helpers to modify a copy.
 function ArtLibrary.find(name: string): Instance?
 	local hit = cache[name]
 	if hit ~= nil then
 		return if hit then hit else nil
 	end
 	local assets = root()
-	local found = if assets then assets:FindFirstChild(name, true) else nil
+	local found = enemyTemplate(name, assets)
 	cache[name] = found or false
 	return found
 end
@@ -54,7 +71,11 @@ function ArtLibrary.clonePart(name: string, height: number?): (BasePart?, Vector
 		return nil, nil
 	end
 	local part = source:Clone()
-	part:ClearAllChildren()
+	for _, child in part:GetChildren() do
+		if not child:IsA("SurfaceAppearance") then
+			child:Destroy()
+		end
+	end
 	prep(part)
 	if height and height > 0 and part.Size.Y > 0 then
 		part.Size = part.Size * (height / part.Size.Y)
