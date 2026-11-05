@@ -202,7 +202,14 @@ Règles communes :
 
 ### 6.2 Classes
 
-Liste des 8 classes (cartes 2 × 4 sur téléphone), avatar au centre (`ViewportFrame` qui tourne, arrêté si mouvement réduit), fiche : arme de départ, passif, mouvement, paliers d'équipement. Classe verrouillée : silhouette grise avec cadenas (jamais sur l'avatar du joueur), texte de la quête, barre de progression, « See quest ». Skins de classe dans l'onglet « Style », prix sur chaque article, jamais de stat.
+Liste des 8 classes (tuiles 4 × 2), fiche : arme de départ, passif, mouvement.
+
+**Au centre, le vrai joueur avec l'équipement sur lui** (demande de Clément, 5 nov.) :
+- le client clone **l'avatar Roblox du joueur** (son personnage du lobby, ou `Players:CreateHumanoidModelFromDescription` avec sa `HumanoidDescription`) dans un `ViewportFrame` ;
+- il y pose l'équipement de la classe choisie avec `ArtLibrary.equipClassTier(clone, classId, palier)` (A01), sur le clone seulement : rien ne change côté serveur tant que le joueur n'a pas touché EQUIP ;
+- par défaut, le palier 3 (niveau 30, tout l'équipement) ; trois boutons « Lv 10 / Lv 20 / Lv 30 » montrent l'équipement qui grandit ;
+- l'avatar tourne lentement (fixe si mouvement réduit) ; le joueur peut le faire tourner au doigt ;
+- le chapeau et les cheveux du joueur sont masqués si le réglage « Keep my hat » est sur OFF, comme en run. Classe verrouillée : silhouette grise avec cadenas (jamais sur l'avatar du joueur), texte de la quête, barre de progression, « See quest ». Skins de classe dans l'onglet « Style », prix sur chaque article, jamais de stat.
 
 ### 6.3 Critters
 
