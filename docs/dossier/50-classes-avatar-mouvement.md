@@ -253,3 +253,17 @@ Limite connue : un tricheur qui reste sous ≈ +25 % de la vitesse permise n'est
 
 fwjelaa : *Camera Systems* §4 (caméra d'épaule Scriptable, Spherecast depuis le pivot), §7 (tactile, manette, zoom), §8 (lissage exponentiel avec dt, un seul propriétaire du FOV) ; *Camera Obstruction Handling - Occlusion Modes, Fades and Collision* (Spherecast rayon 0,5 à 1, entrée immédiate / sortie lente, petits obstacles exclus) ; *Touch Gestures - Pinch, Pan, Swipe and Long Press* (ratio de pincement depuis le début, seuils à l'échelle de l'écran) ; *Input - UserInputService and ContextActionService* §5 (InputContext / InputAction / InputBinding, `UIButton`, `GetState()` pour l'analogique) ; *Server Authority and Input Migration 2026* (bascule IAS des scripts joueur début 2027, ne pas forker sans désactiver le PlayerModule).
 LihFolk (v1, toujours valables) : *Custom Character Controllers*, *Input Responsiveness Buffering and Coyote Time*, *Mover Constraints and Physics Controllers*, *Exploits and Anti-Cheat*, *Detecting Movement Exploits - Speed Fly Noclip Teleport*.
+
+## 10. Test MovementGuard (A06, 5 nov.)
+
+En Play (pas Run), avec `execute_luau` : 1) `tools/tests/a06-guard-client.luau` en datamodel **Client** (installe le coureur) ; 2) `tools/tests/a06-guard-server.luau` en datamodel **Server**. Le serveur pose une piste de test (plat 600 studs + rampe 24°, retirée à la fin), joue bhop / slide / slope / doublejump (+ glide en option) pour chaque ping de `PINGS` (`Workspace.CohueTestPing` + latence de réplication Studio si accessible), et rend une ligne par scénario : PASS (0 strike, 0 recalage, mécanique bien jouée), FAIL, ou INVALID (scénario pas joué). ≈ 18 s par scénario : lancer `PINGS = { 0 }` puis `{ 0.15 }` si l'appel est coupé. Non lancé par A06.
+
+## 11. Verticalité (A06-07) — fiche pour A02
+
+| Objet | Pose | Attributs (défaut, max) |
+| --- | --- | --- |
+| Tremplin | BasePart (ou Model + PrimaryPart) tagué `CohueLaunchPad`, ou dans `Workspace.CohueTraversal.LaunchPads`. Zone = cylindre au-dessus de la pièce (rayon = demi-taille, ou `Radius`) | `LaunchHeight` 18 (8–60), `LaunchForward` 0 studs/s le long du LookVector (max 28) |
+| Geyser | Tag `CohueGeyser` ou dossier `Geysers`. Effets enfants nommés `Eruption…` (ParticleEmitter, Beam, Light, Sound) allumés pendant l'éruption | `Height` 30 (max 60), `Period` 6 s, `Active` 1,5 s, `Offset` 0 |
+| Tyrolienne | Model / Folder tagué `CohueZipline` ou dans `Ziplines`, avec enfants `Start` et `End` (BasePart ou Attachment, à hauteur du câble). Le câble visible est posé par A02 | `Speed` 26 (max 28) |
+
+Le client applique le mouvement (`TraversalController`), le serveur (`TraversalGuard`) exempte MovementGuard quand **il** voit le joueur dans la zone d'un objet du serveur, et finit l'exemption à l'atterrissage, hors du câble ou sans progression. Vitesses plafonnées sous la borne d'exemption (vitesse max × 1,2 + 12 studs) : aucun contrôle relâché. Limite connue : rester près du départ d'une tyrolienne donne des exemptions de ≈ 0,5 s (bornées en distance).
