@@ -12,7 +12,7 @@ La vague 1 (fondations) a démarré le 4 novembre avec 6 conversations d'agents 
 | Conversations lancées | 6 sur 13 (A01, A04, A06, A08, A09, A11) |
 | Prochaine porte | Fin de vague 1 : style voxel validé, run jouable en 3e personne avec 4 classes |
 
-Chaque agent met à jour le statut de ses tâches dans la section Tâches. Le chef de projet (la conversation principale) tient ce tableau et le journal à jour.
+Chaque agent met à jour le statut de ses tâches dans la section Tâches. Ce que le côté technique attend de Clément : `docs/attentes-clement.md`. Le chef de projet (la conversation principale) tient ce tableau et le journal à jour.
 
 ## Décisions du 4 novembre
 
