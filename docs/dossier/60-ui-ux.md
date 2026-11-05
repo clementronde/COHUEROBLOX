@@ -81,6 +81,27 @@ Règles propres à chaque format :
   - Raccourcis : 1, 2, 3 pour les offres ; R, X et B pour reroll, skip et banish ; C et K pour Victory ; Entrée et L pour l'écran de fin.
   - C06 devient la fenêtre CONTROLS, avec un exemple de focus manette (contour crème de 4 px).
 
+**Relecture à l'aveugle (3 relecteurs, deux passes).** Plusieurs relecteurs ont noté la même chose :
+- Passe 1 : 5,8 / 6,7 / 7,5. Les défauts bloquants étaient des marges de 3 px et des chevauchements.
+- Passe 2 : 6,7 / 7,5 / 7,5, médiane 7,5. Il restait deux défauts bloquants : un texte qui débordait sur P04, et les fenêtres sans boutons de manette sur PC.
+- Pour les trois relecteurs, la v3 n'est « plus de l'AI slop, mais pas encore au niveau des références ».
+
+Corrigé après la passe 2, sans nouvelle notation :
+- débordements et marges ;
+- barres de dégâts à l'échelle ;
+- tuile Capture grisée hors cage ;
+- portrait décalé sous une barre Roblox de 150 px ;
+- légendes de manette sur les fenêtres PC ;
+- texte « Team is frozen. Auto-pick at 0 » ;
+- HUD figé visible derrière la fenêtre d'attente ;
+- carte de victoire « YOU: pick one! » ;
+- panneaux à 12 px des tuiles.
+
+Ce qui reste demande un choix de Clément :
+1. **Formes de fenêtres variées.** Les références ont des titres décalés, des onglets en biais et des plaques épaisses ; chez nous, toutes les fenêtres ont la même forme.
+2. **Moins de chiffres.** Stats et récompenses sous forme de tuiles à icône, plutôt qu'en listes.
+3. **Corps de fenêtre plus colorés.** Ils sont désormais teintés de leur couleur, mais restent sombres.
+
 Fonds : `concept/run_scene.py` rend maintenant les trois formats (`run_landscape.png`, `run_portrait.png`, `run_pc.png`). Planches : `concept/captures/v3-planche-*.png` et `v3-composants.png`.
 
 **Lobby piloté par l'interface (décision de Clément du 5 nov. 2026, transmise par le lead)**
