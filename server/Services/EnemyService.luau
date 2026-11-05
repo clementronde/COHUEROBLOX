@@ -33,6 +33,13 @@ local MAX_ID = 65535
 local MAX_PROJECTILES = 150
 local DOT_INTERVAL = 0.5
 local KNOCKBACK_TIME = 0.25
+local MAX_PUDDLES = 24
+local PUDDLE_TICK = 0.5
+
+-- actPhase : 0 marche, 1 préparation (saut, tir, aura, mèche), 2 en l'air, 3 sous terre, 4 surgit
+local PHASE_AIR = 2
+local PHASE_BURROWED = 3
+local PHASE_EMERGING = 4
 
 -- State bits (3 bits on the wire)
 local BIT_ELITE = 1
@@ -80,12 +87,17 @@ local stopUntil: { number } = {}
 local kbVX: { number } = {}
 local kbVZ: { number } = {}
 local kbUntil: { number } = {}
+-- Comportements spéciaux (A03-04)
+local maxHps: { number } = {}
+local hasteMult: { number } = {}
+local hasteUntil: { number } = {}
 
 local columns: { { any } } = {
 	ids, xs, zs, hps, kinds, states, targetOf :: any, dmgMult, sizeMult, external, lootElite,
 	actPhase, actT, actX, actZ, actOX, actOZ,
 	burnDps, burnUntil, burnSrc :: any, poisonDps, poisonUntil, poisonSrc :: any, dotNext,
 	slowMult, slowUntil, stopUntil, kbVX, kbVZ, kbUntil,
+	maxHps, hasteMult, hasteUntil,
 }
 
 local indexOf: { [number]: number } = {} -- id -> index
@@ -143,6 +155,24 @@ local pEnd: { number } = {}
 local nextProjectileId = 1
 local projSpawns: { Codec.Projectile } = {}
 local projRemoved: { number } = {}
+
+-- Nappes au sol (Bloater, A03-04) : quelques zones en données, testées contre les joueurs.
+local puddleN = 0
+local pdX: { number } = {}
+local pdZ: { number } = {}
+local pdY: { number } = {}
+local pdR: { number } = {}
+local pdEnd: { number } = {}
+local pdNext: { number } = {}
+local pdDps: { number } = {}
+local pdSlow: { number } = {}
+
+-- Ennemis qui se retirent d'eux-mêmes (Kamikaze qui explose) : retirés après la boucle de step,
+-- sans KO ni butin (regles-v2 §2.1).
+local pendingRemove: { number } = {}
+local removeN = 0
+local auraBuf: { number } = {}
+local warnedNoTakeXp = false
 
 -- Helpers ------------------------------------------------------------------------------------
 
@@ -230,8 +260,10 @@ local function insertEnemy(kind: number, x: number, z: number, hp: number, dmg: 
 	if countsTowardEliteCap(i) then
 		lootEliteAlive += 1
 	end
-	actPhase[i] = 0
+	actPhase[i] = if def.burrow and not isExternal then PHASE_BURROWED else 0
 	actT[i] = os.clock() + math.random() * 2
+	maxHps[i] = hp
+	hasteMult[i], hasteUntil[i] = 1, 0
 	actX[i], actZ[i], actOX[i], actOZ[i] = 0, 0, 0, 0
 	burnDps[i], burnUntil[i], burnSrc[i] = 0, 0, nil
 	poisonDps[i], poisonUntil[i], poisonSrc[i] = 0, 0, nil
@@ -497,11 +529,174 @@ local function stepProjectiles(targets: { Target }, now: number)
 	end
 end
 
+-- Comportements spéciaux (A03-04) -------------------------------------------------------------
+-- Tout est en données : pas d'Instance par ennemi. Les signaux visuels passent par le remote
+-- EnemyAttackVisual (modes "aura", "explode", "puddle" ; le client retombe sur Burst / Sweep tant
+-- que les effets dédiés n'existent pas dans Assets.FX.Enemies).
+
+-- Vol d'XP du Bomber. StatsService.takeXp(player, amount) -> number (XP réellement retirée, sans
+-- jamais baisser le niveau) est une contract request au domaine combat : tant qu'il n'existe pas,
+-- l'explosion blesse seulement. Une part de l'XP volée retombe en gemme un peu plus loin.
+local function stealXp(player: Player, amount: number, dropFrac: number?, x: number, z: number)
+	local stats = Registry.find("StatsService")
+	local take = stats and (stats :: any).takeXp
+	if type(take) ~= "function" then
+		if not warnedNoTakeXp then
+			warnedNoTakeXp = true
+			warn("[EnemyService] StatsService.takeXp absent : le Bomber ne vole pas encore d'XP")
+		end
+		return
+	end
+	task.spawn(function()
+		local ok, taken = pcall(take, player, amount)
+		if not (ok and type(taken) == "number" and taken > 0 and taken == taken) then
+			return
+		end
+		local frac = dropFrac or 0
+		local loot = Registry.find("LootService")
+		if frac > 0 and loot then
+			local a = math.random() * math.pi * 2
+			local gx, gz = clampToMap(x + math.cos(a) * 12, z + math.sin(a) * 12)
+			pcall(loot.dropXp, gx, gz, taken * frac)
+		end
+	end)
+end
+
+-- Blesse les joueurs dans un disque au sol (explosion, surgissement).
+local function hitPlayers(targets: { Target }, x: number, z: number, radius: number, damage: number, source: string, steal: number?, dropFrac: number?)
+	local run = Registry.find("RunManager")
+	local groundY = Heightmap.getY(x, z)
+	local reach = radius + Run.Player.ContactHalfWidth
+	for _, t in targets do
+		local dx, dz = t.x - x, t.z - z
+		if dx * dx + dz * dz <= reach * reach and math.abs(t.y - groundY) < 4 then
+			if run then
+				task.spawn(run.damagePlayer, t.player, damage, source)
+			end
+			if steal and steal > 0 then
+				stealXp(t.player, steal, dropFrac, x, z)
+			end
+		end
+	end
+end
+
+local function addPuddle(def: Enemies.Def, x: number, z: number, dmg: number)
+	local r = def.puddleRadius
+	if not r or puddleN >= MAX_PUDDLES then
+		return
+	end
+	puddleN += 1
+	local k = puddleN
+	local now = os.clock()
+	pdX[k], pdZ[k], pdY[k], pdR[k] = x, z, Heightmap.getY(x, z), r
+	pdEnd[k] = now + (def.puddleTime or 5)
+	pdNext[k] = now
+	pdDps[k] = (def.puddleDps or 5) * dmg
+	pdSlow[k] = def.puddleSlow or 1
+	attackVisualRemote:FireAllClients(0, def.name, "puddle", Vector3.new(x, pdY[k], z), Vector3.zero, r)
+end
+
+local function removePuddle(k: number)
+	local last = puddleN
+	if k ~= last then
+		pdX[k], pdZ[k], pdY[k], pdR[k] = pdX[last], pdZ[last], pdY[last], pdR[last]
+		pdEnd[k], pdNext[k], pdDps[k], pdSlow[k] = pdEnd[last], pdNext[last], pdDps[last], pdSlow[last]
+	end
+	puddleN -= 1
+end
+
+local function stepPuddles(targets: { Target }, now: number)
+	if puddleN == 0 then
+		return
+	end
+	local run = Registry.find("RunManager")
+	local k = 1
+	while k <= puddleN do
+		if now >= pdEnd[k] then
+			removePuddle(k)
+			continue
+		end
+		if now >= pdNext[k] then
+			pdNext[k] = now + PUDDLE_TICK
+			local reach = pdR[k] + Run.Player.ContactHalfWidth
+			for _, t in targets do
+				local dx, dz = t.x - pdX[k], t.z - pdZ[k]
+				if dx * dx + dz * dz <= reach * reach and math.abs(t.y - pdY[k]) < 3 and run then
+					if pdDps[k] > 0 then
+						task.spawn(run.damagePlayer, t.player, pdDps[k] * PUDDLE_TICK, "EnemyPuddle")
+					end
+					if pdSlow[k] < 1 then
+						task.spawn(run.setSlow, t.player, pdSlow[k], PUDDLE_TICK + 0.3)
+					end
+				end
+			end
+		end
+		k += 1
+	end
+end
+
+-- Aura d'un soutien (Shaman : soin + hâte ; Surveillant : hâte + rassemblement ; Banshee : ralentit
+-- les joueurs). Appelée au plus une fois toutes les auraEvery s par soutien.
+local function castAura(i: number, def: Enemies.Def, targets: { Target }, now: number)
+	local x, z = xs[i], zs[i]
+	local r = def.auraRadius or 12
+	EnemyService._attackVisual(ids[i], "aura", x, z, 0, 0, r)
+	if def.auraHeal or def.auraHaste or def.auraRally then
+		local heal = def.auraHeal or 0
+		local haste = def.auraHaste or 1
+		local hasteEnd = now + (def.auraHasteTime or 3)
+		local chased = targetOf[i]
+		local n = EnemyService.queryRadius(x, z, r, auraBuf)
+		for k = 1, n do
+			local j = indexOf[auraBuf[k]]
+			if not j or external[j] then
+				continue
+			end
+			if heal > 0 and Enemies[kinds[j]].family ~= "MiniBoss" then
+				hps[j] = math.min(maxHps[j], hps[j] + maxHps[j] * heal)
+			end
+			if haste > 1 then
+				hasteMult[j] = if hasteUntil[j] > now then math.max(hasteMult[j], haste) else haste
+				hasteUntil[j] = math.max(hasteUntil[j], hasteEnd)
+			end
+			if def.auraRally and chased then
+				targetOf[j] = chased
+			end
+		end
+	end
+	local slow = def.auraSlow
+	if slow and slow < 1 then
+		local run = Registry.find("RunManager")
+		local groundY = Heightmap.getY(x, z)
+		local reach = r + Run.Player.ContactHalfWidth
+		for _, t in targets do
+			local dx, dz = t.x - x, t.z - z
+			if run and dx * dx + dz * dz <= reach * reach and math.abs(t.y - groundY) < 6 then
+				task.spawn(run.setSlow, t.player, slow, def.auraSlowTime or 2.5)
+			end
+		end
+	end
+end
+
+local function flushRemovals()
+	for k = 1, removeN do
+		local i = indexOf[pendingRemove[k]]
+		if i then
+			addPuddle(Enemies[kinds[i]], xs[i], zs[i], dmgMult[i])
+			removeAt(i)
+		end
+	end
+	removeN = 0
+end
+
 -- Simulation -------------------------------------------------------------------------------------
 
 local function rebuildGrid()
 	table.clear(grid)
 	for i = 1, count do
+		if actPhase[i] == PHASE_BURROWED then
+			continue -- sous terre : ni touché, ni poussé, ni compté au contact
+		end
 		local key = cellKey(xs[i] // CELL, zs[i] // CELL)
 		local cell = grid[key]
 		if cell then
@@ -527,6 +722,9 @@ end
 local function relax(byPlayer: { [Player]: Target })
 	for _ = 1, Balance.RelaxIterations do
 		for i = 1, count do
+			if actPhase[i] == PHASE_BURROWED then
+				continue
+			end
 			local ri = radiusOf(i) + Balance.SeparationGap
 			local wi = weightOf(i)
 			local cx, cz = xs[i] // CELL, zs[i] // CELL
@@ -567,7 +765,7 @@ local function relax(byPlayer: { [Player]: Target })
 	for i = 1, count do
 		local chased = targetOf[i]
 		local t = chased and byPlayer[chased]
-		if t and actPhase[i] ~= 2 then
+		if t and actPhase[i] ~= PHASE_AIR and actPhase[i] ~= PHASE_BURROWED then
 			local minD = Balance.ContactDistance + radiusOf(i)
 			local dx, dz = xs[i] - t.x, zs[i] - t.z
 			local d2 = dx * dx + dz * dz
@@ -691,7 +889,7 @@ local function step(targets: { Target }, now: number)
 
 		local dx, dz = t.x - x, t.z - z
 		local d2 = dx * dx + dz * dz
-		if d2 > recycle2 and actPhase[i] == 0 then
+		if d2 > recycle2 and (actPhase[i] == 0 or actPhase[i] == PHASE_BURROWED) then
 			xs[i], zs[i] = ringPoint(t)
 			states[i] = st
 			continue
@@ -709,11 +907,35 @@ local function step(targets: { Target }, now: number)
 
 		local speed = def.speed * (if slowUntil[i] > now then slowMult[i] else 1)
 		speed *= worldScale().speed
+		if hasteUntil[i] > now then
+			speed *= hasteMult[i]
+		end
 		local d = math.sqrt(d2)
 		local family = def.family
 		local walk = true
 
-		if family == "Jumper" or def.leapAir ~= nil then
+		if actPhase[i] >= PHASE_BURROWED then
+			-- Gravedigger : avance sous terre, surgit près du joueur (cercle annoncé), puis tire.
+			walk = false
+			if actPhase[i] == PHASE_BURROWED then
+				if d <= (def.emergeRange or 9) then
+					actPhase[i] = PHASE_EMERGING
+					actT[i] = now + (def.emergeWindup or 0.7)
+					st = bit32.bor(st, BIT_ACTION)
+					EnemyService._attackVisual(ids[i], "aim", x, z, dx, dz, def.emergeRadius)
+				elseif d > 1e-3 then
+					local v = speed * (def.burrowSpeed or 1.4) * DT
+					xs[i] = x + dx / d * v
+					zs[i] = z + dz / d * v
+				end
+			elseif now >= actT[i] then
+				actPhase[i] = 0
+				actT[i] = now + 1
+				st = bit32.band(st, bit32.bnot(BIT_ACTION))
+				hitPlayers(targets, x, z, def.emergeRadius or 4, (def.emergeDamage or 10) * dmgMult[i], "EnemyEmerge")
+				EnemyService._attackVisual(ids[i], "land", x, z, dx, dz, def.emergeRadius)
+			end
+		elseif family == "Jumper" or def.leapAir ~= nil then
 			local phase = actPhase[i]
 			if phase == 0 then
 				if now >= actT[i] and d < (def.leapRange or 22) and d > 4 then
@@ -753,16 +975,22 @@ local function step(targets: { Target }, now: number)
 					actT[i] = now + (def.shotCooldown or 3.2) + math.random() * 0.5
 					st = bit32.band(st, bit32.bnot(BIT_ACTION))
 					local previousCount = pCount
-					fireProjectile(
-						x,
-						z,
-						t.x - x,
-						t.z - z,
-						def.shotSpeed or 18,
-						(def.shotDamage or 8) * dmgMult[i],
-						def.shotRadius or 1.2,
-						4
-					)
+					local shots = def.shotCount or 1
+					local aim = math.atan2(t.z - z, t.x - x)
+					local spread = math.rad(def.shotSpread or 0)
+					for s = 1, shots do
+						local a = if shots > 1 then aim - spread / 2 + (s - 1) / (shots - 1) * spread else aim
+						fireProjectile(
+							x,
+							z,
+							math.cos(a),
+							math.sin(a),
+							def.shotSpeed or 18,
+							(def.shotDamage or 8) * dmgMult[i],
+							def.shotRadius or 1.2,
+							4
+						)
+					end
 					if pCount > previousCount then
 						EnemyService._attackVisual(ids[i], "shot", x, z, dx, dz)
 					end
@@ -779,6 +1007,51 @@ local function step(targets: { Target }, now: number)
 				zs[i] = z - dz / d * speed * 0.5 * DT
 				walk = false
 			elseif d <= keep then
+				walk = false
+			end
+		elseif family == "Support" then
+			-- Shaman, Banshee, Surveillant : garde ses distances, lance son aura toutes les auraEvery s.
+			walk = false
+			local radius = def.auraRadius or 12
+			if actPhase[i] == 1 then
+				if now >= actT[i] then
+					actPhase[i] = 0
+					actT[i] = now + (def.auraEvery or 6)
+					st = bit32.band(st, bit32.bnot(BIT_ACTION))
+					castAura(i, def, targets, now)
+				end
+			elseif now >= actT[i] and (def.auraSlow == nil or d <= radius) then
+				actPhase[i] = 1
+				actT[i] = now + (def.auraWindup or 0.6)
+				st = bit32.bor(st, BIT_ACTION)
+				EnemyService._attackVisual(ids[i], "aim", x, z, dx, dz, radius)
+			else
+				local keep = def.keepDistance or 14
+				if d < keep - 4 then
+					xs[i] = x - dx / d * speed * 0.5 * DT
+					zs[i] = z - dz / d * speed * 0.5 * DT
+				elseif d > keep then
+					walk = true
+				end
+			end
+		elseif family == "Kamikaze" then
+			-- Bomber, Bloater : fonce, allume sa mèche près du joueur, explose et disparaît.
+			if actPhase[i] == 1 then
+				walk = false
+				if now >= actT[i] then
+					actPhase[i] = 0
+					actT[i] = math.huge -- n'explose qu'une fois (retiré après la boucle)
+					local r = def.blastRadius or 5
+					EnemyService._attackVisual(ids[i], "explode", x, z, 0, 0, r)
+					hitPlayers(targets, x, z, r, (def.blastDamage or 15) * dmgMult[i], "EnemyBlast", def.xpSteal, def.xpStealDrop)
+					removeN += 1
+					pendingRemove[removeN] = ids[i]
+				end
+			elseif now >= actT[i] and d <= (def.fuseRange or 6) + radiusOf(i) then
+				actPhase[i] = 1
+				actT[i] = now + (def.fuseTime or 1)
+				st = bit32.bor(st, BIT_ACTION)
+				EnemyService._attackVisual(ids[i], "aim", x, z, dx, dz, def.blastRadius or 5)
 				walk = false
 			end
 		end
@@ -798,7 +1071,9 @@ local function step(targets: { Target }, now: number)
 		xs[i], zs[i] = clampToMap(xs[i], zs[i])
 	end
 	stepProjectiles(targets, now)
+	stepPuddles(targets, now)
 	flushDamage()
+	flushRemovals()
 end
 
 local function send(viewers: { Player })
@@ -816,6 +1091,9 @@ local function send(viewers: { Player })
 		for i = 1, count do
 			local dx, dz = xs[i] - px, zs[i] - pz
 			local d2 = dx * dx + dz * dz
+			if actPhase[i] == PHASE_BURROWED and not external[i] then
+				continue -- sous terre : invisible jusqu'à ce qu'il surgisse
+			end
 			if d2 <= near2 or (farTick and d2 <= far2) or external[i] then
 				n += 1
 				sendIds[n] = ids[i]
@@ -866,6 +1144,9 @@ function EnemyService.damage(id: number, amount: number, source: Player?): boole
 		-- mais pas de coffre (contract request loot : XP / pièces d'élite pour isElite or hordeElite).
 		local isElite = lootElite[i]
 		local hordeElite = not isElite and bit32.band(states[i], BIT_ELITE) ~= 0 and not external[i]
+		if def.puddleRadius and not external[i] then
+			addPuddle(def, x, z, dmgMult[i]) -- Bloater : nappe laissée à sa mort
+		end
 		removeAt(i)
 		Bus.EnemyKilled:fire(id, kind, x, z, source, isElite, hordeElite)
 		return true
@@ -1051,7 +1332,7 @@ function EnemyService._contactInfo(id: number): (number?, number, number, boolea
 		return nil, 0, 0, false
 	end
 	local def = Enemies[kinds[i]]
-	local harmless = actPhase[i] == 2 or stopUntil[i] > os.clock()
+	local harmless = actPhase[i] >= PHASE_AIR or stopUntil[i] > os.clock() -- en l'air, sous terre, surgit
 	return radiusOf(i), def.height * sizeMult[i], def.contactDamage * dmgMult[i], harmless
 end
 
@@ -1112,12 +1393,16 @@ function EnemyService.clearAll()
 		removeAt(count)
 	end
 	pCount = 0
+	puddleN = 0
+	removeN = 0
 	table.clear(grid)
 	director.active = false
 end
 
 -- Removes every non-boss enemy without loot (stage transitions).
 function EnemyService.clearNonBoss()
+	puddleN = 0
+	removeN = 0
 	local i = 1
 	while i <= count do
 		if external[i] then
