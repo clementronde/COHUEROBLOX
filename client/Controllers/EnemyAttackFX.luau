@@ -1,132 +1,193 @@
 --!strict
--- Short, pooled client-only attack effects. The server owns all hit checks.
+-- Short client-only enemy attack effects. The server owns all hit checks.
+-- A14 (dossier 12, section 14) : rien n'est construit ici. Les effets sont des modèles posés dans
+-- ReplicatedStorage.Assets.FX.Enemies (Sweep, Burst, Shot, Land, Boss) ; ce module les clone en pool, les
+-- place, les met à l'échelle du rayon, les teinte à la couleur du profil de l'ennemi et appelle :Emit().
+-- Un modèle manquant est signalé une fois dans la sortie, puis ignoré.
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Motion = require(script.Parent.EnemyMotion)
 type Profile = Motion.Profile
-type Spark = { part: BasePart, frame: CFrame, velocity: Vector3, size: Vector3, spin: number, ring: boolean }
-type Effect = { start: number, life: number, sparks: { Spark } }
+
+type Shape = { part: BasePart, base: Vector3, s: number, grow: number, fade0: number, fade1: number }
+type Inst = {
+	model: Model,
+	template: Model,
+	anchor: BasePart,
+	life: number,
+	height: number,
+	shapes: { Shape },
+	zones: { { part: BasePart, s: number } },
+	emitters: { { e: ParticleEmitter, n: number, perRadius: boolean } },
+}
+type Effect = { fx: Inst, start: number, base: CFrame, radius: number }
 
 local Effects = {}
-local active: { Effect } = {}
-local pools: { [string]: { BasePart } } = {}
-local container: Folder
-local rng = Random.new()
+local HIDDEN = CFrame.new(0, -10000, 0)
 local LIMIT = 18
+local active: { Effect } = {}
+local pools: { [Model]: { Inst } } = {}
+local container: Folder
+local root: Instance?
+local warned: { [string]: boolean } = {}
 
-local function take(shape: string, color: Color3): BasePart
-	local pool = pools[shape]
-	local part = pool and table.remove(pool)
-	if not part then
-		if shape == "Wedge" then
-			part = Instance.new("WedgePart")
-		else
-			local p = Instance.new("Part")
-			if shape == "Ball" then
-				p.Shape = Enum.PartType.Ball
-			elseif shape == "Cylinder" then
-				p.Shape = Enum.PartType.Cylinder
-			end
-			part = p
-		end
-		part.Name = shape
-		part.Anchored = true
-		part.CanCollide = false
-		part.CanQuery = false
-		part.CanTouch = false
-		part.CastShadow = false
-		part.Material = Enum.Material.Neon
-		part.Parent = container
+local function num(i: Instance, name: string, default: number): number
+	local v = i:GetAttribute(name)
+	return if type(v) == "number" then v else default
+end
+
+local function template(name: string): Model?
+	local m = root and root:FindFirstChild(name)
+	if m and m:IsA("Model") then
+		return m
 	end
-	part.Color = color
-	return part
+	if not warned[name] then
+		warned[name] = true
+		warn(`[EnemyAttackFX] modèle manquant : Assets.FX.Enemies.{name}`)
+	end
+	return nil
+end
+
+local function acquire(t: Model): Inst
+	local pool = pools[t]
+	local fx = pool and table.remove(pool)
+	if fx then
+		return fx
+	end
+	local model = t:Clone()
+	model:PivotTo(HIDDEN)
+	model.Parent = container
+	local anchor = (model.PrimaryPart or model:FindFirstChild("Anchor")) :: BasePart
+	local inst: Inst = {
+		model = model,
+		template = t,
+		anchor = anchor,
+		life = num(t, "Life", 0.4),
+		height = num(t, "Height", 0.08),
+		shapes = {},
+		zones = {},
+		emitters = {},
+	}
+	for _, c in model:GetChildren() do
+		if c:IsA("BasePart") and c ~= anchor then
+			if c.Name == "Zone" then
+				table.insert(inst.zones, { part = c, s = num(c, "S", 1) })
+			else
+				local base = c:GetAttribute("Base")
+				table.insert(inst.shapes, {
+					part = c,
+					base = if typeof(base) == "Vector3" then base else c.Size,
+					s = num(c, "S", 1),
+					grow = num(c, "Grow", 1),
+					fade0 = num(c, "Fade0", c.Transparency),
+					fade1 = num(c, "Fade1", c.Transparency),
+				})
+			end
+		end
+	end
+	for _, d in model:GetDescendants() do
+		if d:IsA("ParticleEmitter") then
+			table.insert(inst.emitters, { e = d, n = num(d, "Burst", 0), perRadius = d:GetAttribute("PerRadius") == true })
+		end
+	end
+	return inst
 end
 
 local function release(effect: Effect)
-	for _, s in effect.sparks do
-		local part = s.part
-		part.Transparency = 1
-		local key = part.Name
-		if not pools[key] then
-			pools[key] = {}
-		end
-		table.insert(pools[key], part)
+	local fx = effect.fx
+	fx.anchor.CFrame = HIDDEN
+	for _, sh in fx.shapes do
+		sh.part.CFrame = HIDDEN
+	end
+	for _, z in fx.zones do
+		z.part.CFrame = HIDDEN
+	end
+	local pool = pools[fx.template]
+	if not pool then
+		pool = {}
+		pools[fx.template] = pool
+	end
+	table.insert(pool, fx)
+end
+
+local function place(effect: Effect, u: number)
+	local fx = effect.fx
+	local e = 1 - (1 - math.clamp(u, 0, 1)) ^ 2
+	fx.anchor.CFrame = effect.base
+	for _, sh in fx.shapes do
+		local k = sh.grow + (1 - sh.grow) * e
+		local r = effect.radius * sh.s * k
+		sh.part.Size = Vector3.new(sh.base.X * r, sh.base.Y, sh.base.Z * r)
+		sh.part.CFrame = effect.base
+		sh.part.Transparency = sh.fade0 + (sh.fade1 - sh.fade0) * math.clamp(u, 0, 1)
+	end
+	for _, z in fx.zones do
+		z.part.Size = Vector3.new(2 * effect.radius * z.s, 0.2, 2 * effect.radius * z.s)
+		z.part.CFrame = effect.base
 	end
 end
 
 function Effects.emit(profile: Profile, origin: Vector3, facing: Vector3, mode: string, radius: number)
+	if not root then
+		return
+	end
 	if #active >= LIMIT then
 		release(table.remove(active, 1) :: Effect)
 	end
-
 	local shoot = mode == "shot"
-	local ground = mode == "land" or mode == "boss" or (not shoot and profile.style == "burst")
-	local r = math.clamp(radius, .7, if mode == "boss" then 10 else 4)
-	local forward = if facing.Magnitude > .01 then facing.Unit else -Vector3.zAxis
-	local base = CFrame.lookAt(origin, origin + forward)
-	local light = profile.color:Lerp(Color3.new(1, 1, 1), .5)
-	local effect: Effect = { start = os.clock(), life = if mode == "boss" then .56 elseif shoot then .30 else .40, sparks = {} }
-
-	local function add(shape: string, color: Color3, frame: CFrame, velocity: Vector3, size: Vector3, spin: number, ring: boolean)
-		local part = take(shape, color)
-		part.CFrame = frame
-		part.Size = size
-		part.Transparency = .12
-		table.insert(effect.sparks, { part = part, frame = frame, velocity = velocity, size = size, spin = spin, ring = ring })
+	local name = if mode == "boss" then "Boss"
+		elseif mode == "land" then "Land"
+		elseif shoot then "Shot"
+		elseif profile.style == "burst" then "Burst"
+		else "Sweep"
+	local t = template(name)
+	if not t then
+		return
 	end
-
-	if not shoot then
-		local count = if ground then 8 else 5
-		for i = 1, count do
-			local angle = if ground then (i - 1) * 2 * math.pi / count else (i - 3) * .40
-			local heading = base * CFrame.Angles(0, angle, 0)
-			local start = heading * CFrame.new(0, if ground then .14 else .25, -r * .32)
-			local size = Vector3.new(r * (if ground then .43 else .35), math.max(.08, r * .075), r * .14)
-			add("Block", if i % 2 == 0 then light else profile.color, start, heading.LookVector * r * 1.18, size, 0, true)
+	local fx = acquire(t)
+	local r = math.clamp(radius, 0.7, if mode == "boss" then 10 else 4)
+	local forward = if facing.Magnitude > 0.01 then facing.Unit else -Vector3.zAxis
+	local pos = if shoot or name == "Sweep" then origin else Vector3.new(origin.X, origin.Y + fx.height, origin.Z)
+	local effect: Effect = { fx = fx, start = os.clock(), base = CFrame.lookAt(pos, pos + forward), radius = r }
+	-- teinte du profil : les formes mates et les particules prennent la couleur de l'ennemi
+	local light = profile.color:Lerp(Color3.new(1, 1, 1), 0.45)
+	for _, sh in fx.shapes do
+		sh.part.Color = profile.color
+	end
+	place(effect, 0)
+	for _, em in fx.emitters do
+		em.e.Color = ColorSequence.new(light, profile.color)
+		local k = if em.perRadius then math.clamp(r / 3, 0.5, 3) else 1
+		if em.n > 0 then
+			em.e:Emit(math.max(1, math.floor(em.n * k + 0.5)))
 		end
-	end
-
-	local count = if mode == "boss" then 9 else 5
-	for i = 1, count do
-		local angle = if ground then i * math.pi * 2 / count else rng:NextNumber(-.75, .75)
-		local heading = base * CFrame.Angles(0, angle, 0)
-		local velocity = heading.LookVector * r * rng:NextNumber(.50, 1.20)
-			+ Vector3.yAxis * r * rng:NextNumber(.24, if shoot then .55 else .95)
-		local size = math.max(.12, r * rng:NextNumber(.12, .23))
-		local dims = if profile.debris == "Cylinder" then Vector3.new(size * .28, size * 1.55, size * 1.55)
-			else Vector3.new(size, size * (if profile.debris == "Ball" then 1 else .65), size * 1.22)
-		add(profile.debris, if i % 3 == 0 then light else profile.color,
-			heading * CFrame.new(0, .15, -r * .23), velocity, dims, rng:NextNumber(-3, 3), false)
 	end
 	table.insert(active, effect)
 end
 
 function Effects.init()
-	container = Instance.new("Folder")
+	container = Instance.new("Folder") -- dossier de rangement vide : invisible
 	container.Name = "ClientEnemyAttackFX"
 	container.Parent = Workspace
+	local assets = ReplicatedStorage:WaitForChild("Assets", 10)
+	local fx = assets and assets:FindFirstChild("FX")
+	root = fx and fx:FindFirstChild("Enemies")
+	if not root then
+		warn("[EnemyAttackFX] ReplicatedStorage.Assets.FX.Enemies introuvable : aucun effet d'attaque ennemie")
+	end
 	RunService.PreRender:Connect(function()
 		local now = os.clock()
 		for i = #active, 1, -1 do
 			local effect = active[i]
-			local t = (now - effect.start) / effect.life
-			if t >= 1 then
+			local u = (now - effect.start) / effect.fx.life
+			if u >= 1 then
 				release(effect)
 				table.remove(active, i)
 				continue
 			end
-			for _, s in effect.sparks do
-				local travel = if s.ring then t else 1 - (1 - t) ^ 2
-				local offset = s.velocity * travel
-				if not s.ring then
-					offset -= Vector3.yAxis * (t * t * s.velocity.Y * .92)
-				end
-				s.part.CFrame = (s.frame + offset) * CFrame.Angles(s.spin * t, 0, s.spin * t * .5)
-				local scale = if s.ring then 1 + t * 1.4 else 1 - t * .78
-				s.part.Size = s.size * scale
-				s.part.Transparency = .12 + t * .88
-			end
+			place(effect, u)
 		end
 	end)
 end
