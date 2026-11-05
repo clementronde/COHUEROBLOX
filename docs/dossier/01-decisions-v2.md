@@ -77,7 +77,11 @@ Pas d'évolution. Un compagnon se gagne en le **battant puis en le capturant** p
 
 ## 7. Direction artistique
 
-- **Voxel**, **palette vive et saturée**, humour absurde.
+- ~~Voxel~~ → **tout en tenons, formes naturelles** (piste B, choix de Clément du 5 nov.) : un seul matériau, le plastique à tenons ; décor en gros blocs, objets interactifs et personnages en briques fines. **Palette vive et saturée**, humour absurde. Guide complet : `80-direction-artistique.md`.
+- **Armes en pixel art extrudé** (Clément, 5 nov.) : chaque arme est un sprite de 24 à 32 px dessiné à plat puis épaissi de 1 à 2 cubes, avec un contour sombre et beaucoup de détails dans les pixels. Pas de tenons sur les armes. Le même sprite sert d'icône dans l'UI. Agent : A14.
+- **Effets lisses et lumineux, jamais en pixels** (Clément, 5 nov.) : particules douces, traînées, faisceaux, anneaux en Neon avec bloom. Règle : des blocs pour ce qui existe, de la lumière pour ce qui se passe. Le rouge reste réservé aux ennemis.
+- **Lobby piloté par l'UI** (Clément, 5 nov.) : un gros bouton **Play** ouvre le choix Solo / Friends / Public (plus de marche jusqu'au portail et aux pads). Une **barre de boutons en bas** ouvre les menus (Upgrades, Inventory, Class, Shop, Quests, Pass, Companions : liste finale A08 et A09). Le village reste du décor, un bâtiment par menu avec son nom en grandes lettres de briques. Clément construit les maps lui-même avec le kit d'A01.
+- Référence ajoutée par Clément le 5 nov. : un jeu Roblox du même genre (map enneigée tout en tenons, armes en pixel, effets lumineux, lobby à bouton Play). On en retient les principes : un seul matériau, forêt ou falaises comme bordure, arène ouverte et claire, décor en couleurs froides et jeu en couleurs chaudes. On n'en copie ni les visuels, ni les noms, ni le HUD.
 - Références de Clément : Megabonk (silhouettes trapues, lisibilité de la horde), Octopath Traveler (effet diorama, profondeur de champ, bloom, lumière chaude), Steal an Egg (Roblox, ton joyeux). Synthèse : **un diorama voxel bien éclairé**. On s'inspire de l'ambiance, on ne copie aucun visuel.
 - Caméra **3e personne** derrière le joueur (remplace la vue de dessus actuelle), dézoomée pour lire la horde, jouable au pouce.
 - **UI glossy cartoon** : maquettes Figma validées par Clément avant toute intégration.
