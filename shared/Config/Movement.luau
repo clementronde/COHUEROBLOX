@@ -272,6 +272,7 @@ local Movement = {
 		StallDirDot = 0.5, -- le rattrapage doit aller dans la direction de la vitesse répliquée pendant le gel
 		SupportRadius = 1.2, -- rayon de la sphère d'appui (bord de plateau, tête d'un coéquipier)
 		GroundReachExtra = 1.5, -- studs sous les pieds pour le rayon de sol serveur
+		FrozenDriftStuds = 5, -- studs cumulés tolérés pendant tout un gel du passage de niveau (S-20) : élan d'un bunny-hop (~26 studs/s) pendant ~150 ms de latence
 	},
 }
 

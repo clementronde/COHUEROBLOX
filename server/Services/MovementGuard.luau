@@ -94,6 +94,7 @@ type State = {
 	airTopY: number,
 	airLowY: number,
 	lastLog: number,
+	frozenDrift: number, -- studs parcourus depuis le début du gel du passage de niveau (S-20)
 	dbg: string, -- dernier échantillon (Studio : CohueGuardDebug)
 }
 
@@ -284,6 +285,7 @@ local function newState(root: BasePart): State
 		airTopY = pos.Y,
 		airLowY = pos.Y,
 		lastLog = 0,
+		frozenDrift = 0,
 		dbg = "",
 	}
 end
@@ -532,6 +534,23 @@ local function sample(player: Player, dt: number)
 	end
 	local ping = pingOf(player)
 	local horizontal = Vector3.new(pos.X - s.lastPos.X, 0, pos.Z - s.lastPos.Z).Magnitude
+
+	-- S-20 : pendant le gel, le joueur ne doit pas bouger. Seul l'élan de la latence est toléré, cumulé
+	-- sur tout le gel (pas de fuite) ; au-delà, recalage.
+	if player:GetAttribute("Frozen") then
+		s.frozenDrift += horizontal
+		if s.frozenDrift > G.FrozenDriftStuds then
+			addStrike(player, s)
+			log(player, s, "frozen-move", `drift={string.format("%.1f", s.frozenDrift)}`)
+			s.frozenDrift = 0
+			if G.Enforce then
+				rubberBand(character, root, s, player)
+				return
+			end
+		end
+	else
+		s.frozenDrift = 0
+	end
 
 	-- Temps couvert par cet échantillon : dt + le gel qui le précède (rattrapage de réplication).
 	local span = dt + math.min(s.stall, G.StallCap)
