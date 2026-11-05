@@ -1057,6 +1057,138 @@ def natural_dressing():
 
 
 # ---------------------------------------------------------------------------------------------
+# Variante « tout en tenons, formes naturelles » (studs.py) : décor en gros blocs à tenons
+
+ROCK = ["Leather.l", "Cream.d", "Leather.l", "Stone.l"]   # roche chaude, sable et rose (images 1-2)
+POND = (34.0, -11.0, 6.5, 5.0)   # mare à pierres de gué, à l'est
+
+
+def in_pond(px, py):
+    cx, cy, rx, ry = POND
+    return ((px - cx) / rx) ** 2 + ((py - cy) / ry) ** 2 <= 1.0
+
+
+def studs_island():
+    """Île en blocs d'un stud : herbe en terrasses, chemins de terre, flanc en gros blocs de roche."""
+    v = Vox("Lobby_StudGround")
+    for x in range(-HX - 2, HX + 2):
+        for y in range(-HY - 2, HY + 2):
+            px, py = x + 0.5, y + 0.5
+            r = rho(px, py)
+            if r > 1.0 - 0.03 * hnoise(x // 2, y // 2, 95):
+                continue
+            h = int(round(nat_height(px, py)))
+            w, clearing = dirt_weight(px, py)
+            if in_pond(px, py):
+                h, top = -2, "Leather.d"
+            elif w > 0.5:
+                top = "Leather.l"
+            elif clearing > 0.5:
+                top = "Leather"
+            else:
+                top = "Leaf.l" if vnoise(px, py, 10, 96) > 0.55 else "Leaf"
+            v.set(x, y, h - 1, top)
+            depth = 2 + int((1 - r) * 34 + 4 * vnoise(px, py, 6, 3))
+            for z in range(h - 2, h - 2 - depth, -1):
+                bx, by, bz = (x + (z // 2) % 2) // 3, y // 3, z // 2
+                v.set(x, y, z, ROCK[int(hnoise(bx, by, bz) * len(ROCK)) % len(ROCK)])
+    return v
+
+
+def studs_cliff():
+    """Falaise en gros blocs décalés derrière la tête, coiffés d'herbe par endroits."""
+    v = Vox("Lobby_StudCliff")
+    for i, deg in enumerate(range(194, 348, 5)):
+        th = math.radians(deg)
+        ex, ey = se_point(th)
+        cx, cy = int(ex * 0.9), int(ey * 0.9)
+        centre = 1 - abs(math.cos(th))
+        sx = 3 + int(4 * hnoise(i, 1, 97))
+        sy = 3 + int(3 * hnoise(i, 2, 98))
+        hz = 5 + int(12 * centre + 5 * hnoise(i, 3, 99))
+        col = ROCK[i % len(ROCK)]
+        for x in range(cx - sx, cx + sx):
+            for y in range(cy - sy, cy + sy):
+                for z in range(0, hz):
+                    v.set(x, y, z, col)
+        if hnoise(i, 4, 100) > 0.35:
+            for x in range(cx - sx, cx + sx):
+                for y in range(cy - sy, cy + sy):
+                    v.set(x, y, hz, "Leaf.l")
+        # blocs qui débordent de la paroi, côté île, d'une autre couleur
+        for k in range(3):
+            bw = 2 + int(3 * hnoise(i, k, 102))
+            bh = 2 + int(4 * hnoise(k, i, 103))
+            bz = int((hz - bh) * hnoise(i, k, 104))
+            bxo = cx - sx + int((2 * sx - bw) * hnoise(k, i, 105))
+            out = 1 + int(2 * hnoise(i, k, 106))
+            toward = 1 if cy < 0 else -1
+            y0 = (cy + sy if toward > 0 else cy - sy - out)
+            col2 = ROCK[(i + k + 1) % len(ROCK)]
+            for x in range(bxo, bxo + bw):
+                for y in range(y0, y0 + out):
+                    for z in range(bz, bz + bh):
+                        v.set(x, y, z, col2)
+    return v
+
+
+def studs_dressing():
+    import studs as S
+
+    for kind, x, y, p in TREES:
+        z = round(nat_height(x, y))
+        seed = abs(x * 7 + y * 13)
+        if kind == "round":
+            S.tree(f"Lobby_Tree_{x}_{y}", (x, y, z), height=p * 1.7, seed=seed, autumn=seed % 5 == 0)
+        elif kind == "pine":
+            S.pine(f"Lobby_Pine_{x}_{y}", (x, y, z), height=p * 0.6, seed=seed)
+        elif kind == "bush":
+            S.bush(f"Lobby_Bush_{x}_{y}", (x, y, z), size=p * 0.8, seed=seed)
+        else:
+            S.rock(f"Lobby_Rock_{x}_{y}", (x, y, z), size=p, seed=seed, color=ROCK[seed % 3])
+    n = 0
+    for ring_r in (0.86, 0.95):
+        for deg in range(0, 360, 5):
+            th = math.radians(deg + (2.5 if ring_r > 0.9 else 0))
+            ex, ey = se_point(th)
+            x = ex * ring_r + (hnoise(deg, 3, 83) - 0.5) * 3
+            y = ey * ring_r + (hnoise(deg, 4, 84) - 0.5) * 3
+            if flat_mask(x, y) > 0.02 or (abs(x) < 30 and y < -22) or (abs(x) < 14 and y > 28) or in_pond(x, y):
+                continue
+            if any(math.hypot(x - sx, y - sy) < r + 6 for sx, sy, r in KEEP_FLAT):
+                continue
+            pick = hnoise(deg, int(ring_r * 100), 85)
+            z = round(nat_height(x, y))
+            n += 1
+            if pick < 0.6:
+                S.pine(f"Lobby_ForestPine{n}", (x, y, z), height=12 + 8 * hnoise(deg, 6, 87), seed=deg + n)
+            elif pick < 0.85:
+                S.tree(f"Lobby_Forest{n}", (x, y, z), height=10 + 6 * hnoise(deg, 5, 86), seed=deg + n,
+                       autumn=pick < 0.66)
+            elif pick < 0.93:
+                S.bush(f"Lobby_ForestBush{n}", (x, y, z), size=2.5 + hnoise(deg, 7, 88), seed=deg)
+            else:
+                S.mushroom(f"Lobby_Mushroom{n}", (x, y, z), seed=deg)
+    # mare et pierres de gué ; dalles sur la place
+    cx, cy, rx, ry = POND
+    S.water("Lobby_Pond", (cx, cy), rx - 0.3, ry - 0.3, -0.6)
+    for i in range(6):
+        t = (i + 0.5) / 6
+        S.slab(f"Lobby_PondSlab{i}", (cx - rx + 2 * rx * t, cy + math.sin(t * 3) * 1.5, -0.5), 1.8, seed=i,
+               color=ROCK[i % 3])
+    for i in range(10):
+        a = i / 10 * math.tau + 0.3
+        r = 5 + 3.5 * hnoise(i, 8, 89)
+        S.slab(f"Lobby_PlazaSlab{i}", (PLAZA[0] + r * math.cos(a), PLAZA[1] + r * math.sin(a), 0.05), 1.6,
+               seed=i, color="Stone.l")
+    for i, (x, y, z, s_) in enumerate(ISLETS):
+        S.block(f"Lobby_IsletGrass{i}", (x, y, z), (8 * s_, 7 * s_, 1.0), "Leaf.l", hnoise(i, 1, 101) * 3)
+        S.block(f"Lobby_IsletRock{i}", (x, y, z - 3 * s_), (6 * s_, 5 * s_, 5 * s_), ROCK[i % 3],
+                hnoise(i, 1, 101) * 3)
+        S.pine(f"Lobby_IsletPine{i}", (x, y, z + 0.5), height=7 * s_, seed=i)
+
+
+# ---------------------------------------------------------------------------------------------
 # Scène Blender : pose, personnages, caméras
 
 
@@ -1101,7 +1233,8 @@ CLOUDS = [(-66, -20, -26, 1.0), (64, 30, -30, 1.0), (10, 66, -34, 1.0), (-46, 60
 ISLETS = [(-96, -58, -8, 1.6), (94, 72, -16, 1.4), (118, -24, 2, 1.2), (-110, 40, -20, 1.3)]
 
 
-def build_scene():
+def build_scene(style: str = "nature"):
+    """style = "nature" (carte naturelle peinte) ou "studs" (tout en tenons, formes naturelles)."""
     import bpy
 
     import boards as BD
@@ -1111,7 +1244,9 @@ def build_scene():
 
     import brick
 
-    cv.to_blender = brick.to_blender            # toute la scène passe en briques à tenons
+    voxel_to_blender = cv.to_blender
+    brick.STUD_TEXTURE = style == "studs"       # tenons en texture, comme Resurface en jeu
+    cv.to_blender = brick.to_blender            # tous les éléments interactifs passent en briques
     brick.OPTIONS.update({"Lobby_StoneHead": {"maxlen": 3}})
     sc = BD.fresh()
     B.diorama_light(sc, sun_elev=52, sun_az=-40, strength=5.0, world="9FD3F7", world_strength=1.0)
@@ -1154,8 +1289,15 @@ def build_scene():
     def note(name, ob):
         stats[name] = ob["tris"]
 
-    natural_island()                            # décor naturel (nature.py), pas de briques
-    natural_dressing()
+    if style == "studs":
+        import studs as S
+
+        for vox in (studs_island(), studs_cliff()):
+            S.apply(voxel_to_blender(vox, (0, 0, 0), voxel=G1))   # gros blocs à tenons
+        studs_dressing()
+    else:
+        natural_island()                        # décor naturel (nature.py), pas de briques
+        natural_dressing()
     note("head", put(stone_head(), (0, -40, 0), 180, G2))
     note("swirl", put(portal_swirl(), (0, -40, 0), 180, G2, strength=1.1))
     for name, (x, y, r, n) in PADS.items():
@@ -1314,10 +1456,10 @@ VIEWS = {  # nom : (position caméra, cible, focale, résolution)
 }
 
 
-def render_views(outdir, names=None):
+def render_views(outdir, names=None, style="nature"):
     import build as B
 
-    sc, stats = build_scene()
+    sc, stats = build_scene(style)
     os.makedirs(outdir, exist_ok=True)
     for name in names or VIEWS:
         loc, target, lens, res = VIEWS[name]
@@ -1332,5 +1474,7 @@ def render_views(outdir, names=None):
 
 if __name__ == "__main__":
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+    style = "studs" if "--studs" in argv else "nature"
+    argv = [a for a in argv if a != "--studs"]
     out = os.path.abspath(argv[0]) if argv else os.path.join(HERE, "review", "lobby")
-    print(render_views(out, argv[1:] or None))
+    print(render_views(out, argv[1:] or None, style))

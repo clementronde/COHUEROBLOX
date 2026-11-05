@@ -289,8 +289,46 @@ def board_lobby_bricks():
     im.save(os.path.join(HERE, "06-lobby-nature-briques.png"), optimize=True)
 
 
+def board_lobby_compare():
+    """Planche 7 : les deux pistes côte à côte (rendus de assets/voxel/lobby.py, styles nature et studs)."""
+    rv = os.path.join(ROOT, "assets", "voxel", "review")
+    W, H = 2400, 2510
+    im, d = canvas(W, H)
+    header(d, "Deux pistes : mélange ou tout en tenons",
+           "Même lobby, même plan, même lumière. Seul le décor change. Maquettes Blender du 5 nov. 2026.", W)
+    colw = (W - 180) // 2
+    for k, (key, title, sub) in enumerate((
+            ("lobby_nature", "A. Carte naturelle + interactions en briques",
+             "Herbe et arbres lisses et peints ; briques seulement sur ce qui sert"),
+            ("lobby_studs", "B. Tout en tenons, formes naturelles (recommandé)",
+             "Décor en gros blocs à tenons (Parts + Resurface) ; interactions en petites briques"))):
+        x = 60 + k * (colw + 60)
+        d.text((x, 200), title, font=H2, fill=INK)
+        d.text((x, 246), sub, font=SMALL, fill=MUTED)
+        paste_fit(im, os.path.join(rv, key, "lobby_arrival.png"), (x, 290, x + colw, 290 + colw * 9 // 16), align="left")
+        y2 = 300 + colw * 9 // 16
+        paste_fit(im, os.path.join(rv, key, "lobby_overview.png"), (x, y2, x + colw, y2 + colw * 10 // 16), align="left")
+    y = 300 + colw * 9 // 16 + colw * 10 // 16 + 30
+    d.text((60, y), "B de près : décor en gros blocs, interactions en briques fines", font=H2, fill=INK)
+    for k, view in enumerate(("lobby_east", "lobby_portal")):
+        x = 60 + k * (colw + 60)
+        paste_fit(im, os.path.join(rv, "lobby_studs", view + ".png"), (x, y + 55, x + colw, y + 55 + colw * 9 // 16),
+                  align="left")
+    y += 55 + colw * 9 // 16 + 30
+    d.text((60, y), "Pourquoi B", font=H2, fill=INK)
+    text = ("Une seule matière pour tout le jeu, donc un vrai style · le naturel vient des formes : falaises en "
+            "blocs décalés, sapins en plaques inclinées, terrasses, eau · se construit vite dans Studio avec des "
+            "Parts et Resurface, sans maille ni téléversement · on reconnaît ce qui sert à son échelle (petites "
+            "briques fines) et à sa couleur, pas à sa matière. À surveiller : la horde sur un sol à tenons "
+            "(sol aux tons calmes, ennemis saturés aux gros yeux, capture à 20 studs dès le premier test).")
+    wrap(d, (60, y + 50), text, BODY, INK, W - 120)
+    im.save(os.path.join(HERE, "07-pistes-melange-ou-tenons.png"), optimize=True)
+
+
 if __name__ == "__main__":
-    if sys.argv[1:] == ["lobby"]:
+    if sys.argv[1:] == ["compare"]:
+        board_lobby_compare()
+    elif sys.argv[1:] == ["lobby"]:
         board_lobby_bricks()
     else:
         board_palette()

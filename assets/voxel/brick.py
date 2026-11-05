@@ -28,6 +28,9 @@ SEGMENTS = 10      # côtés d'un tenon
 # Réglages par modèle (nom du Vox) : longueur maxi des briques, couleurs sans tenons (dalles lisses)
 OPTIONS: dict[str, dict] = {}
 
+# Tenons en texture (comme Resurface en jeu) plutôt qu'en géométrie : voir studs.py
+STUD_TEXTURE = False
+
 
 def _h(*a) -> float:
     n = 2166136261
@@ -94,7 +97,7 @@ def mesh_lists(vox, origin, voxel: float = VOXEL):
         faces += [(b, b + 3, b + 2, b + 1), (b + 4, b + 5, b + 6, b + 7), (b, b + 1, b + 5, b + 4),
                   (b + 1, b + 2, b + 6, b + 5), (b + 2, b + 3, b + 7, b + 6), (b + 3, b, b + 4, b + 7)]
         vcols += [c] * 8
-        for (sx, sy, _) in studs:
+        for (sx, sy, _) in ([] if STUD_TEXTURE else studs):
             cx, cy = (sx + 0.5 - o[0]) * voxel, (sy + 0.5 - o[1]) * voxel
             r, h = STUD_R * voxel, STUD_H * voxel
             b = len(verts)
@@ -108,7 +111,7 @@ def mesh_lists(vox, origin, voxel: float = VOXEL):
                 i2 = (i + 1) % SEGMENTS
                 faces.append((b + i, b + i2, b + SEGMENTS + i2, b + SEGMENTS + i))
                 faces.append((b + SEGMENTS + i, b + SEGMENTS + i2, b + 2 * SEGMENTS))
-    return verts, faces, vcols
+    return verts, faces, vcols, o
 
 
 def brick_material():
@@ -131,7 +134,7 @@ def brick_material():
 def to_blender(vox, origin="bottom", name: str | None = None, collection=None, voxel: float = VOXEL):
     import bpy
 
-    verts, faces, vcols = mesh_lists(vox, origin, voxel)
+    verts, faces, vcols, o = mesh_lists(vox, origin, voxel)
     name = name or vox.name
     me = bpy.data.meshes.new(name)
     me.from_pydata(verts, [], faces)
@@ -140,7 +143,12 @@ def to_blender(vox, origin="bottom", name: str | None = None, collection=None, v
     attr.data.foreach_set("color_srgb", [v for c in vcols for v in c])   # tons de palette en sRGB
     me.color_attributes.active_color = attr
     me.color_attributes.render_color_index = me.color_attributes.find("Color")
-    me.materials.append(brick_material())
+    if STUD_TEXTURE:
+        import studs
+
+        me.materials.append(studs.stud_material(1.0 / voxel, tuple(v % 1.0 for v in o)))
+    else:
+        me.materials.append(brick_material())
     ob = bpy.data.objects.new(name, me)
     (collection or bpy.context.scene.collection).objects.link(ob)
     mod = ob.modifiers.new("Joints", "BEVEL")
