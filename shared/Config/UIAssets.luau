@@ -7,6 +7,7 @@
 local UIAssets = {}
 
 UIAssets.Studs = "rbxassetid://127104067904758" -- 128 px tile, 2 x 2 studs, shown at 12 px per stud (TileSize 24 x 24)
+UIAssets.Rays = "" -- docs/dossier/ui-assets/rays_512.png, sunburst behind the level-up window (to upload)
 
 UIAssets.Icons = {
 	hp = "rbxassetid://109154522336200",
@@ -64,6 +65,8 @@ UIAssets.ById = {
 	LuckySock = "sock",
 	LunchBox = "lunchbox",
 	ChalkStick = "chalk",
+	Heal = "hp", -- level-up fallback offers
+	Coins = "coin",
 }
 
 function UIAssets.icon(key: string?): string
