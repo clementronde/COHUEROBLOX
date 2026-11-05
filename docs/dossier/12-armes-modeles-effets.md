@@ -604,3 +604,33 @@ Commités :
 - effets des ennemis : `EnemyAttackFX` est converti. Il clone `Assets.FX.Enemies.Sweep`, `Burst`, `Shot`, `Land` et `Boss`, posés par `A14_fx_install.luau`. Ces effets sont mats, à la couleur du profil de l'ennemi, avec la même interface pour `EnemyRenderer`. Restent les tirs ennemis (`EnemyRenderer`) et les télégraphes des boss (`BossRenderer`), dans des fichiers de A03, à convertir avec lui ;
 - contrôle qualité (`fwjelaa:quality-score`, seuil 8,5, relecteurs à l'aveugle).
 
+
+## 15. Effets v2 « naturels » (5 nov. 2026, concept à valider)
+
+Demande de Clément après le test en Play : « il faut que les effets soient plus naturels, plus Megabonk, là c'est trop pixel, j'aime pas l'effet ». Sa référence est la capture `.claude/refs/jeu-reference-5nov/1-run-neige.webp` : un coup d'arme en grand ruban lumineux, avec un cœur blanc, des bords doux et saturés et beaucoup de lumière.
+
+Constats sur la v1 en jeu :
+- Les anneaux et disques Neon plats et le croissant en 9 segments donnent un rendu dur.
+- Les étoiles de la texture `sparkles_main` ont des bords nets.
+- Les pièces en pixels qui volent (flèches, dagues) accentuent le côté pixel.
+- La texture « Glow » de la v1 (`forcefield_glow_main`) n'est qu'un anneau très pâle. La vraie lueur ronde de Roblox est `explosion01_implosion_main`.
+
+Concept v2 (planche `assets/a14/11-effets-v2-concept.jpg`, script `assets/a14/concept_fx2.py`) :
+- Il est rendu à la vraie caméra du jeu : Distance 32, Pitch 42, FocusAhead 5, FOV 70.
+- Il n'utilise que ce que Roblox affiche sans téléversement : les textures de particules intégrées (lueur ronde, boule de feu, fumée, onde de choc) et des Beams et Trails à bords doux en FaceCamera.
+- Les textures sont copiées depuis le client Roblox local dans `out/rbxtex`, qui n'est pas versionné.
+
+Les effets du concept :
+- **Épée :** trois Beams courbes (halo, bord bleu ciel, cœur blanc). Variante A : croissant dressé incliné de 25° vers la caméra. Variante B : ruban couché dans le sens de la frappe.
+- **Éclair :** segments fins et fourchus, cœur blanc et halo peu opaque.
+- **Feu :** boules de feu (`explosion01_core_main`) et onde de choc au sol, sans rouge. L'alerte est faite de deux anneaux dorés, dont l'un se resserre, sans disque plein.
+- **Glace :** anneau creux cyan avec étincelles bleutées.
+- **Projectiles rapides :** traits de lumière à tête blanche, une couleur par arme.
+- **Bloom :** il faut un Bloom dans Lighting (Intensity 0,6, Threshold 0,95). C'est une Contract request à A01.
+
+Trois relectures à l'aveugle ont noté 6,5, puis 7,2, puis 7,0 sur 10, avant les dernières corrections (glace, alerte, flammes, variantes d'épée). La note de 8,5 ne pourra se vérifier qu'en Play avec le Bloom de Roblox.
+
+À décider par Clément :
+- la variante d'épée ;
+- les pièces en vol : lumière pour tout, ou pixel pour les objets (bombe, boomerang, haches, lames) ;
+- le créneau Studio pour reconstruire `Assets.FX` et adapter `WeaponFX`.
