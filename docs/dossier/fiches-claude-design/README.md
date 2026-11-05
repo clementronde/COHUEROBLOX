@@ -4,6 +4,40 @@ Clément fait les modèles lui-même avec Claude Design. A03 écrit une fiche pr
 
 **Style retenu par Clément le 5 nov. 2026 : celui de son fantôme** (« On va refaire tous les models dans le style de ce ghost »). Il remplace les tenons de la planche concept d'A03 ; la planche ne sert plus que de référence pour les formes et les gags.
 
+## Où Clément range les modèles
+
+Dans `C:\Users\Charment\COHUE\assets\claude-design\<NomDeContrat>\`, un dossier par modèle, avec tout ce que Claude Design donne :
+- le `.glb` ;
+- le `README.md` de handoff ;
+- le script `*Controller.server.lua`.
+
+A03 y lit les fichiers directement : plus besoin de les envoyer. Les versions corrigées pour COHUE restent dans `assets/a03/<modèle>/`.
+
+## Zone des mobs dans COHUE
+
+`Workspace.A03_ZoneMobs`, à côté du kit d'A01, aligne les modèles de Clément déjà installés. Tous regardent vers −Z, le côté libre du sol.
+
+**Rangée des mobs** (sol `Sol`, x 398 à 486, z 762 à 788) : un socle tous les 12 studs, avec le nom sur le devant :
+- Gobelin ;
+- Zombie ;
+- Chauve-souris ;
+- Squelette ;
+- Fantôme ;
+- Gobelin cavalier ;
+- Sorcière.
+
+Les attaques à longue portée doivent tomber sur le sol, pas dans le vide :
+- le gobelin cavalier a un socle plus profond (10 studs) ;
+- le sol de la sorcière est celui de la zone, et elle vole au-dessus de son socle.
+
+**Coin des boss** (sol `Sol_Boss`, x 486 à 584, z 724 à 836) :
+- l'Ogre est en x 500 ;
+- l'Araignée géante est en x 548.
+
+Ils sont posés directement sur le sol, sans socle, avec une plaque à leur nom devant eux. Le sol opaque sert au trou de la sortie du sol de l'ogre ; les toiles et l'empalement de l'araignée tombent jusqu'à 70 studs devant elle.
+
+Pour un nouveau modèle, ajouter un socle à la suite et allonger le sol. Dans la zone, les dégâts sont à 0 sur chaque mob (`Damage`, et `Knockback`, `PoisonDps`, `PoolDps`, `WebDamage`, `SpiderlingDamage` quand ils existent), pour pouvoir les regarder de près en Play. Pour tester les dégâts, remettre les valeurs de la fiche.
+
 ## Conventions communes (celles du fantôme)
 
 | Règle | Détail |
