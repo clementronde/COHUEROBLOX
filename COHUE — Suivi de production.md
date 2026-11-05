@@ -78,7 +78,7 @@ Une chose à savoir sur « aucun ennemi max » : pour le joueur, la horde ne pla
 | A07 | VFX | Armes, impacts, KO, capture, télégraphes de boss, ambiance Overtime | Studio, fwjelaa-vfx, VFX de l'Asset Pack | 2 | À faire | À lancer |
 | A08 | UI et HUD | Maquettes Figma puis HUD de run, cartes, chrono, compteur de KO, écran de fin | Figma, Studio, fwjelaa-ui, ui-builder | 1 | En cours | a08-ui-hud |
 | A09 | Menus et lobby | Maquettes Figma puis hub 3D, choix de classe, collection, boutique, tableaux de classement | Figma, Studio, make-map | 1 | En cours | a09-menus-lobby |
-| A10 | Sound design | Musiques et sons du Creator Store, SoundController, mixage | Studio, fwjelaa-sfx | 2 | À faire | À lancer |
+| A10 | Sound design | Musiques et sons du Creator Store, SoundController, mixage | Studio, fwjelaa-sfx | 2 | En cours | Cantin (code), Clément (sons) |
 | A11 | Anti-triche et sécurité | Audit des remotes, de l'économie et des achats ; correctifs ; revue à chaque vague | anti-exploit-review, secure-remotes, agent red-team, /audit | 1 | En cours | Cantin (dev) |
 | A12 | Données, progression et monétisation | Sauvegarde, collection, quêtes, classements hebdo, boutique cosmétique, nom anglais | datastore-safety, monetization-compliance, agents revenue-modeler et market-analyst | 2 | À faire | Cantin (dev) |
 | A13 | Perf mobile et QA | Budgets de perf, plafond d'ennemis, tests, équilibrage, liste de bugs | performance-audit, debugging, agent scope-auditor | 3 | À faire | Cantin (dev) |
@@ -407,9 +407,9 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 | --- | --- | --- | --- | --- | --- |
 | A10-01 | Liste des sons et musiques, avec le style de chaque monde | Note | A01-01 | P0 — bloquant | À faire |
 | A10-02 | Recherche dans le Creator Store, chaque id noté avec sa licence | Config des sons | A10-01 | P0 — bloquant | À faire |
-| A10-03 | SoundController : pool, limite de sons simultanés, volumes | Module |  | P0 — bloquant | À faire |
-| A10-04 | Musique dynamique d'Overtime | Module | A04-02 | P1 — lancement | À faire |
-| A10-05 | Mixage et réglages de volume | Réglages | A10-03 | P1 — lancement | À faire |
+| A10-03 | SoundController : pool, limite de sons simultanés, volumes | Module |  | P0 — bloquant | Codé (branche claude/a10-son), à tester en Play |
+| A10-04 | Musique dynamique d'Overtime | Module | A04-02 | P1 — lancement | Codé (branche claude/a10-son), à tester en Play |
+| A10-05 | Mixage et réglages de volume | Réglages | A10-03 | P1 — lancement | Codé, réglages locaux ; curseurs et sauvegarde en contract request |
 
 ### A12 — Données, progression et monétisation (vague 2)
 
