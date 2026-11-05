@@ -649,7 +649,9 @@ function BossService.start()
 			return
 		end
 		acc = math.min(acc - TICK, TICK)
-		step()
+		if not Workspace:GetAttribute("RunFrozen") then -- gel coop du passage de niveau, comme EnemyService
+			step()
+		end
 		local b = boss
 		if b and (b.dirty or sendAcc >= 1 / Bosses.SendHz) then
 			b.dirty = false
