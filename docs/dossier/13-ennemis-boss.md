@@ -323,3 +323,43 @@ Modélisés : Goblin Grunt, Archer, Shaman, Bomber (v2), Zombie Runner, Polterge
    - sol calme (Leaf.d à ±4 %, sans dalles claires) ;
    - horde plus serrée autour du joueur ;
    - quelques XP, 2 tirs Tomato, 1 capturable, 2 élites.
+
+## 11. Codé le 5 nov. (A03-01, A03-04, A03-03)
+
+Branche `claude/a03-familles-comportements`. Rien n'a été testé en Play.
+
+### 11.1 Ids et gabarits attendus de Clément
+
+Chaque ennemi cherche le gabarit `asset` dans `ReplicatedStorage.Assets` (récursif), puis dans `ReplicatedStorage.EnemyVisualRigs`. S'il manque : un avertissement unique dans la sortie et un repli provisoire (bloc de la couleur de la famille, ou Parts v1 pour la faune).
+
+| Id | `name` (= espèce de capture) | Gabarit | Monde | Famille | Comportement |
+| --- | --- | --- | --- | --- | --- |
+| 21 | GoblinGrunt | `Enemy_GoblinGrunt` | 1 | Swarm | — |
+| 22 | GoblinArcher | `Enemy_GoblinArcher` | 1 | Shooter | flèche lente |
+| 4 | GoblinShaman | `Enemy_GoblinShaman` | 1 | Support | toutes les 6 s : +25 % PV et ×1,25 vitesse (3 s) aux voisins à 12 studs |
+| 23 | GoblinBomber | `Enemy_GoblinBomber` | 1 | Kamikaze | mèche 1 s à 6 studs, explosion r 5 (18), vole 6 XP par joueur touché, la moitié retombe en gemme à 12 studs |
+| 1 | GlandGrincheux | `Enemy_GlandGrincheux` | 1 | Swarm (variante 35 %) | — |
+| 2 | ChampignonSauteur | `Enemy_ChampignonSauteur` | 1 | Jumper | — |
+| 3 | HibouPlongeur | `Enemy_HibouPlongeur` | 1 | Shooter (variante 35 %) | — |
+| 5 | ZombieShambler | `Enemy_ZombieShambler` | 2 | Swarm | — |
+| 6 | ZombieRunner | `Enemy_ZombieRunner` | 2 | Jumper | le zombie en tutu (grand jeté) |
+| 7 | ZombieGravedigger | `Enemy_ZombieGravedigger` | 2 | Shooter | avance sous terre (invisible, intouchable), surgit à 9 studs (0,7 s, r 4, 12), puis lance des mottes |
+| 8 | ZombieBloater | `Enemy_ZombieBloater` | 2 | Kamikaze | mèche 0,8 s, explosion r 5 (22) ; à sa mort, nappe r 6 pendant 5 s (6/s, ralenti ×0,6) |
+| 9 | GhostWisp | `Enemy_GhostWisp` | 3 | Swarm | — |
+| 10 | GhostPoltergeist | `Enemy_GhostPoltergeist` | 3 | Shooter | 3 objets en éventail de 30° |
+| 20 | GhostBanshee | `Enemy_GhostBanshee` | 3 | Support | cri toutes les 6 s : joueurs à 12 studs ralentis ×0,6 pendant 2,5 s |
+| 11 | GhostHallMonitor | `Enemy_GhostHallMonitor` | 3 | Support (variante 35 %) | sifflet toutes les 8 s : les fantômes à 26 studs prennent sa cible et vont ×1,45 plus vite 3 s |
+| 12 | HauntedArmor | `Enemy_HauntedArmor` | 3 | Armored | armure 40 %, poids 6 (bloque les couloirs) |
+
+Mini-boss (13 à 15) et boss (16 à 19) : inchangés (A03-05 et A03-06). Le monde 2 garde l'id `DunesCroustillantes` et son mini-boss et boss v1 en attendant A02 et A03-05/06.
+
+### 11.2 Capture (A03-03, API du dossier 40 §6.1)
+
+- `Run.Capturable` : 0,4 % des apparitions après 60 s (25 % pour un mini-boss), 2 au plus en vie, PV ×2,5. `Enemies[].captureChance` remplace le taux pour une espèce.
+- Marquage au spawn seulement si `CompanionService.isSpecies(kind)` répond vrai (sinon rien n'est capturable). À la mort sous les coups : `CompanionService.onCapturableDefeated(kind, x, z, killer)`, une fois, après `Bus.EnemyKilled`.
+- Un Kamikaze capturable n'allume jamais sa mèche.
+- Le client l'apprend par le remote `EnemyCapturable (id, on)`, pas par `EnemyCodec` : le format reste à 7 octets par ennemi (les 8 bits de `flags` sont pris). Il pose l'aura et l'icône (`ArtLibrary.cloneCaptureMarker`, gabarits `FX_CaptureRing` et `FX_CaptureIcon`), poolées et déplacées dans le même `BulkMoveTo`.
+
+### 11.3 Signaux visuels provisoires
+
+Les nouveaux comportements envoient sur `EnemyAttackVisual` les modes `aim` (préparation), `aura`, `explode`, `puddle` et `land`. `EnemyAttackFX` les rend aujourd'hui avec `Burst` ou `Sweep`. Il manque dans `Assets.FX.Enemies` : un cercle de mèche (Tomato), une onde d'aura (Grape), une nappe qui dure, un trou de surgissement.

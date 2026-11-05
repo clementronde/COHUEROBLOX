@@ -64,7 +64,11 @@ type Entry = {
 	tinted: boolean,
 	faceX: number,
 	faceZ: number,
+	marker: Marker?,
 }
+
+-- Aura + icône d'une variante capturable (A03-03) : gabarits FX_CaptureRing / FX_CaptureIcon.
+type Marker = { parts: { BasePart }, offsets: { CFrame } }
 
 type Projectile = {
 	id: number,
@@ -88,6 +92,11 @@ local projectilePool: { BasePart } = {}
 local latestTick = 0
 local visibleCount = 0
 local container: Folder
+
+-- Variantes capturables (remote EnemyCapturable, A03-03 ; hors EnemyCodec pour garder 7 octets)
+local capturableIds: { [number]: boolean } = {}
+local markerPools: { [number]: { Marker } } = {}
+local markerMissing = false
 
 local moveParts: { BasePart } = {}
 local moveCFrames: { CFrame } = {}
@@ -120,6 +129,54 @@ local function newPart(shape: string, size: Vector3, color: Color3, neon: boolea
 	return part
 end
 
+-- Gabarit visuel d'une espèce (Config/Enemies.asset, A03-01) : ReplicatedStorage.Assets (récursif),
+-- puis ReplicatedStorage.EnemyVisualRigs. Cherché une fois par espèce ; s'il manque, on le dit une
+-- fois et buildModel retombe sur le repli (Parts v1 ou bloc de couleur).
+local templateCache: { [number]: Instance | false } = {}
+
+local function findTemplate(kind: number): Instance?
+	local hit = templateCache[kind]
+	if hit ~= nil then
+		return if hit then hit else nil
+	end
+	local def = Enemies[kind]
+	local name = def.asset or ("Enemy_" .. def.name)
+	local found = ArtLibrary.find(name)
+	if not found then
+		local rigs = ReplicatedStorage:FindFirstChild("EnemyVisualRigs")
+		found = if rigs then rigs:FindFirstChild(name) or rigs:FindFirstChild(def.name) else nil
+	end
+	if not found then
+		warn(`[EnemyRenderer] gabarit manquant : {name} (Assets ou EnemyVisualRigs) ; repli provisoire`)
+	end
+	templateCache[kind] = found or false
+	return found
+end
+
+-- Une maille du gabarit, mise à l'échelle pour mesurer `height` studs.
+local function cloneMesh(template: Instance, height: number): BasePart?
+	local source: BasePart? = nil
+	if template:IsA("BasePart") then
+		source = template
+	elseif template:IsA("Model") then
+		source = template:FindFirstChildWhichIsA("BasePart", true)
+	end
+	if not source then
+		return nil
+	end
+	local part = source:Clone()
+	part:ClearAllChildren()
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.CastShadow = false
+	if height > 0 and part.Size.Y > 0 then
+		part.Size = part.Size * (height / part.Size.Y)
+	end
+	return part
+end
+
 local function poolKey(kind: number, lod: number, elite: boolean): number
 	return kind * 16 + lod * 2 + (if elite then 1 else 0)
 end
@@ -133,11 +190,10 @@ local function buildModel(kind: number, lod: number, elite: boolean): Model
 		table.insert(m.offsets, offset)
 		table.insert(m.colors, part.Color)
 	end
-	local assetName = "Enemy_" .. def.name
-	local template = if lod <= 2 then ArtLibrary.find(assetName) else nil
+	local template = if lod <= 2 then findTemplate(kind) else nil
 	local hasRig = template and template:IsA("Model") and template:FindFirstChildWhichIsA("Bone", true) ~= nil
-	local mesh = if lod <= 2 and not hasRig then ArtLibrary.clonePart(assetName, def.height * ART_SCALE * s) else nil
-	local source = if hasRig and template and template:IsA("Model")
+	local mesh = if template and not hasRig then cloneMesh(template, def.height * ART_SCALE * s) else nil
+	local source = if hasRig and template and template:IsA("Model") -- toutes distances : pose figée hors LOD 1 (Codex)
 		then template:FindFirstChildWhichIsA("MeshPart", true) else nil
 	if source and template then
 		local part = source:Clone()
@@ -200,7 +256,50 @@ local function acquire(kind: number, lod: number, elite: boolean): Model
 	return m or buildModel(kind, lod, elite)
 end
 
+local function acquireMarker(kind: number, elite: boolean): Marker?
+	if markerMissing then
+		return nil
+	end
+	local pool = markerPools[poolKey(kind, 1, elite)]
+	local reused = pool and table.remove(pool)
+	if reused then
+		return reused
+	end
+	local def = Enemies[kind]
+	local s = if elite then Run.EliteSizeMult else 1
+	local parts, offsets = ArtLibrary.cloneCaptureMarker(def.height * ART_SCALE * s, def.radius * s * 1.6)
+	if not parts or not offsets then
+		markerMissing = true
+		warn("[EnemyRenderer] gabarits FX_CaptureRing / FX_CaptureIcon manquants : variantes capturables sans aura")
+		return nil
+	end
+	for _, part in parts do
+		part.CFrame = HIDDEN
+		part.Parent = container
+	end
+	return { parts = parts, offsets = offsets }
+end
+
+local function releaseMarker(e: Entry)
+	local mk = e.marker
+	if not mk then
+		return
+	end
+	e.marker = nil
+	for _, part in mk.parts do
+		part.CFrame = HIDDEN
+	end
+	local key = poolKey(e.kind, 1, e.elite)
+	local pool = markerPools[key]
+	if not pool then
+		pool = {}
+		markerPools[key] = pool
+	end
+	table.insert(pool, mk)
+end
+
 local function release(e: Entry)
+	releaseMarker(e)
 	local m = e.model
 	for k, part in m.parts do
 		part.CFrame = HIDDEN -- moving is cheaper than reparenting
@@ -499,6 +598,20 @@ local function render(dt: number)
 			moveParts[n] = part
 			moveCFrames[n] = if hidden then HIDDEN else (if k == m.groundIndex then base else modelBase) * m.offsets[k]
 		end
+		local wantsMarker = capturableIds[id] == true and e.lod <= 2
+		if wantsMarker and not e.marker then
+			e.marker = acquireMarker(e.kind, e.elite)
+		elseif not wantsMarker and e.marker then
+			releaseMarker(e)
+		end
+		local mk = e.marker
+		if mk then
+			for k, part in mk.parts do
+				n += 1
+				moveParts[n] = part
+				moveCFrames[n] = if hidden then HIDDEN else base * mk.offsets[k]
+			end
+		end
 		if not hidden then
 			drawn += 1
 		end
@@ -544,6 +657,11 @@ function EnemyRenderer.start()
 	Net.unreliable("EnemySnapshot").OnClientEvent:Connect(onSnapshot)
 	Net.unreliable("EnemyAttackVisual").OnClientEvent:Connect(onAttackVisual)
 	Net.event("EnemyProjectiles").OnClientEvent:Connect(onProjectiles)
+	Net.event("EnemyCapturable").OnClientEvent:Connect(function(id: unknown, on: unknown)
+		if type(id) == "number" then
+			capturableIds[id] = if on == true then true else nil
+		end
+	end)
 	RunService.PreRender:Connect(render)
 end
 
