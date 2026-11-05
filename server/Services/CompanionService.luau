@@ -108,6 +108,7 @@ type Attempt = {
 	lockUntil: number,
 	sentState: string,
 	sentProgress: number,
+	sentAt: number, -- os.clock du dernier envoi de CaptureState
 }
 
 local CompanionService = {}
@@ -122,6 +123,7 @@ local extraArea: { number } = {}
 local cages: { Cage } = {}
 local attempts: { [Player]: Attempt } = {}
 local capturesThisRun: { [Player]: number } = {}
+local runCaptured: { [Player]: { string } } = {} -- espèces capturées pendant la run (RunSummary.captured)
 local hitFlag: { [Player]: boolean } = {}
 local memory: { [Player]: { order: { string }, owned: { [string]: number } } } = {} -- repli sans A12
 local speciesKind: { [string]: number } = {}
@@ -851,6 +853,7 @@ local function sendCapture(player: Player, a: Attempt, state: string, progress: 
 	end
 	a.sentState = state
 	a.sentProgress = rounded
+	a.sentAt = os.clock()
 	local payload: { [string]: any } = { state = state, progress = progress, holdSeconds = holdSecondsFor(player) }
 	if extra then
 		for k, v in extra do
@@ -863,7 +866,7 @@ end
 local function attemptOf(player: Player): Attempt
 	local a = attempts[player]
 	if not a then
-		a = { cageId = nil, held = 0, strikes = 0, lockUntil = 0, sentState = "Idle", sentProgress = 0 }
+		a = { cageId = nil, held = 0, strikes = 0, lockUntil = 0, sentState = "Idle", sentProgress = 0, sentAt = 0 }
 		attempts[player] = a
 	end
 	return a
@@ -965,6 +968,9 @@ local function grant(player: Player, cage: Cage, a: Attempt)
 			return
 		end
 		sendCapture(player, a, "Captured", 1, { name = name, isNew = isNew })
+		local list = runCaptured[player] or {}
+		runCaptured[player] = list
+		table.insert(list, species)
 		if result == "Granted" then
 			recordStat(player, Companions.QuestKeys.Captured, 1)
 			if isNew then
@@ -1005,11 +1011,13 @@ local function stepCapture(now: number, frozen: boolean)
 		local a = attemptOf(player)
 		local root = ownerRoot(player)
 		local inCage: Cage? = nil
+		local near: Cage? = nil
 		if root and #cages > 0 then
 			local p = root.Position
 			local okF, feet = try(run, "getDamageFeetY", player)
 			local feetY = if okF and type(feet) == "number" then feet else p.Y - 3
 			local bestD2 = CAP.Radius * CAP.Radius
+			local nearD2 = CAP.AvailableRadius * CAP.AvailableRadius
 			for _, cage in cages do
 				if not cage.done[player] then
 					local dx, dz = p.X - cage.x, p.Z - cage.z
@@ -1018,6 +1026,10 @@ local function stepCapture(now: number, frozen: boolean)
 						bestD2 = d2
 						inCage = cage
 					end
+					if d2 <= nearD2 then
+						nearD2 = d2
+						near = cage
+					end
 				end
 			end
 		end
@@ -1025,8 +1037,13 @@ local function stepCapture(now: number, frozen: boolean)
 			if a.cageId then
 				a.cageId, a.held = nil, 0
 			end
-			if a.sentState == "Capturing" then
-				sendCapture(player, a, "Idle", 0)
+			-- « Available » : une cage à capturer est proche (bouton Capture du HUD, sans panneau).
+			-- Interrupted / Captured / Refused restent affichés StickySeconds avant de céder la place.
+			local sticky = (a.sentState == "Interrupted" or a.sentState == "Captured" or a.sentState == "Refused")
+				and now - a.sentAt < CAP.StickySeconds
+			local wanted = if near and phaseOk and (capturesThisRun[player] or 0) < CAP.MaxPerRun then "Available" else "Idle"
+			if not sticky and a.sentState ~= wanted then
+				sendCapture(player, a, wanted, 0, if near then { name = (near :: Cage).name } else nil)
 			end
 			continue
 		end
@@ -1303,6 +1320,11 @@ function CompanionService.getCages(): { { id: number, species: string, x: number
 	return out
 end
 
+-- RunManager (RunSummary.captured) : espèces capturées par ce joueur pendant la run, dans l'ordre.
+function CompanionService.getRunCaptures(player: Player): { string }
+	return table.clone(runCaptured[player] or {})
+end
+
 -- RunManager : joueur qui arrive en cours de run.
 function CompanionService.ensure(player: Player)
 	if player.Parent and not owners[player] then
@@ -1349,6 +1371,7 @@ function CompanionService.init()
 		simTime = 0
 		debugKills = 0
 		table.clear(capturesThisRun)
+		table.clear(runCaptured)
 		table.clear(attempts)
 		table.clear(hitFlag)
 		clearCages()
@@ -1432,6 +1455,7 @@ function CompanionService.init()
 		removeOwner(player)
 		attempts[player] = nil
 		capturesThisRun[player] = nil
+		runCaptured[player] = nil
 		hitFlag[player] = nil
 		memory[player] = nil
 		for _, cage in cages do

@@ -202,12 +202,13 @@ Et CompanionService appelle chez A12 : `grantCapture`, `getCompanionLoadout` (se
 | `ensure(player)` | RunManager | Arrivée en cours de run |
 | `chargeUltimate(player, n)` | autels, objets | Gardé pour le contrat ; sans effet (pas d'Ultime) |
 | `getCages() -> {{ id, species, x, z, expiresAt }}` | Minimap (A08) | Cages vivantes |
+| `getRunCaptures(player) -> { string }` | RunManager (`RunSummary.captured`) | Espèces capturées pendant la run, dans l'ordre |
 
 ## 7. Remotes (`shared/NetDefs/Companion.luau`)
 
 | Remote | Sens | Payload |
 | --- | --- | --- |
-| `CaptureState` | serveur → le joueur qui capture | `{ state = "Idle" \| "Capturing" \| "Interrupted" \| "Captured" \| "Refused", progress: 0..1, holdSeconds: number, name: LocalizedText?, isNew: boolean?, reason: string? }` — forme déjà lue par `CaptureUI` (A08). Au plus 10/s, envoyé seulement quand l'état ou la barre (au 1/10) change. `reason` (Refused) : `"Cap"` (5 captures) ou `"Unavailable"` (profil non modifiable) |
+| `CaptureState` | serveur → le joueur qui capture | `{ state = "Idle" | "Available" | "Capturing" | "Interrupted" | "Captured" | "Refused", \| "Capturing" \| "Interrupted" \| "Captured" \| "Refused", progress: 0..1, holdSeconds: number, name: LocalizedText?, isNew: boolean?, reason: string? }` — forme déjà lue par `CaptureUI` (A08). Au plus 10/s, envoyé seulement quand l'état ou la barre (au 1/10) change. `reason` (Refused) : `"Cap"` (5 captures) ou `"Unavailable"` (profil non modifiable). `Available` (5 nov.) : une cage à capturer à moins de `Capture.AvailableRadius = 18` studs, hors de la cage (bouton Capture du HUD, sans panneau). `Interrupted`, `Captured` et `Refused` restent au moins `StickySeconds = 1,5` s avant de céder la place à `Available` ou `Idle` hors de la cage |
 | `CageState` | serveur → tous | `{ cages = {{ id, species, kind, x, y, z, expiresIn, done = { userId } }} }` — à chaque création, capture ou disparition |
 | `CompanionState` (existant) | serveur → propriétaire | `{ line, stage = 1, level, name, ultimateCharge = 0, stunned, techs = {}, companions = {{ species, name, slot }} }` |
 | `CompanionSnapshot` (existant, non fiable) | serveur → tous | 10 Hz. En-tête 5 octets (`tick u32`, `count u8`) + 25 octets par compagnon : `userId f64`, `slot u8`, `kind u8`, `x/y/z i16` au 1/4 de stud, `yaw u8`, `flags u8` (bit 0 sonné), `evSeq u8`, `evKind u8`, `evX/evZ i16`, `evRadius u8`. 35 compagnons par paquet ≤ 900 octets |
@@ -241,6 +242,7 @@ La cage clignote (transparence) pendant ses 3 dernières secondes. Le compagnon 
 | A12 (`ProgressionService`) | `grantCapture`, `getCompanionLoadout`, `hasCompanion`, `profile.companions`, `SelectLoadout` à 2 compagnons, payload `Profile`, clés de quêtes (sections 3 et 9) |
 | A08 (`CaptureUI`) | Gérer l'état `Refused` (`reason = "Cap"` : « Collection full for this run », `"Unavailable"` : « Can't save right now ») et `isNew` (« NEW! ») ; le bouton Capture mobile n'envoie rien |
 | A08 (`Minimap`) | Les cages via le remote `CageState` ou `CompanionService.getCages` |
+| Ironix (combat, `RunManager`) | `RunSummary.captured = CompanionService.getRunCaptures(player)` (demandé par `60-ui-ux.md`) |
 | Lead (`ARCHITECTURE.md` §3, §4, §6) | Remplacer les lignées par « espèce = `Enemies[].name` », ajouter les APIs de 6.1 et 6.2 et les remotes de la section 7 |
 
 ## 11. Questions pour Clément
