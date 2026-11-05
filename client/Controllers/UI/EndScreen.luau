@@ -194,6 +194,9 @@ local function render()
 	rewards.Quests.frame.Visible = quests > 0
 	UITheme.setText(rewards.Quests.text, S.QuestSteps, { n = quests })
 	rewardsHeader.Visible = rewards.Silver.frame.Visible or rewards.Captured.frame.Visible or rewards.Quests.frame.Visible
+	if playBtn.label then
+		UITheme.setText(playBtn.label, if s.returnToLobby then S.Lobby else S.Replay)
+	end
 	lobbyBtn.root.Visible = lobbyRemote() ~= nil
 end
 
