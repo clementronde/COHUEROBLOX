@@ -209,7 +209,9 @@ Liste des 8 classes (tuiles 4 × 2), fiche : arme de départ, passif, mouvement.
 - il y pose l'équipement de la classe choisie avec `ArtLibrary.equipClassTier(clone, classId, palier)` (A01), sur le clone seulement : rien ne change côté serveur tant que le joueur n'a pas touché EQUIP ;
 - par défaut, le palier 3 (niveau 30, tout l'équipement) ; trois boutons « Lv 10 / Lv 20 / Lv 30 » montrent l'équipement qui grandit ;
 - l'avatar tourne lentement (fixe si mouvement réduit) ; le joueur peut le faire tourner au doigt ;
-- le chapeau et les cheveux du joueur sont masqués si le réglage « Keep my hat » est sur OFF, comme en run. Classe verrouillée : silhouette grise avec cadenas (jamais sur l'avatar du joueur), texte de la quête, barre de progression, « See quest ». Skins de classe dans l'onglet « Style », prix sur chaque article, jamais de stat.
+- le chapeau et les cheveux du joueur sont masqués si le réglage « Keep my hat » est sur OFF, comme en run.
+
+Maquette : image provisoire (rendu A01 du Knight au niveau 30 sur mannequin). La capture de l'avatar de Clément équipé se fera dans Studio quand COHUE sera libre (A08 y monte l'UI v3). Classe verrouillée : silhouette grise avec cadenas (jamais sur l'avatar du joueur), texte de la quête, barre de progression, « See quest ». Skins de classe dans l'onglet « Style », prix sur chaque article, jamais de stat.
 
 ### 6.3 Critters
 
