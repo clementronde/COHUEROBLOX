@@ -520,4 +520,4 @@ Planche : `assets/a14/09-armes-effets-concept.jpg`, dans la DA du 5 nov. (2e ver
 
 Une première version « tout en tenons » a été abandonnée après le changement de DA. Ses relectures à l'aveugle ont laissé des règles qu'on garde : un sens par couleur et par forme au sol, des effets plus grands que nécessaire sur téléphone, le danger ennemi testé dans la horde.
 
-En attente : validation de Clément (porte 2).
+**Validée par Clément le 5 nov. 2026** (« Oui, valide »). Suite : étape 3, les 16 armes, leurs 16 fusions et les pièces en jeu dans ce style.
