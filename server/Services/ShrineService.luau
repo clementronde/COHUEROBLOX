@@ -7,6 +7,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
@@ -649,7 +650,8 @@ end
 
 local function step()
 	local now = os.clock()
-	if isRunning() then
+	-- Gel coop du passage de niveau (RunManager) : la charge des autels s'arrête.
+	if isRunning() and not Workspace:GetAttribute("RunFrozen") then
 		chargeStep(now)
 	end
 	expireOffers(now)

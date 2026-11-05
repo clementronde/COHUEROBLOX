@@ -8,6 +8,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
@@ -754,7 +755,9 @@ end
 
 local function step()
 	simTick += 1
-	if isRunning() then
+	-- Gel coop du passage de niveau (RunManager) : aimant, ramassage, coffres et marchand s'arrêtent ;
+	-- les clients reçoivent toujours l'état.
+	if isRunning() and not Workspace:GetAttribute("RunFrozen") then
 		gatherPositions()
 		pickupStep()
 		awardXp()
@@ -834,7 +837,7 @@ local function sendMerchantOffer(player: Player)
 end
 
 local function onInteract(player: Player, id: any)
-	if not validId(id) or not isRunning() or not isActive(player) then
+	if not validId(id) or not isRunning() or not isActive(player) or Workspace:GetAttribute("RunFrozen") then
 		return
 	end
 	local e = all[id]
