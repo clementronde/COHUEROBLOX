@@ -350,8 +350,8 @@ def view_horde(out, kind, fused=True):
         bpy.context.scene.collection.objects.link(gem)
         gem.data.materials.append(A14._solid_glow(cv.PALETTE["Sky"], 2.2))
         gem.location = (player[0] + math.cos(a) * rr, player[1] - 3 + math.sin(a) * rr, 0.45)
-    for (sx, sy) in ((-5.0, -6.0), (6.0, -7.0)):
-        enemy_shot((player[0] + sx * 0.45, player[1] + sy * 0.45, 2.2), (-sx, -sy, 0))
+    for (sx, sy) in ((-5.5, -1.5), (5.0, -2.5)):                  # dans l'espace vide, à côté du joueur
+        enemy_shot((player[0] + sx, player[1] + sy, 2.0), (-sx, -sy, 0))
     game_camera(sc, player)
     A14.render(sc, out, res=(1600, 900), samples=48)
 

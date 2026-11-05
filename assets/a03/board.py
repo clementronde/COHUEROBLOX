@@ -76,8 +76,8 @@ def main():
     d.text((60, y), "En noir, de face et de profil, à 64 px (taille réelle)", font=NAME, fill=C.INK)
     y += 60
     x = 60
-    for key, name in (("goblin_grunt", "T, grandes oreilles"), ("zombie_runner", "Γ, bras tendus"),
-                      ("ghost_poltergeist", "cloche, sans pieds"), ("boss_hungry_coffin", "cercueil sur mains")):
+    for key, name in (("goblin_grunt", "Grunt : T, oreilles"), ("zombie_runner", "Runner : Γ, bras"),
+                      ("ghost_poltergeist", "Poltergeist : cloche"), ("boss_hungry_coffin", "Coffin : cercueil")):
         d.rounded_rectangle((x, y, x + 545, y + 170), radius=20, fill=(255, 250, 240))
         front, side = silhouette(key, 64), silhouette(key + "_side", 64)
         im.paste(front, (x + 36, y + 100 - front.height), front)
@@ -100,7 +100,7 @@ def main():
     y = section(d, y, "3. Les 4 gobelins d'A01, refaits dans la DA actuelle")
     box = C.paste_fit(im, r("a03_goblins.png"), (60, y, W - 60, y + 855))
     y = labels_under(d, box, [("Grunt", "mêlée : cocotte, louche", 0.165),
-                              ("Archer", "tireur : capuche à pointe, arc", 0.42),
+                              ("Archer", "tireur : capuche à plume, arc", 0.42),
                               ("Shaman", "soutien : théière violette", 0.635),
                               ("Bomber", "kamikaze : bonnet orange, bombe", 0.835)])
     box = C.paste_fit(im, r("a03_compare.png"), (360, y, W - 360, y + 630))
@@ -132,8 +132,8 @@ def main():
                TEXT, C.INK, W - 120) + 30
     box = C.paste_fit(im, r("a03_horde_w23.png"), (60, y, 60 + cw, y + ch))
     C.wrap(d, (box[2] + 40, y + 10),
-           "Mondes 2 et 3 sur leurs sols. À gauche, 30 Zombie Runners (peau grise) sur l'herbe sombre du "
-           "cimetière ; à droite, 30 Poltergeists sur le bitume de la cour, près d'une marelle crème.",
+           "Mondes 2 et 3 sur leurs sols. À gauche, 30 Poltergeists sur le bitume de la cour, près d'une "
+           "marelle crème ; à droite, 30 Zombie Runners (peau grise) sur l'herbe sombre du cimetière.",
            TEXT, C.INK, W - box[2] - 100)
     y = box[3] + 40
     d.text((60, y), "À la taille d'un écran de téléphone (640 px de large, sans agrandissement) :", font=NAME,
@@ -153,14 +153,15 @@ def main():
     rules = [
         ("Horde : briques de 0,25 stud, une maille fusionnée par ennemi (moins de 800 triangles), tenons en "
          "texture (Resurface en jeu). Mini-boss et boss : briques de 0,5.", "Lime"),
-        ("Gros yeux lisses sur une MeshPart à part, sans tenons : blancs à pupille Ink ; ovales Ink à reflet "
-         "blanc sur les fantômes (un oeil blanc disparaît sur le corps crème).", "Ink"),
+        ("Gros yeux lisses sur une MeshPart à part, sans tenons : blancs à pupille Ink ; cerclés d'Ink sur "
+         "les fantômes, pour qu'ils se détachent du corps crème.", "Ink"),
         ("La famille se lit à la silhouette (T, Γ, cloche), le rôle à la couleur et à la forme du dessus : "
          "rouge mêlée et sauteur, vert tireur, violet soutien, orange kamikaze.", "Tomato"),
         ("Un gag par ennemi, montré par un objet : cocotte et louche, théière, tutu et chaussons, pile de "
          "livres, serviette et couverts.", "Grape"),
-        ("Écart au guide DA à valider : peau des zombies grise (Stone.d) au lieu de Sky.d. En bleu, le zombie "
-         "rappelait un monstre bleu connu ; en vert, un dinosaure connu.", "Stone"),
+        ("Écarts au guide DA à valider : peau des zombies grise (Stone.d) au lieu de Sky.d (en bleu, le zombie "
+         "rappelait un monstre bleu connu ; en vert, un dinosaure connu) ; théière violette du Shaman au lieu du "
+         "champignon (le chapeau-champignon à pois rappelait un personnage connu).", "Stone"),
         ("Pas de Neon sur un ennemi ordinaire : il est réservé aux élites (or), à la capture (rose) et aux "
          "effets.", "Gold"),
     ]

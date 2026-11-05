@@ -296,30 +296,35 @@ Les ids d'ennemis utilisés par le serveur (`Worlds.roster`, `Bosses.kind`, `sum
 
 ---
 
-## 10. Étape 2 : planche concept (en cours, porte 2 pas encore présentée)
+## 10. Étape 2 : planche concept (porte 2 présentée à Clément)
 
-Planche : `assets/a03/01-ennemis-boss-concept.jpg`. Sources : `assets/a03/creatures.py` (modèles sur grille), `assets/a03/concept.py` (rendus Blender 5.2 en ligne de commande), `assets/a03/board.py` (montage).
+Planche : `assets/a03/01-ennemis-boss-concept.jpg`. Sources :
+- `assets/a03/creatures.py` : les modèles sur grille ;
+- `assets/a03/concept.py` : les rendus Blender 5.2 en ligne de commande ;
+- `assets/a03/board.py` : le montage.
 
-Modélisés : Goblin Grunt, Archer, Shaman, Bomber (v2), Zombie Runner, Poltergeist, The Hungry Coffin. La horde est rendue en maille fusionnée du jeu (technique B) : 694 à 760 triangles par ennemi, plus les yeux. En briques chanfreinées, un ennemi en coûte environ 3 500 à 4 200.
+Modélisés : Goblin Grunt, Archer, Shaman et Bomber (v2), Zombie Runner, Poltergeist et The Hungry Coffin. La horde est rendue en maille fusionnée du jeu (technique B) : environ 700 triangles par ennemi, plus les yeux. En briques chanfreinées, un ennemi en coûterait 3 500 à 4 900.
 
 **Relectures à l'aveugle** (2 relecteurs par tour, seuil 8,5) :
-- tour 1 : 7,2 et 6 ;
-- tour 2 : 7,1 et 7,0.
 
-**À corriger au tour 3** (convergence des relecteurs du tour 2) :
-1. **Ressemblances avec des licences** :
-   - chapeau-champignon à pois du Shaman (un personnage Nintendo connu) : le remplacer par une théière violette, dans la lignée de la cocotte du Grunt ;
-   - tête brune du boss à sourcils noirs (idem) ;
-   - zombie bleu aux yeux globuleux (« Blue » de Rainbow Friends, un jeu Roblox connu) : peau vert éteint Leaf.d (à valider par Clément, le guide dit Sky.d), rendu de trois-quarts pour montrer le Γ.
-2. **Boss** : cercueil en bois clair (tons de Leather), hexagonal à sommet plat, liseré Leather.dd. Le haut du couvercle est soulevé : dans le noir, deux gros yeux blancs, des dents sur les bords, une langue Tomato. Pas de sourcils, poignées Steel, pas de Gold, serviette Cream à carreaux Tomato 2 × 2, mains Leaf.d. 5 couleurs principales au plus.
-3. **Grunt** :
-   - cocotte haute de 4 briques, bouton 2 × 2, anses à mi-hauteur collées aux parois ;
-   - louche en bois avec un cuilleron rond 4 × 4 : plus d'acier qui scintille comme de l'XP ;
-   - bouche ouverte sur 2 rangées, intérieur Plum.dd et dents : plus de moustache sous le nez.
-4. **Archer** : capuche Leaf.d (guide §6), pointe qui tombe dans le dos. Le brun se confondait avec l'orange du Bomber.
-5. **Bomber** : retirer le sac d'XP, qui se lit comme un cupcake.
-6. **Poltergeist** : pile de 3 livres décalés d'une brique, tranches Cream, dos visibles ; bouche Ink.
-7. **Test de horde** :
-   - sol calme (Leaf.d à ±4 %, sans dalles claires) ;
-   - horde plus serrée autour du joueur ;
-   - quelques XP, 2 tirs Tomato, 1 capturable, 2 élites.
+| Tour | Notes | Moyenne | Ce qui a changé ensuite |
+| --- | --- | --- | --- |
+| 1 | 7,2 et 6 | 6,6 | cocotte sans bord crème, 3 gobelins v2 de plus, test de horde du monde 1 avec les 4 rôles |
+| 2 | 7,1 et 7,0 | 7,05 | ressemblances retirées (chapeau-champignon, tête brune à sourcils, zombie bleu), Grunt sans moustache, sol calme |
+| 3 | 7,6 et 7,5 | 7,55 | zombie gris, yeux blancs cerclés pour le fantôme, cercueil à bouche noire, capturable et tirs visibles, test des mondes 2 et 3 |
+| 4 | 8,4 et 7,6 | 8,0 | corrections légères : plume crème de l'Archer, livres verts, théière redessinée, légendes corrigées |
+
+Le coordinateur a demandé de présenter la planche après ce tour, même sous 8,5.
+
+**Points encore ouverts** (relecteur le plus sévère du tour 4) :
+- le zombie se lit encore mal comme zombie (« un rat ou un pigeon en tutu ») ;
+- le cercueil se lit comme un coffre piégé ;
+- la louche et la théière restent difficiles à lire.
+
+Ces trois points se règlent à l'étape 3, modèle par modèle, avec un contrôle qualité à 8,5 (étape 5).
+
+**Écarts au guide DA, à valider par Clément** :
+- peau des zombies grise (Stone.d) au lieu de Sky.d : en bleu, le zombie rappelait un monstre bleu connu, et en vert, un dinosaure connu ;
+- théière violette pour le Shaman au lieu du champignon : le chapeau-champignon à pois rappelait un personnage connu ;
+- yeux blancs cerclés d'Ink sur les fantômes, au lieu d'yeux Ink : deux yeux noirs faisaient une tache sombre, et de loin le fantôme passait pour un mouton ;
+- couleur du sauteur : Tomato, comme la mêlée.

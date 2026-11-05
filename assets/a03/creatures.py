@@ -113,9 +113,9 @@ def goblin_grunt():
     v.box(-8, -5, -1, 0, 4, 5, "Lime")             # bras tendu sur le côté
     v.box(-10, -9, -2, -1, 3, 6, "Lime.d")         # main
     v.box(-12, -11, -2, -1, 2, 12, "Steel.d")      # manche droit
-    v.ell(-11.5, -1.5, 15.0, 2.6, 2.6, 2.6, "Steel", zmin=13, zmax=16)   # cuilleron rond
-    v.carve(-13, -10, -3, 0, 16, 16)               # creux
-    v.box(-13, -10, -3, 0, 15, 15, "Steel.d")
+    v.ell(-11.5, -1.5, 15.0, 3.2, 3.2, 2.6, "Steel.l", zmin=13, zmax=16)  # cuilleron rond de 6 x 6
+    v.carve(-14, -9, -4, 1, 16, 16)                # creux
+    v.box(-14, -9, -4, 1, 15, 15, "Steel.dd")
     return v, "bottom", {"kind": "enemy", "cell": 0.25, "eyes": GOBLIN_EYES, "label": "Goblin Grunt",
                          "role": "Mêlée · monde 1"}
 
@@ -131,6 +131,8 @@ def goblin_archer():
     v.box(-5, 4, -4, -4, 13, 13, "Leather")        # bord de la capuche
     v.box(-2, 1, -1, 2, 15, 15, "Leaf.dd")         # pointe dressée
     v.box(-1, 0, 0, 1, 16, 17, "Leaf.dd")
+    v.box(0, 1, 1, 2, 17, 19, "Cream")             # plume crème plantée dans la capuche : lisible sur l'herbe
+    v.box(1, 2, 2, 2, 19, 20, "Cream")
     v.box(-1, 0, 4, 4, 9, 13, "Leaf.dd")           # queue qui tombe dans le dos
     v.box(-1, 0, 5, 5, 6, 9, "Leaf.dd")
     # Grand arc tenu de côté (+X), tourné vers la caméra : une parenthèse qui sort de la silhouette
@@ -152,16 +154,18 @@ def goblin_shaman():
     v = goblin_base("Enemy_GoblinShaman", "Grape", belt="Gold", legs=False)
     v.box(-3, 2, -2, 1, 0, 2, "Grape")             # robe jusqu'au sol, évasée
     v.box(-4, 3, -3, 2, 0, 0, "Grape.d")
-    # Théière violette en guise de chapeau (soutien) : panse ronde, couvercle, bec et anse
-    v.ell(0, -0.5, 13.0, 5.0, 4.3, 3.0, "Grape", zmin=13, zmax=15)
-    v.box(-2, 1, -2, 1, 16, 16, "Grape.l")         # couvercle
-    v.box(-1, 0, -1, 0, 17, 17, "Grape.d")         # bouton
-    v.box(5, 6, -2, -1, 14, 14, "Grape")           # bec vers l'avant et le côté
-    v.box(7, 8, -3, -2, 15, 15, "Grape")
-    v.box(8, 9, -3, -2, 16, 16, "Grape.d")
-    v.box(-6, -6, -1, 0, 13, 13, "Grape.d")        # anse, collée à la panse
-    v.box(-6, -6, -1, 0, 15, 15, "Grape.d")
-    v.box(-8, -7, -1, 0, 13, 15, "Grape.d")
+    # Théière violette en guise de chapeau (soutien) : panse ronde, couvercle à bouton, bec et anse détachés.
+    # Écart au guide DA (§6 : « champignon magique violet ») : le chapeau-champignon à pois rappelait un
+    # personnage connu (relecture du 5 nov.)
+    v.ell(0, -0.5, 13.0, 4.8, 4.2, 3.6, "Grape", zmin=13, zmax=16)
+    v.box(-2, 1, -2, 1, 17, 17, "Grape.d")         # couvercle
+    v.box(-1, 0, -1, 0, 18, 18, "Cream")           # bouton
+    v.box(5, 6, -1, 0, 14, 14, "Grape")            # bec qui monte vers l'avant
+    v.box(7, 7, -1, 0, 15, 15, "Grape")
+    v.box(8, 8, -1, 0, 16, 16, "Grape")
+    v.box(-6, -6, -1, 0, 14, 14, "Grape.d")        # anse en boucle
+    v.box(-6, -6, -1, 0, 16, 16, "Grape.d")
+    v.box(-8, -7, -1, 0, 14, 16, "Grape.d")
     # Bâton de berger en bois, la crosse enroulée vers l'extérieur (main droite, -X)
     v.box(-9, -6, -2, -1, 4, 5, "Lime")            # bras tendu
     v.box(-11, -10, -3, -2, 0, 13, "Bark")
@@ -270,11 +274,9 @@ def ghost_poltergeist():
     v.box(5, 7, -1, 0, 4, 5, body)
     v.box(-7, -6, -1, 0, 4, 6, body)
     v.box(-8, -7, -1, 0, 7, 8, body)
-    _book(v, 8, 15, -3, 2, 2, "Plum")
-    _book(v, 9, 16, -3, 2, 4, "Royal.d")
-    _book(v, 8, 15, -3, 2, 6, "Leaf.dd")                          # le dessus est vert sombre (tireur)
-    for z in (3, 5, 7):
-        v.box(8, 8, -3, 2, z, z, "Gold")                          # filets dorés sur les dos
+    _book(v, 8, 15, -3, 2, 2, "Leaf.dd")                          # livres verts (couleur du rôle tireur)
+    _book(v, 9, 16, -3, 2, 4, "Leaf.d")
+    _book(v, 8, 15, -3, 2, 6, "Leaf.dd")
     # Yeux blancs cerclés d'Ink à pupille Ink (deux yeux noirs faisaient une tache sombre : un mouton de loin)
     eyes = [eye(-1.9, None, 8.6, 0.46, look=(0.15, -0.1), p=0.42, d=0.35, sz=1.25, rim=True),
             eye(1.9, None, 8.6, 0.46, look=(-0.15, -0.1), p=0.42, d=0.35, sz=1.25, rim=True)]
