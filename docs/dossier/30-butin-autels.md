@@ -176,6 +176,8 @@ Sons : à ajouter plus tard (aucun id d'asset inventé).
 
 Deltas (apparitions, ramassages, ouvertures) envoyés à 10 Hz quand il y en a, **état complet toutes les 1 s** dans 160 studs (les paquets non fiables peuvent se perdre : le complet répare). Coffres instanciés : un joueur ne reçoit que ses propres coffres.
 
+**PERF-09 (A12 v3)** : l'état complet est capturé en une fois (tous ses paquets portent le même tick), puis part à raison d'**un paquet par tick et par joueur** (`LootService.drainFull`) : 400 gemmes + 160 pièces = 5 paquets en 0,5 s au lieu de 5 d'un coup, qui se perdaient ensemble sur un réseau mobile. Un envoi pas fini est remplacé par le suivant (le client garde le plus récent) et abandonné au nettoyage du monde. Côté client (`LootRenderer`), un enregistrement complet plus ancien que le delta qui a retiré l'objet (`goneAt`) est ignoré : un paquet en retard ne fait pas réapparaître un objet ramassé.
+
 ## 9. Politique « objets aléatoires payants » (vérifiée vault, oct. 2026)
 Un objet aléatoire payant = tout résultat aléatoire obtenu **directement ou indirectement avec des Robux**, y compris via une monnaie achetable en Robux. Les récompenses aléatoires gagnées sans Robux ni monnaie payante sont **exemptées**.
 Coffres payants, marchand et Distributeur farceur coûtent des **pièces de run gagnées en jouant** et remises à zéro à chaque run : ils sont exemptés **tant que** cette règle tient :
