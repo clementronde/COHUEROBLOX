@@ -104,6 +104,7 @@ local state = {
 	firstReplayAt = nil :: number?,
 	firstReadyAt = nil :: number?, -- premier PLAY au lobby (départ Run.Lobby.StartDelay s après)
 	waitForLobbyPlay = false,
+	soloRun = false, -- run lancée en Solo (MatchService) : pas de retardataire
 	frozenAt = nil :: number?, -- gel du passage de niveau en cours depuis (os.clock)
 	stateDirty = true,
 	firstJoinAt = nil :: number?,
@@ -716,6 +717,16 @@ local function lobbyMode(): boolean
 	return not Run.UseLobbyPlace
 end
 
+-- Groupe choisi au lobby (MatchService, MatchMode) : "Solo" part seul ; sinon "Party" / "Public".
+local function isSolo(player: Player): boolean
+	local match = find("MatchService")
+	if not match or not match.getMode then
+		return false
+	end
+	local ok, mode = safe(match.getMode, player)
+	return ok and mode == "Solo"
+end
+
 -- Équipement de la classe choisie, palier 1, porté au lobby (65-lobby §10).
 local function applyLobbyClass(r: PlayerRun)
 	local progression = find("ProgressionService")
@@ -777,8 +788,9 @@ local function finishPlayer(r: PlayerRun, summary: Types.RunSummary)
 	end
 end
 
-local function startRun(players: { Player })
+local function startRun(players: { Player }, solo: boolean?)
 	state.runId += 1
+	state.soloRun = solo == true
 	-- v2 : la run part toujours du monde 1 de Run.WorldChain (la sélection v1 monde/tier est ignorée).
 	state.worldId = worldIdFor(1)
 	local lobby = lobbyConfig()
@@ -1379,6 +1391,12 @@ local function stepRun(dt: number)
 			local ready = {}
 			for _, player in players do
 				if getRecord(player).ready then
+					-- Solo : part seul tout de suite (le client a déjà fait son décompte de 3 s) ;
+					-- les autres prêts attendent la run suivante.
+					if isSolo(player) then
+						startRun({ player }, true)
+						return
+					end
 					table.insert(ready, player)
 				end
 			end
@@ -1949,7 +1967,15 @@ local function onReady(player: Player)
 	-- Late joiner: enter the running run at the stage spawn. Un joueur parti en Cash out (ou qui
 	-- attend son retour au lobby) attend la run suivante.
 	local running = state.phase ~= "Loadout" and state.phase ~= "Ended"
-	if not r.inRun and running and r.finishedRunId ~= state.runId and r.lobbyAt == nil then
+	-- Run Solo en cours, ou joueur qui a choisi Solo : pas d'entrée en retardataire, il attend la suivante.
+	if
+		not r.inRun
+		and running
+		and r.finishedRunId ~= state.runId
+		and r.lobbyAt == nil
+		and not state.soloRun
+		and not isSolo(player)
+	then
 		initPlayerForRun(r)
 		teleport(player, spawnPointFor(#runPlayers))
 		state.stateDirty = true

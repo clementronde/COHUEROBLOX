@@ -165,6 +165,7 @@ Serveur → client sauf « C→S ». (U) = `UnreliableRemoteEvent`, paquets ≤ 
 | EggHatched | NetDefs/Data | `{ line?, tokens? }` |
 | Leaderboards | NetDefs/Data | `{ [boardKey]: {{ userId, value }} }` |
 | MatchRequest (C→S) / MatchState | NetDefs/Data | `(worldId, tier)` / `{ state, reason? }` |
+| MatchMode (C→S) | NetDefs/Data | `("Solo" \| "Party" \| "Public")`, avant `SelectLoadout`. Solo part seul, sans retardataire ; défaut Party |
 | DataNotice | NetDefs/Data | `{ kind, text, questId? }` |
 
 Le détail de chaque payload est dans le dossier du domaine (20 §7, 30 §8, 40 §7, 50, 70 §16).

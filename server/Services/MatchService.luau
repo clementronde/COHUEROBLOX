@@ -453,12 +453,35 @@ function MatchService.isActive(): boolean
 end
 
 ---------------------------------------------------------------------------------------------------
+-- Groupes Solo / Party (place unique, 65-lobby §2.2 et §10 demande 2)
+---------------------------------------------------------------------------------------------------
+-- Le client envoie MatchMode(mode) avant SelectLoadout. RunManager lit getMode au départ :
+-- Solo part seul (et personne ne le rejoint en retardataire) ; Party et Public gardent le
+-- regroupement de Run.Lobby.StartDelay s. Sans MatchMode reçu : "Party" (comportement d'avant).
+local MODES = { Solo = true, Party = true, Public = true }
+local modes: { [Player]: string } = {}
+
+local function onMatchMode(player: Player, mode: any)
+	if type(mode) == "string" and MODES[mode] then
+		modes[player] = mode
+	end
+end
+
+function MatchService.getMode(player: Player): string
+	return modes[player] or "Party"
+end
+
+---------------------------------------------------------------------------------------------------
 -- Lifecycle
 ---------------------------------------------------------------------------------------------------
 function MatchService.init()
 	active = readUseLobbyPlace()
 	-- The remote handler is always wired (Net requires handlers before publish); it no-ops when inactive.
 	Net.onServerEvent("MatchRequest", 1, onMatchRequest)
+	Net.onServerEvent("MatchMode", 4, onMatchMode)
+	Players.PlayerRemoving:Connect(function(player)
+		modes[player] = nil
+	end)
 	if not active then
 		return
 	end
