@@ -13,9 +13,14 @@ séparée en jeu, sans tenons). Un oeil = dict(c=(x, y, z) en cellules, r=rayon 
 look=(dx, dz) direction de la pupille, p=rayon de la pupille relatif, ink=True pour un oeil noir à reflet
 blanc (fantômes : un oeil blanc disparaîtrait sur le corps crème), sz=étirement vertical, lid=paupière).
 
-Relecture à l'aveugle du 5 nov. (7,2 et 6 sur 10) : le Grunt faisait lutin de Noël (bord crème), le zombie
-cyclope, le fantôme crâne, le boss totem. Corrigé ici : cocotte à lèvre Tomato.d, zombie en Γ à deux yeux
-inégaux, fantôme en cloche à bas ondulé et yeux ovales, cercueil à couvercle débordant entrouvert.
+Relectures à l'aveugle du 5 nov. :
+- tour 1 (7,2 et 6) : Grunt en lutin de Noël, zombie cyclope, fantôme crâne, boss totem ;
+- tour 2 (7,1 et 7,0) : ressemblances avec des personnages connus (chapeau-champignon à pois du Shaman, tête
+  brune à sourcils noirs du boss, zombie bleu aux yeux globuleux), « moustache » du Grunt, Archer brun confondu
+  avec le Bomber orange, chapeaux tous plats, sac d'XP en cupcake, livres en sandwich.
+Tour 3 (ce fichier) : cocotte haute à couvercle et louche en bois, bouche ouverte à dents ; capuche verte à
+pointe ; théière violette ; zombie vert éteint ; trois livres décalés ; cercueil en bois clair dont le couvercle
+soulevé laisse voir deux yeux dans le noir.
 """
 
 from __future__ import annotations
@@ -53,7 +58,8 @@ def front_y(v: Vox, x: float, z: float) -> float:
 # =============================================================================================
 # Monde 1 : les gobelins, refaits en briques (formes et gags de la v1 d'A01 gardés, tête plus grosse,
 # yeux ronds). Silhouette en T : grandes oreilles horizontales. Peau Lime ; le dessus de la tête porte la
-# couleur du rôle (la caméra est haute) : rouge mêlée, brun tireur, violet soutien, orange kamikaze.
+# couleur du rôle (la caméra est haute) : rouge mêlée, vert tireur, violet soutien, orange kamikaze, chacun
+# avec une forme de chapeau différente vue de dessus (cocotte, capuche à pointe, théière, bonnet à lunettes).
 
 
 def goblin_base(name: str, tunic: str, belt: str = "Bark", legs: bool = True) -> Vox:
@@ -76,46 +82,56 @@ def goblin_base(name: str, tunic: str, belt: str = "Bark", legs: bool = True) ->
     v.box(5, 6, -1, 0, 9, 11, skin)
     v.box(7, 8, -1, 0, 10, 11, skin)
     v.box(5, 6, -1, -1, 10, 10, skin + ".d")       # creux de l'oreille
-    # Visage : sourcils froncés au-dessus des yeux ronds, gros nez, bouche à une dent
+    # Visage : sourcils froncés, gros nez entre les yeux, bouche ouverte sur deux rangées (pas une barre
+    # noire sous le nez : elle faisait moustache)
     v.box(1, 3, -4, -4, 12, 12, skin + ".d")
     v.set(1, -4, 11, skin + ".d")                  # bout intérieur du sourcil, plus bas : l'air fâché
-    v.box(0, 0, -5, -4, 8, 9, skin)                # gros nez (2 x 2 après le miroir)
-    v.box(0, 2, -3, -3, 7, 7, "Ink")               # bouche
+    v.box(0, 0, -5, -4, 9, 10, skin)               # gros nez (2 x 2 après le miroir)
+    v.box(0, 1, -3, -3, 7, 8, "Plum.dd")           # bouche ouverte
     v.mirror_x()
-    v.set(0, -3, 7, "Cream")                       # une seule dent (asymétrie voulue)
+    v.set(-2, -3, 8, "Cream")                      # deux dents du haut, de travers
+    v.set(1, -3, 8, "Cream")
+    v.box(-1, 0, -3, -3, 7, 7, "Tomato.d")         # langue
     return v
 
 
-GOBLIN_EYES = [eye(2.4, -3, 10.2, 0.44, look=(-0.4, -0.2)), eye(-2.4, -3, 10.2, 0.44, look=(0.4, -0.2))]
+GOBLIN_EYES = [eye(2.6, -3, 10.5, 0.42, look=(-0.4, -0.2)), eye(-2.6, -3, 10.5, 0.42, look=(0.4, -0.2))]
 
 
 def goblin_grunt():
     v = goblin_base("Enemy_GoblinGrunt", "Tomato")
-    # Cocotte retournée en casque : parois droites Tomato, lèvre Tomato.d, anses en acier
-    v.box(-6, 5, -4, 3, 13, 13, "Tomato.d")        # lèvre (le bord de la cocotte, posé sur la tête)
-    v.box(-5, 4, -3, 2, 14, 15, "Tomato")
-    v.box(-8, -7, -1, 0, 14, 15, "Steel")          # anses 2 x 2
-    v.box(6, 7, -1, 0, 14, 15, "Steel")
-    # Louche en bois brandie (main droite, -X) : manche épais de 2, cuilleron creux de 4 x 4
-    for dx in (0, -1):
-        for dy in (0, 1):
-            v.line((-5 + dx, -2 + dy, 3), (-10 + dx, -2 + dy, 12), "Bark")
-    v.box(-14, -11, -4, -1, 12, 13, "Steel")
-    v.carve(-13, -12, -3, -2, 13, 13)
-    v.box(-13, -12, -3, -2, 12, 12, "Steel.d")
+    # Cocotte posée sur la tête, couvercle et bouton : parois Tomato, rebord Tomato.d, anses Ink à mi-hauteur
+    v.box(-5, 4, -3, 2, 13, 15, "Tomato")
+    v.box(-6, 5, -4, 3, 15, 15, "Tomato.d")        # rebord
+    v.box(-4, 3, -2, 1, 16, 16, "Tomato.l")        # couvercle
+    v.box(-1, 0, -1, 0, 17, 17, "Ink")             # bouton 2 x 2
+    v.box(5, 6, -1, 0, 13, 14, "Ink")              # anses, collées aux parois
+    v.box(-7, -6, -1, 0, 13, 14, "Ink")
+    # Louche en bois tenue droite (main droite, -X) : le manche monte, se recourbe vers l'extérieur, et le
+    # cuilleron rond pend au bout (vue de face, une forme en crosse : ni marteau ni arc)
+    v.box(-8, -5, -1, 0, 4, 5, "Lime")             # bras tendu sur le côté
+    v.box(-10, -9, -2, -1, 3, 6, "Lime.d")         # main
+    v.box(-12, -11, -2, -1, 2, 14, "Bark")         # manche droit
+    v.box(-14, -13, -2, -1, 15, 16, "Bark")        # crosse
+    v.box(-12, -11, -2, -1, 15, 15, "Bark")
+    v.ell(-15.5, -1.0, 12.0, 2.6, 2.6, 2.4, "Leather", zmin=10, zmax=14)   # cuilleron rond, sous la crosse
+    v.carve(-17, -14, -3, 1, 14, 14)               # creux du cuilleron
+    v.box(-17, -14, -3, 0, 13, 13, "Leather.d")
     return v, "bottom", {"kind": "enemy", "cell": 0.25, "eyes": GOBLIN_EYES, "label": "Goblin Grunt",
                          "role": "Mêlée · monde 1"}
 
 
 def goblin_archer():
-    v = goblin_base("Enemy_GoblinArcher", "Leaf.d")
-    # Capuche brune (tireur) : le dessus et le dos de la tête, les oreilles passent dessous
-    v.box(-5, 4, -3, 2, 13, 14, "Leather")
-    v.box(-5, 4, 3, 3, 8, 13, "Leather")
-    v.box(-6, -6, -3, 2, 12, 13, "Leather")
-    v.box(5, 5, -3, 2, 12, 13, "Leather")
-    v.box(-5, 4, -4, -4, 13, 13, "Leather.d")      # bord de la capuche
-    v.box(-1, 0, 1, 2, 15, 16, "Leather")          # pointe
+    v = goblin_base("Enemy_GoblinArcher", "Leather")
+    # Capuche verte (tireur) : le dessus et le dos de la tête, pointe qui tombe dans le dos
+    v.box(-5, 4, -3, 2, 13, 14, "Leaf.d")
+    v.box(-5, 4, 3, 3, 8, 13, "Leaf.d")
+    v.box(-6, -6, -3, 2, 12, 13, "Leaf.d")
+    v.box(5, 5, -3, 2, 12, 13, "Leaf.d")
+    v.box(-5, 4, -4, -4, 13, 13, "Leaf.dd")        # bord de la capuche
+    v.box(-1, 0, 4, 4, 9, 13, "Leaf.d")            # pointe qui tombe dans le dos
+    v.box(-1, 0, 5, 5, 6, 9, "Leaf.d")
+    v.box(-1, 0, 6, 6, 5, 6, "Leaf.dd")
     # Grand arc tenu de côté (+X), tourné vers la caméra : une parenthèse qui sort de la silhouette
     for z in range(1, 17):
         x = 7 + round(2.2 * math.sin(math.pi * (z - 1) / 15))
@@ -135,87 +151,100 @@ def goblin_shaman():
     v = goblin_base("Enemy_GoblinShaman", "Grape", belt="Gold", legs=False)
     v.box(-3, 2, -2, 1, 0, 2, "Grape")             # robe jusqu'au sol, évasée
     v.box(-4, 3, -3, 2, 0, 0, "Grape.d")
-    # Chapeau-champignon violet à pois crème (rôle soutien) : large, il se lit de haut
-    v.box(-7, 6, -5, 4, 13, 13, "Grape.d")
-    v.box(-6, 5, -4, 3, 14, 14, "Grape")
-    v.box(-4, 3, -3, 2, 15, 15, "Grape")
-    for (x, y, z) in ((-6, -3, 14), (4, -2, 14), (-1, 0, 15), (1, 1, 15), (-4, 1, 15)):
-        v.box(x, x + 1, y, y + 1, z, z, "Cream")
-    # Bâton noueux (main droite, -X) surmonté d'un gland (clin d'oeil à la faune de la forêt)
-    v.box(-6, -5, -3, -2, 0, 14, "Bark")
-    v.box(-7, -4, -4, -1, 15, 15, "Leather.d")
-    v.box(-7, -4, -4, -1, 16, 17, "Leather")
+    # Théière violette en guise de chapeau (soutien) : panse ronde, couvercle, bec et anse
+    v.ell(0, -0.5, 13.0, 5.0, 4.3, 3.0, "Grape", zmin=13, zmax=15)
+    v.box(-2, 1, -2, 1, 16, 16, "Grape.l")         # couvercle
+    v.box(-1, 0, -1, 0, 17, 17, "Grape.d")         # bouton
+    v.box(5, 6, -2, -1, 14, 14, "Grape")           # bec vers l'avant et le côté
+    v.box(7, 8, -3, -2, 15, 15, "Grape")
+    v.box(8, 9, -3, -2, 16, 16, "Grape.d")
+    v.box(-6, -6, -1, 0, 13, 13, "Grape.d")        # anse, collée à la panse
+    v.box(-6, -6, -1, 0, 15, 15, "Grape.d")
+    v.box(-8, -7, -1, 0, 13, 15, "Grape.d")
+    # Bâton de berger en bois, la crosse enroulée vers l'extérieur (main droite, -X)
+    v.box(-9, -6, -2, -1, 4, 5, "Lime")            # bras tendu
+    v.box(-11, -10, -3, -2, 0, 13, "Bark")
+    v.box(-13, -12, -3, -2, 14, 15, "Bark")
+    v.box(-11, -10, -3, -2, 14, 14, "Bark")
+    v.box(-15, -14, -3, -2, 11, 14, "Bark")
     return v, "bottom", {"kind": "enemy", "cell": 0.25, "eyes": GOBLIN_EYES, "label": "Goblin Shaman",
                          "role": "Soutien · monde 1"}
 
 
 def goblin_bomber():
     v = goblin_base("Enemy_GoblinBomber", "Ember")
-    # Bonnet d'aviateur orange (kamikaze), lunettes remontées sur le front
+    # Bonnet d'aviateur orange (kamikaze), lunettes noires remontées sur le front
     v.box(-5, 4, -3, 2, 13, 14, "Ember")
     v.box(-5, 4, -4, -4, 13, 13, "Ember.d")
-    v.box(-4, -2, -5, -5, 13, 14, "Steel")
-    v.box(1, 3, -5, -5, 13, 14, "Steel")
-    v.box(-3, -2, -6, -6, 13, 14, "Steel.l")
-    v.box(1, 2, -6, -6, 13, 14, "Steel.l")
+    v.box(-4, -1, -5, -5, 13, 14, "Bark.d")
+    v.box(0, 3, -5, -5, 13, 14, "Bark.d")
+    v.box(-3, -2, -6, -6, 13, 14, "Ink")
+    v.box(1, 2, -6, -6, 13, 14, "Ink")
+    v.box(-6, -6, -1, 0, 10, 12, "Ember.d")        # rabats sur les oreilles
+    v.box(5, 5, -1, 0, 10, 12, "Ember.d")
     # Grosse bombe tenue à bout de bras (main droite, -X) : un gros rond noir hors de la silhouette
     v.ell(-10, -1, 6.5, 3.4, 3.2, 3.4, "Ink", zmin=3)
     v.paint_if(lambda x, y, z, c: c == "Ink" and z == 6, "Steel.d")
     v.box(-11, -10, -2, -1, 10, 10, "Steel")       # bouchon
     v.box(-11, -10, -2, -1, 11, 12, "Bark")        # mèche
     v.box(-11, -10, -3, -2, 13, 14, "Gold")        # étincelle
-    # Sac d'XP volée dans la main gauche (le gag : il vole ton XP)
-    v.box(4, 6, -3, -1, 1, 3, "Leather")
-    v.box(4, 6, -3, -1, 4, 4, "Sky")
     return v, "bottom", {"kind": "enemy", "cell": 0.25, "eyes": GOBLIN_EYES, "label": "Goblin Bomber",
                          "role": "Kamikaze · monde 1"}
 
 
 # =============================================================================================
-# Monde 2 : Zombie Runner, la ballerine. Silhouette en Γ : buste penché, tête basse en avant, bras tendus
-# à l'horizontale. Peau Sky.dd mate, haillons Plum. Noeud Tomato sur le dessus : il frappe au contact.
+# Monde 2 : Zombie Runner, la ballerine. Silhouette en Γ : buste voûté, tête basse et en avant, bras tendus à
+# l'horizontale, genoux pliés. Peau vert éteint (Leaf.d), haillons Plum. Noeud Tomato sur le dessus.
 
 
 def zombie_runner():
     v = Vox("Enemy_ZombieRunner")
-    skin = "Sky.dd"
-    v.box(1, 2, -1, 0, 1, 3, skin)                 # jambes fines
+    skin = "Leaf.d"
     v.box(1, 2, -2, 0, 0, 0, "Grape.l")            # chaussons de danse
-    v.box(0, 2, -1, 1, 3, 4, "Plum")               # short
-    # Buste penché en avant, haillons Plum
+    v.box(1, 2, 0, 1, 1, 1, skin)                  # mollets en arrière
+    v.box(1, 2, -1, 0, 2, 3, skin)                 # genoux pliés en avant
+    v.box(0, 2, -1, 1, 4, 4, "Plum")               # short
+    # Buste voûté, haillons Plum déchirés
     v.box(0, 2, -1, 1, 5, 6, "Plum")
     v.box(0, 2, -2, 0, 7, 8, "Plum")
     v.box(0, 2, -3, -1, 9, 9, "Plum")
-    # Bras tendus à l'horizontale, 2 x 2, mains qui pendent
+    v.set(2, 1, 5, skin)                           # accrocs
+    v.set(1, -2, 7, skin)
+    # Bras tendus à l'horizontale, 2 x 2, sur 7 briques ; mains qui pendent
     v.box(3, 4, -2, -1, 8, 9, "Plum")
     v.box(3, 4, -9, -3, 8, 9, skin)
-    v.box(3, 4, -11, -10, 7, 9, "Sky.d")
+    v.box(3, 4, -11, -10, 7, 9, "Leaf.dd")
     v.mirror_x()
-    v.set(-1, 1, 5, skin)                          # accrocs
-    v.set(2, -2, 7, skin)
     # Tutu évasé (deux couches) : la ballerine se lit de haut et de face
     v.ell(0, -0.2, 4.5, 5.3, 4.6, 0.6, "Grape.l", zmin=4, zmax=4)
     v.ell(0, -0.2, 5.5, 4.3, 3.7, 0.6, "Grape.l", zmin=5, zmax=5)
     for (x, y) in ((5, 0), (-6, 0), (0, 4), (-1, -5), (3, -4), (-4, 3)):
         v.carve(x, x, y, y, 4, 4)
-    # Tête carrée, basse et en avant du buste (Γ de profil)
-    v.box(-4, 3, -9, -3, 10, 14, skin)
-    v.carve(3, 3, -9, -9, 14, 14)
-    v.carve(-4, -4, -9, -9, 14, 14)
-    v.box(-2, 1, -10, -10, 10, 11, "Ink")          # bouche ouverte qui gémit
+    # Tête plus petite, basse et en avant du buste (Γ de profil)
+    v.box(-3, 2, -9, -4, 10, 14, skin)
+    v.carve(2, 2, -9, -9, 14, 14)
+    v.carve(-3, -3, -9, -9, 14, 14)
+    v.box(-2, 1, -10, -10, 10, 11, "Plum.dd")      # bouche qui pend, ouverte
     v.set(1, -10, 11, "Cream")                     # une dent
+    v.box(-2, 1, -10, -10, 9, 9, skin)             # menton tombé
     # Chignon et noeud de danseuse Tomato sur le dessus
-    v.box(-1, 0, -6, -5, 15, 16, "Plum")
-    v.box(-4, -2, -6, -5, 15, 16, "Tomato")
-    v.box(1, 3, -6, -5, 15, 16, "Tomato")
-    eyes = [eye(-1.9, -9, 12.5, 0.52, look=(0.3, 0.3)),                      # gros oeil grand ouvert
-            eye(2.1, -9, 12.2, 0.38, look=(-0.3, -0.35), p=0.55, lid=0.45)]   # petit oeil mi-clos
+    v.box(-1, 0, -7, -6, 15, 16, "Plum")
+    v.box(-4, -2, -7, -6, 15, 16, "Tomato")
+    v.box(1, 3, -7, -6, 15, 16, "Tomato")
+    eyes = [eye(-1.5, -9, 12.7, 0.46, look=(0.3, 0.3)),                      # oeil grand ouvert
+            eye(1.6, -9, 12.4, 0.36, look=(-0.3, -0.35), p=0.55, lid=0.5)]    # oeil mi-clos
     return v, "bottom", {"kind": "enemy", "cell": 0.25, "eyes": eyes, "label": "Zombie Runner",
-                         "role": "Sauteur · monde 2", "skin": "Sky.dd"}
+                         "role": "Sauteur · monde 2", "skin": "Leaf.d"}
 
 
 # =============================================================================================
 # Monde 3 : Poltergeist. Dôme plein, corps en cloche, bas ondulé ; flotte à 1 stud. Lance ses livres.
+
+
+def _book(v: Vox, x0, x1, y0, y1, z, cover):
+    v.box(x0, x1, y0, y1, z, z, "Cream")                          # pages
+    v.box(x0, x0, y0, y1, z, z, cover + ".d")                     # dos du livre
+    v.box(x0, x1, y0, y1, z + 1, z + 1, cover)                    # couverture
 
 
 def ghost_poltergeist():
@@ -231,18 +260,15 @@ def ghost_poltergeist():
             if math.cos(6 * a) > -0.1:
                 v.set(x, y, 0, body + ".d")
     for (x, z) in ((-1, 4), (0, 4), (-1, 5), (0, 5)):
-        front_paint(v, x, z, "Plum")                              # petite bouche ronde
-    # Bras 2 x 2 : le gauche (+X) levé tient deux livres de classe, le droit s'agite
-    v.box(5, 6, -1, 0, 4, 7, body)
-    v.box(6, 7, -1, 0, 8, 10, body)
+        front_paint(v, x, z, "Ink")                               # petite bouche ronde (« bouh »)
+    # Bras 2 x 2 : le gauche (+X) levé porte trois livres décalés, le droit s'agite
+    v.box(5, 6, -1, 0, 4, 6, body)
+    v.box(6, 7, -1, 0, 7, 8, body)
     v.box(-7, -6, -1, 0, 4, 6, body)
     v.box(-8, -7, -1, 0, 7, 8, body)
-    v.box(2, 11, -3, 2, 11, 11, "Leaf.d")                         # livre du dessous
-    v.box(3, 10, -3, -3, 11, 11, "Cream.d")                       # tranche des pages
-    v.box(3, 10, -3, 2, 12, 12, "Cream.d")
-    v.box(2, 11, -3, 2, 13, 13, "Leather")                        # livre du dessus : brun, lisible sur l'herbe
-    v.box(3, 10, -3, -3, 13, 13, "Cream.d")
-    v.box(2, 11, -3, 2, 14, 14, "Leather")
+    _book(v, 3, 11, -3, 2, 9, "Plum")
+    _book(v, 4, 12, -3, 2, 11, "Bark")
+    _book(v, 2, 10, -3, 2, 13, "Leather")                         # le dessus est brun (tireur), lisible sur l'herbe
     eyes = [eye(-1.9, None, 8.6, 0.42, d=0.35, ink=True, sz=1.45),
             eye(1.9, None, 8.6, 0.42, d=0.35, ink=True, sz=1.45)]
     return v, "bottom", {"kind": "enemy", "cell": 0.25, "eyes": eyes, "label": "Poltergeist",
@@ -250,15 +276,15 @@ def ghost_poltergeist():
 
 
 # =============================================================================================
-# Boss du monde 2 : The Hungry Coffin. Briques de 0,5 stud. Cercueil debout sur quatre mains de zombie :
-# couvercle clair qui déborde, entrouvert en mâchoire sur une doublure capitonnée Plum ; serviette à
-# carreaux nouée, fourchette et couteau géants.
+# Boss du monde 2 : The Hungry Coffin. Briques de 0,5 stud. Cercueil en bois clair, debout sur quatre mains de
+# zombie. Le haut du couvercle est soulevé : dans le noir, deux gros yeux blancs, des dents sur les bords, une
+# langue qui pend sur la serviette à carreaux. Fourchette et couteau. Pas de visage peint sur le bois.
 
 
 def boss_hungry_coffin():
     v = Vox("Boss_HungryCoffin")
-    side, lid = "Bark.d", "Leather"
-    z0, top, shoulder = 6, 33, 25
+    side, lid, rim = "Leather.d", "Leather", "Leather.l"
+    z0, top, shoulder = 6, 33, 26
 
     def hw_at(z):
         if z <= shoulder:
@@ -268,41 +294,45 @@ def boss_hungry_coffin():
     for z in range(z0, top + 1):
         w = int(round(hw_at(z)))
         v.box(-w, w - 1, -2, 3, z, z, side)                       # caisse
-        v.box(-w - 1, w, -3, -3, z, z, lid)                       # couvercle clair qui déborde d'une brique
+        v.box(-w, w - 1, -3, -3, z, z, lid)                       # couvercle
+        v.set(-w, -3, z, rim)                                     # liseré clair du couvercle
+        v.set(w - 1, -3, z, rim)
     w = int(round(hw_at(top)))
-    v.box(-w, w - 1, -2, 3, top, top, lid)                        # le dessus de la couleur du couvercle
-    # Bouche : le couvercle s'entrouvre ; dedans, la doublure capitonnée Plum, dents carrées, langue
-    v.carve(-6, 5, -3, -1, 15, 21)
+    v.box(-w, w - 1, -3, 3, top, top, rim)                        # sommet plat
+    v.box(-3, 2, -3, -3, z0, z0, rim)                             # pied
+    # Le haut du couvercle est soulevé et avancé (mâchoire du haut) ; dessous, l'intérieur sombre
+    v.carve(-6, 5, -3, -1, 17, 28)
     for x in range(-6, 6):
-        for z in range(15, 22):
-            v.set(x, 0, z, "Plum.l" if (x // 2 + z // 2) % 2 == 0 else "Plum")
-    for x in range(-6, 6, 2):
-        v.box(x, x, -3, -2, 21, 21, "Cream")                      # dents du haut
-        v.box(x + 1, x + 1, -3, -2, 15, 15, "Cream")              # dents du bas
-    v.box(-6, 5, -4, -4, 22, 22, lid)                             # lèvre du couvercle, en avant (il s'ouvre)
-    v.box(-2, 1, -2, -1, 16, 16, "Tomato")                        # langue
-    v.box(-2, 1, -4, -3, 14, 15, "Tomato")
-    v.box(-1, 0, -5, -5, 12, 14, "Tomato.d")
-    for x in (7, -8):                                             # charnières dorées au coin de la mâchoire
-        v.box(x, x, -3, -2, 20, 22, "Gold")
-    # Sourcils Ink épais, au-dessus des yeux
-    v.box(-6, -2, -4, -4, 29, 30, "Ink")
-    v.box(1, 5, -4, -4, 29, 30, "Ink")
-    v.box(-2, -2, -4, -4, 28, 28, "Ink")
-    v.box(1, 1, -4, -4, 28, 28, "Ink")
-    # Serviette à carreaux nouée sous la mâchoire, pointes du noeud qui dépassent sur les côtés
-    for i, z in enumerate(range(7, 15)):
-        w = min(2 + i, int(round(hw_at(z))))
-        for x in range(-w, w):
-            edge = x in (-w, w - 1) or z == 14
-            v.set(x, -4, z, "Tomato" if edge else "Cream")
-    v.box(-8, -7, -2, -1, 14, 15, "Cream")
-    v.box(6, 7, -2, -1, 14, 15, "Cream")
-    # Poignées dorées 1 x 4 sur les côtés
-    for z in (11, 18):
+        for z in range(17, 29):
+            v.set(x, 0, z, "Plum.dd")                             # fond du cercueil, dans le noir
+    for z in range(17, 29):
+        v.set(-6, -1, z, "Plum.d")
+        v.set(5, -1, z, "Plum.d")
+    for z in range(29, top + 1):
         w = int(round(hw_at(z)))
-        v.box(w, w, -1, 2, z, z, "Gold")
-        v.box(-w - 1, -w - 1, -1, 2, z, z, "Gold")
+        v.carve(-w, w - 1, -3, -3, z, z)
+        v.box(-w, w - 1, -5, -4, z, z, lid)                       # couvercle soulevé, en avant
+        v.set(-w, -5, z, rim)
+        v.set(w - 1, -5, z, rim)
+    for x in range(-6, 6, 2):
+        v.box(x, x, -5, -4, 28, 28, "Cream")                      # dents du haut, sous le couvercle
+        v.box(x + 1, x + 1, -3, -2, 17, 17, "Cream")              # dents du bas, sur le bord de la caisse
+    v.box(-2, 1, -2, -1, 17, 17, "Tomato")                        # langue qui pend par-dessus le bord
+    v.box(-2, 1, -4, -3, 14, 17, "Tomato")
+    v.box(-1, 0, -5, -5, 12, 14, "Tomato.d")
+    # Serviette Cream à carreaux Tomato de 2 x 2, en pointe, nouée sous la mâchoire
+    for i, z in enumerate(range(7, 16)):
+        wn = min(1 + i, int(round(hw_at(z))))
+        for x in range(-wn, wn):
+            check = ((x + 8) // 2 + z // 2) % 2 == 0
+            v.set(x, -4, z, "Tomato" if check else "Cream")
+    v.box(-8, -7, -2, -1, 15, 16, "Cream")                        # pointes du noeud sur les côtés
+    v.box(6, 7, -2, -1, 15, 16, "Cream")
+    # Poignées Steel 1 x 4 sur les flancs
+    for z in (11, 20):
+        w = int(round(hw_at(z)))
+        v.box(w, w, -1, 2, z, z, "Steel")
+        v.box(-w - 1, -w - 1, -1, 2, z, z, "Steel")
     # Quatre mains de zombie en guise de pattes : manchette Plum, trois doigts écartés et un pouce
     for sx in (1, -1):
         for sy in (-1, 1):
@@ -312,31 +342,32 @@ def boss_hungry_coffin():
                 z = z0 - 1 - k
                 x, y = bx + sx * ((k + 1) // 2), by + sy * ((k + 1) // 2)
                 v.box(min(x, x + sx), max(x, x + sx), min(y, y + sy), max(y, y + sy), z, z,
-                      "Plum" if k < 2 else "Sky.d")
+                      "Plum" if k < 2 else "Leaf.d")
             hx, hy = bx + sx * 3, by + sy * 3
             v.box(min(hx, hx + 2 * sx), max(hx, hx + 2 * sx), min(hy, hy + 2 * sy), max(hy, hy + 2 * sy), 0, 0,
-                  "Sky.d")
+                  "Leaf.d")
             for f in (0, 2):
                 v.box(min(hx + 3 * sx, hx + 4 * sx), max(hx + 3 * sx, hx + 4 * sx), hy + sy * f, hy + sy * f, 0, 0,
-                      "Sky.d")
-            v.box(hx + sx, hx + sx, min(hy + 3 * sy, hy + 4 * sy), max(hy + 3 * sy, hy + 4 * sy), 0, 0, "Sky.d")
+                      "Leaf.d")
+            v.box(hx + sx, hx + sx, min(hy + 3 * sy, hy + 4 * sy), max(hy + 3 * sy, hy + 4 * sy), 0, 0, "Leaf.d")
     # Bras qui tiennent la fourchette (gauche, +X) et le couteau (droite, -X), manchettes Plum
-    v.box(7, 9, 0, 1, 16, 17, "Sky.d")
+    v.box(7, 9, 0, 1, 16, 17, "Leaf.d")
     v.box(7, 8, 0, 1, 16, 17, "Plum")
-    v.box(10, 11, -1, 1, 15, 18, "Sky.d")
-    v.box(-10, -8, 0, 1, 16, 17, "Sky.d")
+    v.box(10, 11, -1, 1, 15, 18, "Leaf.d")
+    v.box(-10, -8, 0, 1, 16, 17, "Leaf.d")
     v.box(-9, -8, 0, 1, 16, 17, "Plum")
-    v.box(-12, -11, -1, 1, 15, 18, "Sky.d")
+    v.box(-12, -11, -1, 1, 15, 18, "Leaf.d")
     v.box(11, 11, -2, -2, 10, 27, "Steel")
     v.box(9, 13, -2, -2, 28, 28, "Steel")
     for x in (9, 11, 13):
-        v.box(x, x, -2, -2, 29, 32, "Steel.l")
-    v.box(-12, -12, -2, -2, 11, 19, "Bark")
+        v.box(x, x, -2, -2, 29, 32, "Steel")
+    v.box(-12, -12, -2, -2, 11, 19, "Steel.d")
     v.box(-13, -11, -2, -2, 20, 20, "Steel.d")
-    v.box(-13, -12, -2, -2, 21, 30, "Steel.l")
-    v.set(-12, -2, 31, "Steel.l")
-    eyes = [eye(3.0, -3, 26.0, 1.3, look=(-0.2, -0.35), p=0.42),
-            eye(-3.0, -3, 26.0, 1.3, look=(0.2, -0.35), p=0.42)]
+    v.box(-13, -12, -2, -2, 21, 30, "Steel")
+    v.set(-12, -2, 31, "Steel")
+    # Deux gros yeux blancs qui regardent depuis le noir
+    eyes = [eye(2.9, -1.2, 23.0, 1.2, look=(-0.15, -0.4), p=0.45),
+            eye(-2.9, -1.2, 23.0, 1.2, look=(0.15, -0.4), p=0.45)]
     return v, "bottom", {"kind": "boss", "cell": 0.5, "eyes": eyes, "label": "The Hungry Coffin",
                          "role": "Boss · monde 2"}
 

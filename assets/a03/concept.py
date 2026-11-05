@@ -204,7 +204,8 @@ def place_v1(fn, loc, rot_z=0.0):
 
 def ground(sc, kind="grass", half=6, seed=0):
     rnd = random.Random(seed)
-    base = {"grass": ("Leaf.d", "Leaf"), "sand": ("Leather.l", "Cream.d"), "grave": ("Leaf.d", "Plum.l")}[kind]
+    # Sol d'arène calme (guide DA §4) : un seul ton par sol, ±3 % d'un bloc à l'autre, sans dalles claires
+    base = {"grass": ("Leaf.d", "Leaf.d"), "sand": ("Leather.l", "Leather.l"), "grave": ("Leaf.d", "Leaf.d")}[kind]
     for i in range(-half, half):
         for j in range(-half - 3, half):
             cx, cy = i * 8 + 4, j * 8 + 4
@@ -262,7 +263,7 @@ def view_lineup(out):
     S.block("Plinth", (0, 0, -0.5), (44, 20, 1), "Leaf.d", jitter=0.0)
     BD.dressed("Knight", 3, -10.0, y=1.0, rot=math.radians(-12))
     place(C.goblin_grunt, (-3.5, 0, 0), rot_z=math.radians(12))
-    place(C.zombie_runner, (3.0, 0, 0), rot_z=math.radians(-8))
+    place(C.zombie_runner, (3.0, 0, 0), rot_z=math.radians(-42))   # de trois-quarts : on voit le Γ
     place(C.ghost_poltergeist, (9.5, 0, 0), rot_z=math.radians(-14))
     B.camera(sc, (0.0, -30.0, 9.0), (0.0, 0.0, 2.6), lens=40)
     A14.render(sc, out, res=(2400, 900), samples=64)
@@ -306,11 +307,11 @@ def horde_points(n=70, player=(0.0, 6.0), seed=42):
     pts = []
     while len(pts) < n:
         a = rnd.uniform(-math.pi, math.pi)
-        rr = rnd.uniform(6.0, 34.0)
-        if rnd.random() < 0.75:                       # la plupart devant le joueur (dans le champ)
-            a = rnd.uniform(-math.pi * 0.85, -math.pi * 0.15)
+        rr = 4.5 + rnd.random() ** 1.6 * 22.0         # serrés près du joueur, plus clairsemés au loin
+        if rnd.random() < 0.85:                       # la plupart devant le joueur (dans le champ)
+            a = rnd.uniform(-math.pi * 0.9, -math.pi * 0.1)
         x, y = player[0] + math.cos(a) * rr, player[1] + math.sin(a) * rr
-        if any(math.hypot(x - p, y - q) < 2.3 for p, q in pts):
+        if any(math.hypot(x - p, y - q) < 1.9 for p, q in pts):
             continue
         pts.append((x, y))
     return pts
@@ -334,6 +335,20 @@ def view_horde(out, kind, fused=True):
         elite = k in (5, 23)
         place(kinds[k], (x, y, 0), rot_z=face + rnd.uniform(-0.3, 0.3), scale=1.3 if elite else 1.0, elite=elite,
               fused=fused)
+        if k == 11:                                   # un capturable : anneau rose au sol (Bubblegum, réservé)
+            A14.disc((x, y), 2.0, 0.07, cv.PALETTE["Bubblegum"], 2.4,
+                     [(0.0, 0.0), (0.74, 0.0), (0.8, 1.0), (0.93, 1.0), (1.0, 0.0)])
+    # Ce qui entoure la horde en jeu : XP au sol (Neon cyan), deux tirs ennemis (Tomato mat)
+    xr = random.Random(21)
+    for _ in range(14):
+        a, rr = xr.uniform(0, math.tau), xr.uniform(2.5, 9.0)
+        gem = bpy.data.objects.new("XP", A14._sphere_mesh("XP", 0.32, 4, 2))
+        bpy.context.scene.collection.objects.link(gem)
+        gem.data.materials.append(A14._solid_glow(cv.PALETTE["Sky"], 2.2))
+        gem.location = (player[0] + math.cos(a) * rr, player[1] - 3 + math.sin(a) * rr, 0.45)
+    for (sx, sy) in ((-7.0, -10.0), (8.0, -12.0)):
+        tx, ty = sx + (player[0] - sx) * 0.55, sy + (player[1] - sy) * 0.55
+        A14.enemy_shot((tx, ty, 2.0), (player[0] - sx, player[1] - sy, 0))
     game_camera(sc, player)
     A14.render(sc, out, res=(1600, 900), samples=48)
 
