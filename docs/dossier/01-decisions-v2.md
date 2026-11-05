@@ -49,7 +49,7 @@ Les classes ne sont **jamais vendues** en Robux. Les chiffres sont des points de
 - **14 Runes** (les « grimoires » de la v1, renommés) : Damage, Attack Speed, Projectiles, Area, Duration, Cooldown, Crit, Luck, Wisdom (XP), Magnet, Vitality, Armor, Agility, Cursed (plus de difficulté contre plus de butin). 4 emplacements, jusqu'à 6 en méta.
 - **40 objets** en 4 raretés (Common, Rare, Epic, Legendary), trouvés dans les coffres.
 - **Fusion** (proposée, à confirmer) : une arme au niveau 8 + une Rune précise au niveau 5 se transforme en version ultime. Exemple : Longbow + Rune Attack Speed → Storm Bow.
-- **Cartes de niveau** : 3 choix, rareté visible. En coop, pas de pause : 8 s pour choisir, joueur ralenti et invulnérable. Bannir / Passer / Relancer limités par run.
+- **Cartes de niveau** : 3 choix, rareté visible. **En coop, toute l'équipe se fige** pendant qu'un joueur choisit (réponse de Clément à A08 le 5 nov. : « Tout le monde » ; remplace l'ancienne règle « pas de pause, joueur ralenti et invulnérable »). Celui qui choisit voit un compte à rebours, les autres voient qui choisit. Délai proposé par A08 : 15 s, puis l'offre sélectionnée est prise (à valider par Clément). Plusieurs joueurs qui montent en même temps choisissent en parallèle. En solo, le jeu attend le choix. Pause côté serveur : A04 (demande dans `60-ui-ux.md`, section 0.0 bis). Bannir / Passer / Relancer limités par run.
 - **Autels** : on garde ceux de `00-vision.md` section 8.4.
 
 ## 5. Compagnons : on les bat, on les capture
