@@ -1,379 +1,390 @@
 # 65 — Lobby : hub 3D et menus (domaine A09)
 
-Statut : **plan du hub et structure des 8 écrans validés par Clément le 4 nov. 2026** (A09-02, A09-03). Écrans habillés le 4 nov. avec le design system de A08 (bibliothèque Figma publiée par Clément) : **habillage validé par Clément le 4 nov.** (A09-01). Rien n'est construit en vague 1.
-Sources : `01-decisions-v2.md` (fait foi), `00-vision.md` §5.1, §11.3, §12.1, `70-donnees-progression-monetisation.md` §13 et §15, `60-ui-ux.md`.
-Schéma : [img/65-lobby-plan.svg](img/65-lobby-plan.svg) (vue de dessus à l'échelle, 1 stud = 3 px).
+Statut : **5 nov. 2026 : le lobby passe à un bouton Play et une barre de menus** (décision de Clément, `01-decisions-v2.md` §7). Ce dossier est réécrit pour ce flux. Restent valables : les 8 écrans de menu et leur habillage (validés le 4 nov.), et les réponses du 4 nov. (§12). **Lobby jouable en cours de montage dans COHUE** (§2.3) : HUD du hub, choix du mode, menu Classes, 7 menus provisoires.
+Sources : `01-decisions-v2.md` (fait foi), `80-direction-artistique.md` (tout en tenons), `00-vision.md` §5.1, §11.3, §12.1, `70-donnees-progression-monetisation.md` §6, §8, §9, §13, §15, `60-ui-ux.md`.
 
-Le hub est un **petit village voxel compact** : on y arrive face au portail, on passe devant les 8 présentoirs de classes, et on peut lancer sa première run en **environ 40 s** (60 s dans le pire cas). Tout est à moins de 10 s de marche. Chaque station du village a aussi un bouton dans le HUD du hub : sur téléphone, marcher est un plaisir, jamais une obligation.
-
-![Plan du hub](img/65-lobby-plan.svg)
+Le lobby se pilote par l'UI. Un gros bouton **PLAY** lance une run en deux touches, et une **barre de 8 boutons** en bas de l'écran ouvre les menus. Le village est un **décor** composé par Clément avec le kit d'A01 : un bâtiment par menu, avec son nom en grandes lettres de briques, et entrer dans un bâtiment ouvre le même menu. Une première run démarre en **25 à 35 s**.
 
 ---
 
-## 1. Brief du monde
+## 0. Ce qui change le 5 nov.
+
+| Sujet | Avant (4 nov.) | Maintenant (5 nov.) |
+| --- | --- | --- |
+| Lancer une run | Marcher jusqu'aux 3 pads du portail | Bouton **PLAY** → Solo / Friends / Public → START |
+| Ouvrir un menu | Stations du village + colonne de boutons à droite | **Barre de 8 boutons en bas** ; entrer dans le bâtiment ouvre le même menu |
+| Le village | Plan à coordonnées, construit par A09 | **Décor composé par Clément** avec le kit d'A01 ; un bâtiment par menu |
+| Choisir une classe | Présentoirs de la Hero Row | Menu **Classes** (bouton ou bâtiment CLASSES) |
+| Style | Voxel | **Tout en tenons** (piste B, `80-direction-artistique.md`) |
+
+Ce qui ne change pas : 8 joueurs par serveur de lobby, Solo mis en avant pour la 1re run, file publique entre joueurs du même serveur, enclos privé, classes verrouillées au cadenas seul, boutique et pass 100 % cosmétiques.
+
+Le plan du 4 nov. ([img/65-lobby-plan.svg](img/65-lobby-plan.svg)) est remplacé : il reste une source d'idées (place compacte, portail visible dès l'arrivée, enclos, podium), pas une carte à construire.
+
+---
+
+## 1. Brief
 
 | Champ | Valeur |
 | --- | --- |
-| Nom (jeu) | **Hubbub Village** (« cohue » en anglais), nom de travail validé par Clément en attendant le nom du jeu |
-| Fantasme | Un village voxel joyeux et un peu absurde, là où les héros se préparent avant d'aller taper la horde |
-| Jeu, dans l'ordre | arrivée → choisir une classe → portail → run ; au retour : compagnons, boutique, quêtes, classements |
-| Cible | mobile d'abord, 9-15 ans ; **8 joueurs max par serveur de lobby** (décision de Clément, 4 nov.), donc 2 groupes complets au plus |
-| Échelle | R15 par défaut, WalkSpeed 16 (100 studs = 6 s), pas de saut de précision, aucune marche > 1 stud |
-| Style | voxel, palette vive (guide de style A01, `80-direction-artistique.md`, en cours) |
-| Ambiance | lumière de jour chaude, effet diorama (bloom léger, profondeur de champ douce) : réglage final A02/A07 |
-| Héros (repère) | le **Portail** : arche voxel de 44 studs, au nord, vue dès l'arrivée (15° de champ à 160 studs) |
-| Quartiers | 8 zones, §3 |
-| Chemins | avenue de 24 studs, chemins secondaires de 16 studs, plus clairs et plus lisses que le sol |
-| Pas ça | pas de cercles lumineux « reste ici » au sol ; pas de panneaux bavards ; pas de vitrine qui bloque un passage ; pas de pop-up d'achat |
-| Budget | ≤ 4 000 instances, ≤ 10 lumières locales dont 2 avec ombre, ≤ 300 k triangles visibles (§8) |
+| Nom (jeu) | **Hubbub Village**, nom de travail validé par Clément en attendant le nom du jeu |
+| Fantasme | Un village de briques joyeux et un peu absurde, où les héros se préparent avant d'aller taper la horde |
+| Jeu, dans l'ordre | arrivée → **PLAY** → run ; au retour : classes, compagnons, améliorations, quêtes, classements, boutique |
+| Cible | mobile d'abord, 9-15 ans ; **8 joueurs max par serveur de lobby** |
+| Style | tout en tenons : décor en gros blocs, objets interactifs en briques fines (`80-direction-artistique.md`) |
+| Héros (repère) | le portail en tête de gobelin de pierre (32 studs, maquette A01), vu dès l'arrivée |
+| Carte | composée à la main par Clément avec le kit d'A01 ; A09 fournit la liste des bâtiments et leurs règles (§3) |
+| Pas ça | pas de panneaux qui expliquent ; pas de cercles « reste ici » au sol ; pas de pop-up d'achat ; pas de compte à rebours d'achat |
 
 ### Les jobs du hub, par priorité
 
-Le vault (« Lobby and Hub Design ») impose de classer ce que le hub doit faire avant de le dessiner. Pour COHUE :
-
-1. **Amener un nouveau joueur à sa première run** : cible ≤ 60 s après la prise de contrôle.
-2. **Renvoyer un joueur qui revient en run** : ≤ 20 s, un seul bouton ou un pad.
-3. **Montrer la progression** : classements KO, quêtes, classes à débloquer.
+1. **Amener un nouveau joueur à sa première run** : ≤ 60 s après la prise de contrôle (cible 25-35 s).
+2. **Renvoyer un joueur qui revient en run** : 2 touches (PLAY, START).
+3. **Montrer la progression** : classements KO, quêtes, classes à débloquer, améliorations.
 4. **Montrer la collection** : compagnons capturés, cosmétiques portés.
-5. **Former un groupe** : amis, public, jusqu'à 4.
-6. **Proposer la boutique cosmétique**, visible mais jamais sur le passage obligé (public 9-15 ans, §6.6).
+5. **Former un groupe** : amis ou public, jusqu'à 4.
+6. **Proposer la boutique et le pass**, toujours accessibles, jamais poussés.
 
 ---
 
-## 2. Plan et distances
+## 2. Le HUD du hub : PLAY et la barre du bas
 
-Coordonnées en studs, origine au centre de la place, **nord = −Z** dans Roblox (haut du schéma). Emprise ≈ 230 × 215 studs, fermée par une ceinture d'arbres et de falaises.
+Maquette de structure : écran 0 du [Figma](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b), capture [img/65-hud-play.png](img/65-hud-play.png). **Le visuel de référence est celui de A08** (v3 « briques », validé par Clément le 5 nov.) : écrans LB01 (lobby) et LB02 (choix du mode) de la page « Lobby v3 — barre et Play » du [Figma A08](https://www.figma.com/design/0Yq5m1skq5dzgOQXZ9bG6D), composants `Lobby/PlayButton`, `Lobby/BarButton`, `Lobby/ModeChoice`, `Lobby/Currency`. A09 fixe la liste des boutons, les pastilles et le flux. L'écran 0 d'A09 est refait avec ces composants (bibliothèque v3 publiée par Clément le 5 nov.) : 7 boutons dans l'ordre d'A09, pastilles seulement sur Pets, Upgrades et Quests. Le 8e bouton Ranks attend la réponse de Clément ; l'icône trophée existe déjà (`BrickIcon/trophy`), il manquerait une variante `Item=Ranks` à A08. Positions sur la référence téléphone 844 × 390 (pixels logiques, `60-ui-ux.md`).
 
-| # | Zone (nom en jeu) | Centre (x, z) | Taille | Rôle |
+| Élément | Place | Taille | Règle |
+| --- | --- | --- | --- |
+| **PLAY** | bas, centré, au-dessus de la barre | 220 × 58 | La seule action verte de l'écran (bouton Go de A08, taille L) |
+| **Barre du bas** | bas, centrée, entre le joystick et le bouton Saut de Roblox | 8 boutons de 66 × 60, écart 4 (556 px) | Icône + mot ; pas de cadre autour de la barre, le village reste visible |
+| Monnaies | haut gauche, après la zone des boutons Roblox | pastilles de 32 px | Étoiles d'argent et jetons de quête. Les Robux n'apparaissent que sur les boutons de prix |
+| Réglages | haut droite | 44 × 44 | Bouton engrenage de A08 |
+| Joystick, Saut | bas gauche, bas droite | Roblox | Rien de notre UI dessous |
+
+**Couleurs** : un bouton de la barre, l'en-tête de son menu et son bâtiment partagent la même couleur (variables `zone/*` de A08 ; barre v3 alignée par A08 le 5 nov., commit 621e34f de sa branche).
+
+| Menu | Couleur | Variable Figma | Couleur dans COHUE (palette 16) |
+| --- | --- | --- | --- |
+| Classes | turquoise | `zone/classes` | Sky |
+| Critters | vert lime | `zone/critters` | Lime |
+| Upgrades | violet | à créer : `zone/upgrades` | Grape |
+| Inventory | acier | à créer : `zone/inventory` | Steel |
+| Quests | bleu | `zone/quests` | Royal |
+| Ranks | or | `zone/ranks` | Gold |
+| Pass | rose (ciel avant le 5 nov.) | à créer : `zone/pass` | Bubblegum |
+| Shop | mandarine | `zone/shop` | Ember |
+| Queue & Party, portail | violet | `zone/play` | Grape |
+| Settings | gris | `zone/settings` | Stone |
+
+Dans le jeu, les couleurs viennent de la palette COHUE 16 (`UIKit.tone`), qui n'a pas de turquoise : Classes prend Sky. Pass passe donc en Bubblegum, sinon il aurait la même couleur que Classes.
+
+Le bouton PLAY reste **vert** : c'est l'action principale (rôle Go), pas une zone. Les fenêtres v3 de A08 n'ont que 5 couleurs (Gold, Sky, Leaf, Tomato, Plum) : il faut que l'en-tête de `Window` suive la zone de son menu (demande à A08).
+
+**Pastilles de nombre** (rouges, sur l'icône) : seulement pour une chose à voir qui ne coûte rien. Quêtes terminées, nouveau compagnon capturé, amélioration abordable avec l'argent gagné. **Jamais sur Shop ni Pass.**
+
+**Première visite** : une flèche animée pointe PLAY, sans texte. Elle disparaît après la 1re run.
+
+### 2.1 Les 8 boutons de la barre (proposition, liste finale avec A08 et Clément)
+
+Le chef de projet a proposé 7 boutons (repris par A08 dans `Lobby/BarButton`). A09 ajoute **Ranks**, parce que le classement hebdo des KO est le pilier du jeu (décisions v2 §1). Ordre : du plus utilisé au moins utilisé, la boutique au bout. Deux libellés diffèrent entre A08 et A09 (Class / Classes, Companions / Critters) : à trancher avec Clément (§12).
+
+| # | Bouton (EN) | Ouvre | Monnaie | Écran |
 | --- | --- | --- | --- | --- |
-| 1 | **Arrival** | (0, 101) | pad 32 × 18 | Apparition, face au portail. Aussi le point de retour après une run |
-| 2 | **Hero Row** | avenue x ±12, z 40 → 92 | 8 présentoirs 8 × 8 | Les 8 classes, l'équipement apparaît sur l'avatar |
-| 3 | **Plaza** | (0, 0) | rayon 40 | Place centrale vide : on voit le portail à travers |
-| 4 | **Portal Court** | (0, −50) | 84 × 26 + arche 40 × 10 | Portail + 3 pads : Solo, Friends, Public |
-| 5 | **Critter Pen** | (−84, 6) | 56 × 48, clôturé | Les compagnons capturés s'y promènent |
-| 6 | **Gob's Glam Shop** | (77, 4) | bâtiment 38 × 36 | Boutique cosmétique |
-| 7 | **Hall of Fame** | (−73, −52) | parcelle 54 × 48 | Classements KO hebdo et all-time, podium |
-| 8 | **Quest Board** | (73, −52) | parcelle 54 × 48 | Tableau des quêtes |
+| 1 | **Classes** (A08 : « Class ») | Choix de classe et ses skins | aucune (déblocage par quête) | n° 2, fait |
+| 2 | **Critters** (A08 : « Companions ») | Collection de compagnons + style | Robux pour le style seulement | n° 3, fait |
+| 3 | **Upgrades** | Boutique d'argent : armes, Runes et objets dans le pool, emplacements, Bannir / Passer / Relancer (`70-donnees` §6) | étoiles d'argent gagnées en run, **jamais de Robux** | nouveau, §6.9 |
+| 4 | **Inventory** | Tout ce qu'on possède : skins, styles de compagnon, effets de KO, traînées, emotes, poses, titres ; équiper par emplacement | aucune | nouveau, §6.10 |
+| 5 | **Quests** | Quêtes | aucune (récompense automatique) | n° 6, fait |
+| 6 | **Ranks** | Classements KO hebdo et all-time | aucune | n° 5, fait |
+| 7 | **Pass** | Pass saisonnier cosmétique : piste gratuite + piste payante | Robux pour la piste payante | nouveau, §6.11 |
+| 8 | **Shop** | Boutique cosmétique | Robux et jetons | n° 4, fait |
 
-### Temps de marche (16 studs/s, en ligne droite sur les chemins)
+Réglages : bouton engrenage en haut à droite, pas dans la barre.
 
-| Trajet | Distance | Temps | Règle du vault |
-| --- | --- | --- | --- |
-| Arrivée → 1er présentoir (Knight) | 29 studs | **1,8 s** | 1re station < 15 s ✓ |
-| Arrivée → pads du portail | 147-149 studs | **9,3 s** | sortie < 20 s ✓ |
-| Arrivée → enclos ou boutique | 110-111 studs | 6,9 s | |
-| Arrivée → classements ou quêtes | 161 studs | 10,1 s | |
-| Enclos ↔ classements, boutique ↔ quêtes | 51-52 studs | 3,2 s | station → station < 10 s ✓ |
-| Enclos ↔ boutique (le plus long) | 110 studs | 6,9 s | ✓ |
-| Classements ↔ quêtes | 136 studs | 8,5 s | ✓ |
+### 2.2 Le flux PLAY
 
-### Lisibilité sur téléphone
+1. Toucher **PLAY** ouvre l'écran **Queue & Party** (n° 8). **Solo** est présélectionné pour la 1re run ; ensuite, le dernier mode choisi.
+2. **START** :
+   - **Solo** : décompte de 3 s, bouton « Cancel ».
+   - **Friends** : le chef lance pour tout le groupe, avec un décompte de 5 s.
+   - **Public** : les joueurs du serveur qui ont choisi Public sont regroupés jusqu'à 4. Départ 10 s après le 1er joueur, remis à 10 s à chaque arrivée, 20 s au plus.
+3. Téléportation (MatchService, modes Solo / Party / Public), puis écran de chargement de run (n° 1b).
 
-- **Gros repères** : chaque station a une icône voxel flottante de 8 studs à 18-22 studs de haut (patte = enclos, chapeau = boutique, trophée = classements, parchemin « ! » = quêtes, épée = Hero Row). Elles se lisent depuis l'arrivée. Elles tournent lentement, et restent fixes si le joueur a activé la réduction des mouvements.
-- **Une couleur par zone, la même que son menu** : quand on ouvre la boutique, le bandeau du menu a la couleur de la boutique du village. Proposition, à caler sur A01 et A08 :
+Entrer dans le portail du village ouvre aussi l'écran Queue & Party.
 
-| Zone | Couleur | Menu associé |
-| --- | --- | --- |
-| Portail et pads | violet (seule zone violette, c'est le héros) | File et groupe (Play) |
-| Hero Row | une couleur par classe sur les bannières | Choix de classe |
-| Critter Pen | vert feuille | Collection de compagnons |
-| Gob's Glam Shop | mandarine | Boutique |
-| Hall of Fame | or | Classements |
-| Quest Board | bleu ciel | Quêtes |
+### 2.3 Montage dans COHUE (5 nov., A09-04)
 
-- La couleur n'est jamais le seul signal : icône + mot sur un panneau de 3 à 8 mots.
-- Hauteurs : portail 44 studs, maisons ≤ 22, boutique 20, panneaux 14, bannières de classe 12. Le portail fait au moins 2 fois tout le reste.
-- Le centre de la place reste vide : rien ne cache le portail depuis l'arrivée (erreur classique du vault : « sortie derrière la pièce maîtresse »).
+Règle de Clément : rien de visible n'est construit par script en jeu. Les écrans sont posés une fois dans la place par l'outil d'édition `tools/ui/build-lobby.luau` (lancé par `execute_luau` en mode Edit, comme `build-ui-v3.luau` de A08) ; Clément les voit dans StarterGui, peut les retoucher et les sauvegarde.
+
+| Objet posé | Contenu |
+| --- | --- |
+| `StarterGui.COHUE_Lobby` | Zone `Bottom` : `Status` (étiquette), `Play` (brique verte 220 × 58, touche ENTER), `Bar` (8 boutons 66 × 60 : icône, libellé, pastille cachée, touche 1-8). `TopLeft.Silver` (argent). `TopRight.Settings` (engrenage) |
+| `StarterGui.COHUE_ModeSelect` | Fond `Scrim`, fenêtre « PLAY WITH... » (Grape) : `Modes.Solo / Friends / Public`, `Countdown` (chiffre, CANCEL), `Status`, `Header.Close` |
+| `StarterGui.COHUE_LobbyMenus` | Fond `Scrim`, une fenêtre par menu dans `Center` (en-tête de la couleur du menu, icône, titre, croix). `Classes` : 8 tuiles (`Tiles.Tile1..8`) et une ligne `Hint`. Les 7 autres : « COMING SOON » et une phrase |
+
+Le code : `client/Controllers/Lobby/LobbyController.luau` retrouve ces objets, les remplit (argent, classes et cadenas d'après le profil), les montre et les anime. Il est lancé par `LoadoutUI` quand `COHUE_Lobby` existe ; sans gabarits, l'ancien écran de choix reste.
+
+| Action | Effet aujourd'hui (une seule place) |
+| --- | --- |
+| PLAY (ou ENTRÉE) | Ouvre « PLAY WITH... » |
+| SOLO | Décompte de 3 s (CANCEL possible), puis `SelectLoadout(classe, compagnon)` |
+| PUBLIC | `SelectLoadout` tout de suite ; « WAITING FOR PLAYERS... » s'il y a d'autres joueurs |
+| FRIENDS | Invitation Roblox (`SocialService:PromptGameInvite`) ; on lance ensuite avec PUBLIC |
+| Classes | Choisir une classe débloquée ; elle part avec PLAY. Classe verrouillée : cadenas et phrase d'aide |
+| Les 7 autres boutons | Fenêtre provisoire de la couleur du menu |
+| Engrenage | `SettingsUI.open()` (A08) |
+
+Le serveur décide de tout : `SelectLoadout` dit seulement « prêt, avec cette classe ». Tant que A04 n'a pas fait la demande du §10, le serveur garde le comportement d'avant le lobby : la run démarre quand **tous** les joueurs du serveur sont prêts, et un joueur qui n'a rien choisi est déclaré prêt au bout de 45 s (5 s dans Studio). À la fin de la run, personne ne revient au lobby.
+
+Point d'apparition : `Workspace.SpawnLocation` est posé sur l'arrivée du lobby, `Workspace.HubbubVillage.Ground.ArrivalPad` (rôle `Arrival`), en (0 ; 16,8 ; 901). Ancienne place notée dans son attribut `PrevPosition`. Clément peut le déplacer où il veut sur sa carte.
+
+**Monté et testé dans COHUE le 5 nov.** Captures : [HUD](img/65-cohue-hud.jpg), [Classes](img/65-cohue-classes.jpg), [choix du mode](img/65-cohue-modes.jpg).
+
+| Test en Play (Studio, 1 joueur) | Résultat |
+| --- | --- |
+| Apparition | Sur l'ArrivalPad du village (−3 ; 20 ; 903) à 1,4 s ; HUD du lobby affiché, HUD de run caché |
+| ENTRÉE puis 3 (PUBLIC) | `SelectLoadout("Cornu", "Braise")` reçu par le serveur à 1,95 s ; la run démarre à 2,19 s (avant le prêt automatique) ; téléportation dans la zone de run, HUD du lobby caché, HUD de run affiché |
+| Menu Classes (touche 1) | Knight « PICKED », 3 classes libres en bleu, 5 au cadenas en gris, icône de l'arme de départ |
+| Choix du mode (ENTRÉE) | SOLO / FRIENDS / PUBLIC avec leurs silhouettes et touches 1-3 |
+| Retour au lobby en fin de run | **Pas testable** : à faire par A04 (§10, demande n° 3) |
+| Sans PLAY | Le serveur lance la run seul au bout de 5 s dans Studio (demande A04 n° 1) |
+
+Console : aucune erreur des scripts du lobby.
 
 ---
 
-## 3. Les zones en détail
+## 3. Le village (décor)
 
-### 3.1 Arrival
+Clément compose la carte avec le kit d'A01 (tout en tenons). A09 ne pose rien dans COHUE et ne construit rien par script ; A09 donne la liste des bâtiments et leurs règles.
 
-- Pad de 32 × 18 studs, assez pour 4 apparitions simultanées sans chevauchement (12-20 studs par apparition).
-- La caméra apparaît derrière le joueur, **tournée vers le portail**. Au premier plan : les présentoirs Knight et Archer.
-- Derrière : la porte du village (décor, c'est par là qu'on « revient » d'une run).
-- Panneau unique : « PORTAL » avec une flèche.
-- Les joueurs qui reviennent d'une run réapparaissent ici, avec leur groupe reformé (§5.3).
+### 3.1 Un bâtiment par menu
 
-### 3.2 Hero Row (8 présentoirs)
+**Le mot écrit sur le bâtiment est le même que sur le bouton** : un enfant fait le lien sans lire de panneau. Les lettres sont en grosses briques, en anglais. C'est le nom du bâtiment, pas un panneau explicatif.
 
-Disposition (W = côté ouest, E = côté est, z depuis la place) :
-
-| z | Ouest (x = −24) | Est (x = +24) |
+| Bâtiment (lettres) | Ouvre | Ce qu'on y voit (idées, à composer par Clément) |
 | --- | --- | --- |
-| 84 | **Knight** (gratuit) | **Archer** (gratuit) |
-| 70 | **Mage** (gratuit) | Guardian (quête) |
-| 56 | Rogue (quête) | Cleric (quête) |
-| 42 | Barbarian (quête) | Tamer (quête) |
+| **PLAY** (le portail en tête de gobelin) | Queue & Party | Le repère du village, visible dès l'arrivée ; tourbillon lumineux (A07) |
+| **CLASSES** | Classes | 8 mannequins avec l'équipement au palier 3 ; les classes verrouillées sont grises, avec un cadenas |
+| **CRITTERS** | Critters | L'enclos : ta collection s'y promène (jusqu'à 12, rendus côté client, chacun voit les siens) |
+| **UPGRADES** | Upgrades | Une forge : l'enclume brille quand une amélioration est abordable |
+| **INVENTORY** | Inventory | Une garde-robe ou un grenier |
+| **QUESTS** | Quests | Un tableau de quêtes avec le Hibou Plongeur perché dessus |
+| **RANKS** | Ranks | Deux grands tableaux WEEKLY KO / ALL-TIME KO (top 10) et le podium des 3 meilleurs de la semaine en statues |
+| **PASS** | Pass | Les récompenses de la saison exposées comme des statues |
+| **SHOP** | Shop | La boutique de Gob, gobelin devenu chapelier ; vitrine sans prix ni compte à rebours |
 
-Les 3 classes gratuites sont les plus proches de l'arrivée. Chaque présentoir comprend :
+### 3.2 Entrer dans un bâtiment
 
-- un socle voxel de 8 × 8 × 2 studs ;
-- un mannequin qui porte l'équipement **au palier 3** (ce que la classe devient au niveau 30), dans une pose drôle : le casque du Knight est trop grand, l'Archer vise un pigeon ;
-- une bannière verticale de 12 studs à la couleur de la classe, avec son icône ;
-- une plaque : nom de la classe + arme de départ (« Knight · Broadsword ») ;
-- un `ProximityPrompt` sur le mannequin (« Try on » si la classe est débloquée, « See quest » sinon), à hauteur de poitrine : `MaxActivationDistance = 7`, `HoldDuration = 0`, `RequiresLineOfSight = false` (le mannequin cacherait son propre prompt). Les prompts d'un même côté sont à 14 studs (= 2 × 7, règle du vault contre le clignotement entre deux prompts), ceux d'en face à 48.
+- Une **zone de porte** invisible devant chaque bâtiment. Quand le joueur y entre, le client ouvre le menu (vérification de la zone toutes les 0,2 s, pas de `Touched`). Le menu ne se rouvre qu'après être sorti de la zone. Pas de `ProximityPrompt` à enchaîner.
+- Ouvrir un menu ne change rien côté serveur : tout achat ou équipement passe par les remotes habituels.
+- Les zones de porte sont des Parts posées par Clément (nommées `Door_<Menu>`, invisibles, sans collision) : le code les trouve par leur nom.
 
-**Classe débloquée** : « Try on » équipe la classe tout de suite. L'équipement **palier 1** apparaît sur l'avatar avec un petit pop (VFX A07), et un toast dit « Knight equipped! ». Le bouton « Details » du toast ouvre l'écran Choix de classe. Pas de fenêtre bloquante.
+### 3.3 Règles de composition (conseils pour Clément)
 
-**Classe verrouillée** (décision de Clément, 4 nov. : **cadenas seul**, pas d'essai sur l'avatar) : le mannequin est gris, avec un cadenas voxel et une plaque « Quest: … » (texte de la quête de déblocage). Le prompt « See quest » ouvre l'écran Quêtes sur cette quête. Rien n'apparaît sur l'avatar du joueur. Les classes ne sont **jamais** en Robux.
-
-### 3.3 Plaza
-
-- Cercle de rayon 40 (le vault conseille 40-70 pour qu'une place paraisse vivante avec 5 joueurs).
-- Sol en mosaïque de voxels avec une grande flèche vers le portail.
-- Bancs au bord, côté enclos et côté boutique : c'est là qu'on traîne, hors de l'axe arrivée → portail.
-- Les emotes et poses de victoire (cosmétiques) se jouent n'importe où ; la place est le « coin photo » naturel, avec le portail en fond.
-
-### 3.4 Portal Court (file solo, amis, public)
-
-- L'**arche du portail** : 40 studs de large, 44 de haut, tourbillon violet (VFX A07 : 2-3 émetteurs, en veille au-delà de 300 studs). Gardée par un **Gland Grincheux** avec un petit drapeau qui « fait signe de passer ».
-- Trois pads posés au sol devant l'arche, chacun avec un panneau vertical de 10 studs :
-
-| Pad | Diamètre | Panneau | Fonctionnement |
-| --- | --- | --- | --- |
-| **Solo** | 12 studs | « SOLO » | Monter dessus → décompte de 3 s affiché sur le pad et à l'écran, bouton « Cancel ». À 0 : téléportation |
-| **Friends** | 16 studs | « FRIENDS » | Ouvre l'écran File et groupe sur l'onglet du groupe. Le chef lance : décompte de 5 s pour tout le groupe, où qu'il soit dans le village |
-| **Public** | 16 studs | « PUBLIC · 1-4 » | Rejoint la file publique du serveur. Les joueurs présents sur le pad partent ensemble (4 max). Décompte de 10 s dès le 1er joueur, remis à 10 s à chaque arrivée, dans la limite de 20 s au total |
-
-- Détection : boîte interrogée par le serveur (`GetPartBoundsInBox`), **jamais `Touched`** (peu fiable pour un personnage immobile, note du vault).
-- Bords dégagés : on descend d'un pad sans traverser personne. Les pads sont à 26 studs les uns des autres.
-- État visible sur l'anneau du pad **et** en texte : « Step in! », « Starting in 3 », « 2/4 · Starting in 8 », « Full ».
-- Le pad Public lance la run avec les joueurs **de ce serveur de lobby** (validé). Avec 8 joueurs par serveur, il partira souvent à 1 ou 2 : c'est pourquoi le décompte est plafonné à 20 s. Si les mesures de la bêta montrent trop de runs publiques en solo, on ajoute le matchmaking entre serveurs (MemoryStore, A12).
-- Monde de départ : toujours le monde 1 (la run enchaîne les 3 mondes, décision v2 à confirmer).
-
-### 3.5 Critter Pen (enclos des compagnons)
-
-- Prairie clôturée de 56 × 48 studs, porte côté place. Panneau humoristique : « Do not feed the critters. They bite. »
-- **Ta collection s'y promène** : jusqu'à 12 de tes compagnons capturés, rendus **côté client** (chacun ne voit que les siens). Ça ne coûte rien au serveur et ça évite 8 joueurs × 30 créatures. Déplacement simple à 10 Hz, en pause si le joueur est à plus de 120 studs.
-- Toucher une créature ouvre le prompt « Equip » (portée 6). Le kiosque à la porte ouvre l'écran Collection.
-- **Ton compagnon équipé te suit partout dans le village** et les autres le voient : c'est là qu'on montre sa collection et ses cosmétiques (chapeaux, couleurs, auras).
-- Le Tamer, qui équipe 2 compagnons, est suivi par les deux.
-
-### 3.6 Gob's Glam Shop (boutique cosmétique)
-
-- Petite boutique voxel tenue par **Gob**, un gobelin qui a quitté la horde : « I used to steal XP. Now I sell hats. »
-- Vitrine : 3 mannequins avec les cosmétiques à la une. Ils changent chaque semaine, **sans compte à rebours**.
-- Prompt « Shop » sur le comptoir. Aucun prix dans le monde 3D : les prix sont dans le menu, sur chaque article.
-- Placée sur le côté de la place, visible depuis l'arrivée, **pas sur le chemin obligé** du portail. Aucune fenêtre ne s'ouvre toute seule.
-
-### 3.7 Hall of Fame (classements KO)
-
-- Deux grands tableaux voxel de 18 × 14 studs, tournés vers la place :
-  - **WEEKLY KO** : le plus de KO en une run cette semaine. Ligne fixe « Resets Monday 00:00 UTC » : c'est une information neutre, pas un compte à rebours d'urgence.
-  - **ALL-TIME KO** : le record en une run, depuis le lancement.
-- Chaque tableau montre le top 10 (`SurfaceGui`, 10 lignes : rang, nom d'affichage, KO, icône de la classe jouée). Rafraîchi toutes les 120 s, comme le serveur (`70-donnees` §13).
-- **Podium** devant le tableau hebdo : statues voxel des 3 meilleurs de la semaine (avatars figés), un vrai coin photo. Un 4e socle vide porte la plaque « Your statue here? ».
-- Prompt « Leaderboards » : l'écran complet, avec ton rang et le filtre amis.
-
-### 3.8 Quest Board
-
-- Grand tableau de liège voxel de 20 × 12 studs. Un **Hibou Plongeur** perché dessus « livre » les nouvelles quêtes.
-- Le tableau affiche **tes** quêtes (rendu client) : les 3 les plus proches de la fin + la prochaine quête de déblocage de classe.
-- Prompt « Quests » : l'écran Quêtes.
-- Les récompenses sont données automatiquement par le serveur (`70-donnees` §11 : pas de remote de réclamation). L'écran montre « Done! » ; la récompense est déjà dans l'inventaire.
+- Arrivée **face au portail** ; centre de la place dégagé, rien ne cache le portail.
+- Village compact : chaque bâtiment visible depuis l'arrivée et à moins de 10 s de marche (160 studs).
+- Coins où l'on traîne (podium, enclos, bancs) hors de l'axe arrivée → portail.
+- Ton compagnon équipé te suit dans le village, et tout le monde le voit.
 
 ---
 
 ## 4. Parcours d'un nouveau joueur : première run en moins de 60 s
 
-Le chrono part quand le joueur prend le contrôle de son personnage. Le vault vise une prise de contrôle ≤ 10 s après l'arrivée sur le jeu : l'écran de chargement couvre ce temps (§6.1).
-
 | t | Ce qui se passe | Ce que voit le joueur |
 | --- | --- | --- |
-| 0 s | Apparition sur Arrival, caméra tournée vers le portail. **Classe par défaut déjà équipée : Knight.** | Ligne d'objectif en haut au centre : « Pick a class, then jump in the portal! » (8 mots). Une flèche voxel au-dessus du présentoir Knight |
-| 2 s | Arrive au Knight (29 studs). « Try on » | L'équipement apparaît sur lui, toast « Knight equipped! » |
-| 2-6 s | Peut essayer Archer ou Mage, à 14 et 48 studs | La flèche passe au-dessus du pad **Solo** |
-| ~12 s | Monte sur le pad Solo | Décompte 3 s, « Cancel » |
-| ~15 s | Téléportation (MatchService : libération du profil, `TeleportAsync` vers un serveur réservé) | Écran de chargement de run (§6.1) avec le nom du monde |
-| **~35-45 s** | La run démarre, chrono 10:00 | HUD de run (A08) |
+| 0 s | Apparition face au portail. **Classe par défaut déjà équipée : Knight.** | Une flèche animée pointe PLAY |
+| ~2 s | Touche PLAY | Écran Queue & Party, **Solo** présélectionné |
+| ~4 s | Touche START | Décompte de 3 s, « Cancel » |
+| ~7 s | Téléportation (MatchService : libération du profil, `TeleportAsync` vers un serveur réservé) | Écran de chargement de run (n° 1b) |
+| **~25-35 s** | La run démarre, chrono 10:00 | HUD de run (A08) |
 
-- **Pire cas** : un joueur qui ignore tout et marche droit vers le portail arrive en run vers 30 s, avec le Knight. Un joueur lent ou un téléphone lent (téléportation de 30 s) reste sous 60 s.
-- Le pad Solo est mis en avant **pour la 1re run** : c'est le plus rapide et le plus simple pour apprendre. Dès la 2e visite, la flèche disparaît, et le pad Public reçoit un petit badge « Play together! » (la coop compte : objectif 35 % des runs).
-- Aucun mur de texte, aucune cinématique, aucun tutoriel bloquant. Les compagnons, la boutique et les quêtes se découvrent au retour.
+Pas de marche obligatoire, pas de choix obligatoire, pas de texte à lire. Les classes, les compagnons et la boutique se découvrent au retour.
 
-## 5. Joueurs qui reviennent et flux
+## 5. Joueurs qui reviennent et groupe
 
-### 5.1 Retour (vétéran)
-
-Arrivée → avenue → pad, 9 s ; ou **un seul bouton PLAY** dans le HUD du hub → écran File et groupe → Solo / Friends / Public. Après une run, l'écran de fin (A08) propose déjà « Play again » (rejouer dans la place de run, même équipe) : on ne revient au village que pour changer de classe ou de compagnon, regarder les classements ou faire un tour à la boutique.
-
-### 5.2 Où l'on traîne
-
-Bancs de la place, podium du Hall of Fame, clôture de l'enclos. Tous hors de l'axe arrivée → portail (x = 0) : les nouveaux joueurs n'apparaissent jamais au milieu d'un attroupement.
-
-### 5.3 Groupe
-
-- Groupe de 1 à 4. On invite un joueur du serveur (le toucher → « Invite to party ») ou un ami hors du jeu (invitation Roblox `SocialService:PromptGameInvite`).
-- Le chef lance depuis le pad Friends ou l'écran File et groupe. Tout le groupe part, où qu'il soit dans le village.
-- Retour de run : le groupe est téléporté ensemble vers le même serveur de lobby et reformé à l'arrivée (demande de contrat data, §10).
-- **Pass VIP** : bouton « Private village » dans l'écran File et groupe, pour le propriétaire et ses amis (`MatchService.openVipRoom`, déjà prévu par A12).
-
-### 5.4 Le HUD du hub (raccourcis)
-
-Toutes les stations sont aussi dans le HUD, pour qu'un joueur mobile n'ait jamais à marcher pour une action :
-
-- en haut à gauche : avatar, étoiles d'argent, jetons de quête (les Robux n'apparaissent que sur les boutons de prix) ;
-- à droite, colonne de boutons de 56 px : Classes, Critters, Shop, Quests, Ranks, Settings ;
-- en bas à droite : gros bouton **PLAY** (la seule action verte de l'écran) ;
-- en bas à gauche : joystick.
+- **Retour** : l'écran de fin (A08) propose « Play again » (même équipe, sans repasser par le village). Au village : PLAY puis START.
+- **Groupe de 1 à 4** : depuis Queue & Party, « Invite » (invitation d'amis Roblox, `SocialService:PromptGameInvite`) ou toucher un joueur du serveur. Le chef lance pour tout le groupe. Au retour de run, le groupe est reformé (demande de contrat data, §10).
+- **Pass VIP** : bouton « Private village » dans Queue & Party (`MatchService.openVipRoom`).
 
 ---
 
-## 6. Les 8 écrans de menu (A09-01)
+## 6. Les écrans de menu
 
-Maquettes Figma : **[COHUE — Menus & Lobby (A09)](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b)** (équipe « c_rondepierre's team »). Pages : `00 · Read me`, `01 · Hub plan` (ce plan en vecteurs), `02 · Wireframes` (les 8 écrans + le HUD du hub, une note par écran), `03 · Wireframe kit` (17 composants propres au lobby). **État : habillés avec le design system de A08** ([fichier A08](https://www.figma.com/design/0Yq5m1skq5dzgOQXZ9bG6D), bibliothèque « COHUE — UI Design System & Run Screens »). Les boutons sont les `Button` de A08 (Go vert = l'action principale, Premium or = prix en Robux, Neutral, Disabled) ; les couleurs, les styles de texte (Display, Title, Label, Body) et les ombres viennent de ses variables et styles ; les composants du kit (cartes, lignes, onglets, interrupteurs) sont liés à ces variables. La structure validée n'a pas bougé.
+Maquettes Figma : **[COHUE — Menus & Lobby (A09)](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b)**. Pages : `00 · Read me`, `01 · Hub plan` (plan du 4 nov., remplacé), **`02 · Screens v3 (briques)`** (14 écrans), `03 · Wireframe kit`, `05 · Archive v2 (4 nov.)` (anciens écrans glossy, à ne plus suivre).
 
-Couleur d'en-tête de chaque menu = couleur de sa zone dans le village (primitives A08) : Classes `teal/500`, Critters `lime/500`, Shop `orange/500`, Ranks `gold/500`, Quests `blue/500`, Settings `action/neutral/face`, Play `purple/500`, avec une lèvre en `*/700`.
+Planche des 14 écrans v3 (5 nov.) : [img/65-menus-v3.png](img/65-menus-v3.png).
 
-Planche des maquettes habillées (capture du 4 nov. 2026) : [img/65-maquettes-v2.png](img/65-maquettes-v2.png).
+**Style UI : v3 « briques » de A08**, validé par Clément le 5 nov. (lobby, puis le concept Classes). Tous les écrans sont refaits avec la bibliothèque v3 de A08 : `Window` (en-tête recoloré par la variable de zone du menu, en attendant la propriété Zone de A08), `Button` (taille L de 48 px), `Tile`, `Tag`, `Portrait`, `Lobby/*`, icônes `BrickIcon/*`. Texte en Fredoka One, très peu de phrases. Icônes provisoires : Archer « ! » (arc d'A14 attendu) et compagnons « cage » (portraits d'A05 attendus). Relectures à l'aveugle (5 nov.) : concept Classes 6,3 / 10, puis l'ensemble 5,8 / 10 (plafonné à 5 sur estimation d'une planche réduite). Mesure faite : seuls les onglets COLLECTION / STYLE faisaient 40 px, passés à 44 px. Corrigé aussi : un seul interrupteur par réglage, « tokens » écrit en entier, plus de date de fin de saison sur le pass, bouton d'achat du pass moins dominant, légendes inutiles retirées. Restent notés : les animations ne sont pas spécifiées (U4 = 0), et les menus partagent la même structure fenêtre + grille + fiche (le relecteur y voit un gabarit ; c'est aussi ce qui les rend cohérents). En-têtes : A08 a ajouté une variante de `Window` par zone, à brancher après le prochain Publish.
 
 Règles communes :
 
-- textes en anglais ; lisibles sur un téléphone de 6 pouces. Dessin en **pixels logiques sur la référence téléphone 844 × 390** (convention de `60-ui-ux.md`) : texte ≥ 12 px, zones tactiles ≥ 44 px, écarts ≥ 8 px ;
-- zones réservées dessinées sur chaque écran (`skip_safe_area`, en magenta) : encoche (48 px), boutons Roblox en haut à gauche, barre du bas. Rien d'interactif dedans ;
-- **adaptation** : un menu est un panneau en mise en page flexible. Échelle = clamp(min(L / 844, H / 390), 1, 1,6) (plafond 1,6 sur PC fixé par A08) : jamais de texte sous 12 px. La hauteur du corps suit l'écran, les listes défilent. Sous 780 px logiques de large, la colonne d'aperçu 3D est cachée et remplacée par un bouton « VIEW 3D » (« hide, do not shrink »). Vérifié sur l'écran le plus dense (Choix de classe) en 800 × 360 (Android 6") et 667 × 375 (petit iPhone) : rien ne déborde ;
-- **une seule action verte** par écran, avec un verbe ;
-- un bouton verrouillé dit toujours pourquoi ;
-- la couleur n'est jamais le seul signal (icône, mot, losanges de rareté) ;
-- design system de A08 (glossy cartoon) dès qu'il est publié ; en attendant, wireframes en niveaux de gris.
+- textes en anglais ; lisibles sur un téléphone de 6 pouces ; pixels logiques sur la référence 844 × 390 : texte ≥ 12 px, zones tactiles ≥ 44 px, écarts ≥ 8 px ;
+- zones réservées (`skip_safe_area`) : encoche, boutons Roblox en haut à gauche, barre du bas ; rien d'interactif dedans ;
+- adaptation : panneau flexible, échelle = clamp(min(L / 844, H / 390), 1, 1,6) ; les listes défilent ; sous 780 px de large, la colonne d'aperçu 3D est cachée et remplacée par « VIEW 3D ». Vérifié en 800 × 360 et 667 × 375 ;
+- **une seule action verte** par écran, avec un verbe ; un bouton verrouillé dit pourquoi ; la couleur n'est jamais le seul signal ;
+- **peu de texte** : pas de sous-titre d'aide sous les boutons.
 
-| # | Écran | Contenu | Action principale |
-| --- | --- | --- | --- |
-| 1 | **Title & Loading** | Chargement au lancement (logo, barre, astuce) et chargement entre places (nom du monde, membres du groupe qui arrivent) | aucune (pas d'écran « Tap to play » : il coûterait des secondes à la 1re run) |
-| 2 | **Class Select** | Avatar 3D qui tourne, 8 classes (3 gratuites, 5 par quête), arme de départ, passif, mouvement, aperçu des paliers 10/20/30 | EQUIP |
-| 3 | **Critter Collection** | Grille des compagnons capturés, 1 équipé (2 pour le Tamer), attaque et techniques, onglet Style (chapeaux, couleurs, auras, effets en Robux, aperçu gratuit). **Pas de renommage** | EQUIP |
-| 4 | **Shop** | Onglets Hero gear / Critter style / Effects / Emotes / Passes. Prix affiché sur chaque article. Achat via la fenêtre Roblox | le prix (bouton) |
-| 5 | **Leaderboards** | Weekly / All-time, Global / Friends, podium top 3, liste, ta ligne fixée en bas | aucune |
-| 6 | **Quests** | Classes à débloquer en tête, puis par catégorie, barres de progression, récompense visible | aucune (récompense automatique) |
-| 7 | **Settings** | Graphismes, son, contrôles, accessibilité (daltonisme, flashs, taille du texte, garder mon chapeau) | aucune (réglages immédiats) |
-| 8 | **Queue & Party** | Solo / Friends / Public, 4 places de groupe, inviter, état prêt, Private village (VIP) | START |
+| # | Écran | Ouvert par | Contenu | Action principale |
+| --- | --- | --- | --- | --- |
+| 1 | **Title & Loading** | lancement, téléportations | Logo, barre, astuce ; entre places : monde, membres du groupe qui arrivent | aucune |
+| 2 | **Classes** | bouton Classes, bâtiment CLASSES | 8 classes (3 gratuites, 5 par quête), avatar qui tourne, arme, passif, mouvement, paliers | EQUIP |
+| 3 | **Critters** | bouton Critters, enclos | Collection, 1 équipé (2 pour le Tamer), onglet Style ; pas de renommage | EQUIP |
+| 4 | **Shop** | bouton Shop, bâtiment SHOP | Hero gear / Critter style / Effects / Emotes / Passes, prix sur chaque article | le prix |
+| 5 | **Ranks** | bouton Ranks, bâtiment RANKS | Weekly / All-time, Global / Friends, podium, ta ligne fixée en bas | aucune |
+| 6 | **Quests** | bouton Quests, bâtiment QUESTS | Classes à débloquer en tête, barres, récompenses visibles | aucune |
+| 7 | **Settings** | engrenage | Graphismes, son, contrôles, accessibilité | aucune |
+| 8 | **Queue & Party** | PLAY, portail | Solo / Friends / Public, 4 places, inviter, Private village | START |
+| 9 | **Upgrades** | bouton Upgrades, bâtiment UPGRADES | Boutique d'argent | le prix en argent |
+| 10 | **Inventory** | bouton Inventory, bâtiment INVENTORY | Objets possédés, équipement par emplacement | EQUIP |
+| 11 | **Pass** | bouton Pass, bâtiment PASS | Paliers de la saison, piste gratuite et piste payante | CLAIM (gratuit) |
 
 ### 6.1 Title & Loading
 
-- **Au lancement** : fond voxel (le village vu du ciel), logo (« COHUE » en attendant le nom anglais), barre de progression, une astuce par chargement (« Stand still in a capture cage for 2 s to catch a critter. »). On passe au village dès que la zone d'arrivée est chargée (`StreamingEnabled`, rayon minimal 64) : on n'attend pas tout le village.
-- **Entre places** (village → run, run → village) : carte du monde (« World 1 · Grumpy Woods ») ; vignettes des membres du groupe avec une coche quand ils sont arrivés ; astuce. En cas d'échec de téléportation, message clair (« Couldn't start the run. Try again? ») et retour au village : le profil est repris par MatchService.
+- **Au lancement** : fond du village vu du ciel, logo (« COHUE » en attendant le nom anglais), barre de progression, une astuce par chargement. On passe au village dès que la zone d'arrivée est chargée (`StreamingEnabled`, rayon minimal 64).
+- **Entre places** : carte du monde, vignettes des membres du groupe avec une coche quand ils sont arrivés, astuce. Échec de téléportation : « Couldn't start the run. Try again? » et retour au village (MatchService reprend le profil).
 
-### 6.2 Class Select
+### 6.2 Classes
 
-Écran du présentoir, aussi accessible par le HUD. Liste des 8 classes à gauche (cartes 2 × 4 sur téléphone), avatar au centre (`ViewportFrame` qui tourne, arrêté si mouvement réduit), fiche à droite : arme de départ, passif, mouvement, paliers d'équipement (3 vignettes). Classe verrouillée : silhouette grise avec cadenas au centre (jamais sur l'avatar du joueur) + texte de la quête + barre de progression + « See quest ». Les cosmétiques de classe (skins) se voient dans un sous-onglet « Style », avec le prix de chaque article ; jamais de stat.
+Liste des 8 classes (tuiles 4 × 2), fiche : arme de départ, passif, mouvement.
 
-### 6.3 Critter Collection
+**Au centre, le vrai joueur avec l'équipement sur lui** (demande de Clément, 5 nov.) :
+- le client clone **l'avatar Roblox du joueur** (son personnage du lobby, ou `Players:CreateHumanoidModelFromDescription` avec sa `HumanoidDescription`) dans un `ViewportFrame` ;
+- il y pose l'équipement de la classe choisie avec `ArtLibrary.equipClassTier(clone, classId, palier)` (A01), sur le clone seulement : rien ne change côté serveur tant que le joueur n'a pas touché EQUIP ;
+- par défaut, le palier 3 (niveau 30, tout l'équipement) ; trois boutons « Lv 10 / Lv 20 / Lv 30 » montrent l'équipement qui grandit ;
+- l'avatar tourne lentement (fixe si mouvement réduit) ; le joueur peut le faire tourner au doigt ;
+- le chapeau et les cheveux du joueur sont masqués si le réglage « Keep my hat » est sur OFF, comme en run.
 
-Grille des créatures capturées (vignette, nom de l'espèce, monde d'origine) ; silhouettes grises « Not caught yet » pour donner un objectif de collection, avec l'endroit où on les trouve (« Found in: Grumpy Woods »). Fiche : attaque, cartes de technique. Onglet **Style** : chapeaux, couleurs, auras, effets, aperçu gratuit sur la créature, prix en Robux sur le bouton. Aucun champ de nom (décision v2). Rappel : la capture est gratuite et sûre à 100 %, il n'y a aucun objet payant de capture.
+Maquette : capture Studio du 5 nov. de l'avatar de Clément équipé au niveau 30 avec `ArtLibrary.equipClassTier` (Knight dans le menu ; Knight, Archer et Mage dans [img/65-avatar-classes.png](img/65-avatar-classes.png)). Prise sur des clones temporaires dans COHUE, supprimés juste après. Classe verrouillée : silhouette grise avec cadenas (jamais sur l'avatar du joueur), texte de la quête, barre de progression, « See quest ». Skins de classe dans l'onglet « Style », prix sur chaque article, jamais de stat.
+
+### 6.3 Critters
+
+Grille des créatures capturées ; silhouettes « ??? » pour celles qu'on n'a pas encore, avec l'endroit où les trouver. Fiche : attaque, cartes de technique. Onglet **Style** : chapeaux, couleurs, auras, effets, aperçu gratuit, prix sur le bouton. Aucun champ de nom. La capture est gratuite et sûre à 100 %.
 
 ### 6.4 Shop
 
-Règles pour un public de 9 à 15 ans (`00-vision` §11.3, décisions v2 §9) :
+- **100 % cosmétique** : aucune stat, aucune classe, aucune résurrection, aucun objet aléatoire payant.
+- **Prix sur chaque article** (Robux ou jetons gagnés en jouant) ; achat par la fenêtre officielle Roblox.
+- **Aperçu gratuit** avant tout achat.
+- **Aucune pression** : pas de compte à rebours, pas de « Only 2 left! », pas de rouge d'alerte, pas de « BEST VALUE », pas de prix qui clignote, pas de fenêtre qui s'ouvre seule, pas de pastille de nombre sur le bouton Shop (la maquette LB01 de A08 en montre une : à retirer).
+- Articles possédés : « Owned » + « Equip ».
 
-- **100 % cosmétique** : aucune stat, aucune classe, aucune résurrection, aucun objet aléatoire payant. Une ligne au bas de l'écran le dit : « Everything here is just for looks. »
-- **Prix affiché sur chaque article**, en Robux (icône Robux + nombre) ; l'achat passe par la fenêtre officielle Roblox (`MarketplaceService`), qui confirme.
-- **Aperçu gratuit** sur ton avatar ou ton compagnon avant tout achat.
-- **Aucune pression** : pas de compte à rebours, pas de « Only 2 left! », pas de rouge d'alerte, pas de pastille « BEST VALUE », pas d'animation qui pulse sur un prix, pas de fenêtre qui s'ouvre toute seule, pas de bouton « No thanks, I don't want to look cool ».
-- Les articles gagnés en jouant (jetons de quête, étoiles d'argent) sont dans la même boutique, avec leur prix en jetons : la boutique n'est pas qu'un mur payant.
-- Articles déjà possédés : « Owned » + bouton « Equip ».
-- Le pass VIP et le pass saisonnier listent clairement leur contenu, 100 % cosmétique (+ serveur privé pour le VIP).
+### 6.5 Ranks
 
-### 6.5 Leaderboards
-
-Onglets **Weekly** / **All-time** et filtre **Global** / **Friends**. Podium des 3 premiers (vignettes d'avatar), puis lignes 4 à 50 : rang, nom d'affichage, KO, classe jouée. **Ta ligne reste fixée en bas** (« You · #1,284 · 2,431 KO »), même hors du top. « Resets Monday 00:00 UTC » en petit, sans alerte. Données : `Leaderboards` (A12), top 50 rafraîchi toutes les 120 s.
+Weekly / All-time et Global / Friends. Podium des 3 premiers, lignes 4 à 50 : rang, nom d'affichage, KO, classe jouée. **Ta ligne reste fixée en bas.** « Resets Mon 00:00 UTC » en petit, sans alerte. Données : `Leaderboards` (A12), top 50 toutes les 120 s.
 
 ### 6.6 Quests
 
-En tête : **Unlock a class** (5 quêtes : Guardian, Rogue, Cleric, Barbarian, Tamer), puis les catégories (Combat, Survival, Critters, Co-op…). Chaque ligne : nom, barre « 34 / 50 », récompense visible (icône + nombre ou nom de l'objet). Une quête terminée affiche « Done! » et une coche ; la récompense est déjà donnée. Pas de quête limitée dans le temps qui crée de l'urgence au lancement.
+En tête **Unlock a class** (Guardian, Rogue, Cleric, Barbarian, Tamer), puis les catégories. Chaque ligne : nom, barre, récompense visible. Récompense donnée automatiquement par le serveur ; la ligne affiche « Done! ».
 
 ### 6.7 Settings
 
-Quatre sections à onglets : **Graphics** (qualité Auto / Low / High, effets réduits), **Sound** (musique, effets, curseurs 0-100), **Controls** (sensibilité caméra, sensibilité tactile, position des boutons tactiles), **Accessibility** (Colorblind mode, Reduce flashes, Text size 100/115/130 %, Keep my hat). Chaque ligne entière est tactile. Le jeu est en anglais seul au lancement : pas de choix de langue. Coordination : `SettingsUI` appartient à A08, qui code l'écran ; A09 fournit la maquette du menu.
+Onglets Graphics, Sound, Controls, Accessibility (Colorblind mode, Reduce flashes, Text size 100/115/130 %, Keep my hat). Toute la ligne est tactile, effet immédiat. Anglais seul au lancement. A08 code `SettingsUI` d'après cette maquette.
 
 ### 6.8 Queue & Party
 
-Trois grosses cartes de mode : **Solo** (« Just you »), **Friends** (« Your party, up to 4 »), **Public** (« Team up with anyone »). Panneau groupe : 4 places (toi + 3), vignette, nom, classe choisie, état « Ready » ; « Invite » (amis Roblox) ; « Leave party » ; le chef peut retirer un membre. Bouton vert **START**, avec le motif quand il est grisé (« Waiting for Alex to pick a class »). Ligne « World 1 → 2 → 3 ». Pass VIP : bouton « Private village ».
+Ouvert par PLAY. Trois cartes de mode : **Solo**, **Friends**, **Public**. Groupe : 4 places (vignette, nom, classe, état). « Invite », « Leave », START (le chef). « Picking… » informe sans bloquer : chacun a toujours une classe. « Private village » avec le pass VIP.
+
+### 6.9 Upgrades (nouveau, maquette après le concept UI de A08)
+
+- Boutique d'**étoiles d'argent** gagnées en run (`70-donnees` §6) : armes, Runes et objets à ajouter au pool ; emplacements de Rune ; +1 Bannir / Passer / Relancer par run.
+- **Jamais de Robux, jamais de monnaie achetable** : c'est de la progression gagnée en jouant.
+- Une carte par amélioration : niveau actuel → suivant, prix en argent sur le bouton ; grisé avec le prix manquant si on n'a pas assez (« Need 120 more Silver »).
+
+### 6.10 Inventory (nouveau, maquette après le concept UI de A08)
+
+- Tout ce qu'on possède, par onglet : Hero gear, Critter style, Effects (KO, traînées, pas), Emotes et poses, Titles.
+- Toucher un objet = aperçu ; EQUIP l'équipe dans son emplacement (`EquipCosmetic`). Les objets non possédés n'y sont pas : l'Inventory ne vend rien et ne renvoie pas vers la boutique.
+
+### 6.11 Pass (nouveau, maquette après le concept UI de A08)
+
+- Pass saisonnier **100 % cosmétique** : une piste gratuite et une piste payante (pass Roblox). Les paliers se gagnent **en jouant** (XP de run et quêtes).
+- **Aucun palier vendu en Robux**, aucun objet aléatoire, aucune puissance.
+- Fin de saison affichée comme une date neutre (« Season 1 · ends Jan 12 »), jamais en compte à rebours rouge.
+- Récompenses gratuites : bouton CLAIM ; piste payante : cadenas tant que le pass n'est pas acheté, avec le prix du pass sur un seul bouton.
 
 ---
 
 ## 7. Mobile et accessibilité
 
-- Toute station est atteignable par le HUD : marcher est optionnel.
-- Pas de saut de précision, pas d'escalier de plus de 1 stud par marche, aucun passage plus étroit que 16 studs.
-- Prompts sur l'objet, à hauteur de poitrine, jamais sous la zone du bouton Saut quand on se tient devant (à vérifier en vrai sur téléphone).
-- Réduction des mouvements : icônes fixes, pas de rotation de l'avatar dans les menus, fondus au lieu de pops.
-- Daltonisme : chaque zone = icône + mot + couleur. Test en niveaux de gris (`ColorCorrection.Saturation = −1`) : les chemins et les pads doivent rester lisibles.
-- Textes des panneaux : 3 à 8 mots, en anglais, intégrés au décor.
+- Tout se fait depuis le HUD : marcher dans le village est un plaisir, jamais une obligation.
+- La barre du bas tient entre le joystick et le bouton Saut ; chaque bouton fait au moins 56 px de haut.
+- Réduction des mouvements : pas d'icône qui tourne, la flèche de première visite est fixe, fondus au lieu de pops.
+- Daltonisme : chaque bouton = icône + mot ; chaque bâtiment = forme + mot.
 
-## 8. Performance
+## 8. Performance (budget du village, carte de Clément)
 
 | Poste | Budget | Note |
 | --- | --- | --- |
-| Instances (tout le hub) | ≤ 4 000 | vault : hubs mesurés de 913 à 4 531 ; le hub est la 1re chose chargée sur les téléphones faibles |
-| Triangles visibles | ≤ 300 k | bas de la fourchette mobile, pour laisser 20-30 % aux effets et à l'UI |
-| Lumières locales | ≤ 10, dont 2 avec ombre (portail, vitrine de la boutique) | |
-| Émetteurs de particules | ≤ 12 (portail 3, présentoirs 0 au repos, enclos 2) | en veille au-delà de 300 studs |
+| Instances (tout le hub) | ≤ 4 000 | vault : hubs mesurés de 913 à 4 531 ; c'est la 1re chose chargée sur les téléphones faibles |
+| Triangles visibles | ≤ 300 k | décor en Parts : surveiller leur nombre plus que les triangles |
+| Lumières locales | ≤ 10, dont 2 avec ombre | |
+| Émetteurs de particules | ≤ 12, en veille au-delà de 300 studs | |
 | Compagnons de l'enclos | ≤ 12, côté client, 10 Hz | en pause à plus de 120 studs |
 | Tableaux de classement | 2 × 10 lignes, rafraîchis toutes les 120 s | la liste complète est dans le menu |
-| Streaming | `StreamingEnabled`, min 64, Opportunistic, PauseOutsideLoadedArea | Arrival et Hero Row arrivent en premier |
+| Streaming | `StreamingEnabled`, min 64 | l'arrivée et le portail d'abord |
 
-## 9. Ce qui reste à construire (vague 2, après validation)
+## 9. Ce qui reste à faire (vague 2, après validation)
 
-A09-04 : place du lobby, blockout gris puis formes, puis décor (méthode `fwjelaa-worldbuilding` : 4 passes, audit, budget). A09-05 : `LoadoutUI` du lobby, pads, file, téléportation (avec MatchService). A09-06 : tableaux 3D. A09-07 : collection et boutique. Rien de tout cela n'est commencé.
+- **A09-04** : `LobbyController` côté client (HUD du hub : PLAY, barre, zones de porte `Door_<Menu>`), sur la carte de Clément. Plus de blockout du village par A09. **En cours (5 nov.)** : HUD, choix du mode, menu Classes et menus provisoires (§2.3) ; restent les portes `Door_<Menu>` (quand la carte aura ses bâtiments), les pastilles et l'aperçu de l'avatar dans Classes (§6.2).
+- **A09-05** : Queue & Party, file et téléportation (avec MatchService).
+- **A09-06** : tableaux 3D du bâtiment RANKS.
+- **A09-07** : Critters, Shop, Upgrades, Inventory, Pass.
+- Maquettes des 3 nouveaux menus (§6.9 à 6.11), après le concept UI en briques de A08.
 
 ## 10. Demandes de contrat (pour la vague 2)
 
+**Contract request (A04, run — 5 nov., pour que PLAY lance vraiment la run depuis le lobby, dans la place unique COHUE)** :
+1. **Pas de « prêt » automatique au lobby.** En phase `Loadout`, ne plus déclarer prêt un joueur au bout de `LoadoutTimeout` / `StudioLoadoutTimeout` quand le lobby est dans la place (réglage proposé `Config.Run.LobbyInPlace = true`). Le joueur reste au lobby tant qu'il n'a pas appuyé sur PLAY.
+2. **La run part avec les joueurs prêts, pas avec tout le serveur.** `startRun` ne prend que les joueurs qui ont envoyé `SelectLoadout`. Départ proposé : `Run.LobbyStartDelay` s (3) après le premier prêt ; ceux qui sont prêts pendant ce délai partent ensemble. Les autres restent au lobby et entrent ensuite comme retardataires (c'est déjà le cas avec `onReady`).
+3. **Retour au lobby en fin de run.** Après le résumé (Replay non choisi, ou bouton « Back to lobby » de l'EndScreen), téléporter les joueurs de la run au point d'apparition du lobby (`Workspace.SpawnLocation`, ou la Part qui porte l'attribut `LobbyRole = "Arrival"`), avec l'exemption de `MovementGuard`, puis repasser en `Loadout` avec les drapeaux « prêt » remis à zéro.
+4. **Qui est dans la run.** Poser l'attribut `InRun` (booléen) sur chaque joueur. Aujourd'hui l'UI (HUD de A08, LobbyController) déduit « en run » de la phase globale ; un joueur resté au lobby pendant la run d'un autre verrait le HUD de run.
+
 | Domaine | Demande |
 | --- | --- |
-| lead (ARCHITECTURE) | Ajouter au périmètre A09 : la place du lobby, `client/Controllers/Lobby/*`, `server/Services/LobbyService.luau` (pads, présentoirs, enclos), et les noms de boot correspondants |
-| data (A12) | `MatchRequest` : accepter un groupe (liste de membres présents) et un mode `Solo`/`Party`/`Public` ; reformer le groupe au retour de run ; API `getParty(player)` |
-| data (A12) | Exposer le texte de la quête de déblocage de chaque classe (`Config.Quests`) pour les plaques des présentoirs |
-| classes (A04, propriétaire de l'équipement de classe qui remplace TraitService) | `applyClass(player, classId)` utilisable **dans le lobby** (palier 1) |
-| companion (A05) | Mode lobby de `CompanionRenderer` : le compagnon équipé suit son joueur (visible de tous), la collection du joueur se promène dans l'enclos (client seul) |
-| ui (A08) | Ajouter au design system des variables sémantiques `zone/*` (classes, critters, shop, ranks, quests, settings, play) pour remplacer les primitives utilisées dans les en-têtes ; icônes manquantes pour le lobby : 8 classes, Solo / Friends / Public, quêtes (aujourd'hui des codes de 2 lettres) ; `SettingsUI` suit la maquette n° 7 ; toasts et prompts au style du kit |
-| VFX (A07) | Pop d'équipement au « Try on », tourbillon du portail, anneau de décompte des pads |
-| monde (A02) | Lumière diorama du hub ; kit de maisons voxel |
+| lead (ARCHITECTURE) | Périmètre A09 : `client/Controllers/Lobby/*`, `server/Services/LobbyService.luau`, et les modèles d'UI du lobby dans COHUE (rien construit par script). Ajouter `"LobbyController"` à l'ordre de `client/Main.client.luau`, après `LoadoutUI` (en attendant, `LoadoutUI` le lance ; un double lancement est sans effet) |
+| ui (A08) | `HUD` et `UITheme.inRun()` : lire l'attribut `InRun` du joueur (demande A04 n° 4) plutôt que la phase globale |
+| data (A12) | `SelectLoadout` / `setLoadout` : accepter les ids de classe v2 (`Knight`, `Archer`...) ; le profil et `Progression.Unlocks` sont encore en ids v1 (`Cornu`...), alors le menu Classes envoie l'id v1. `MatchRequest` : un groupe et un mode `Solo` / `Party` / `Public` ; reformer le groupe au retour ; `getParty(player)` ; données du pass saisonnier (paliers, piste gratuite et payante, XP gagnée en jouant) ; texte de la quête de déblocage de chaque classe |
+| classes (A04) | `applyClass(player, classId)` utilisable dans le lobby (palier 1) |
+| companion (A05) | Mode lobby de `CompanionRenderer` : le compagnon équipé suit son joueur ; la collection se promène dans l'enclos (client seul) |
+| ui (A08) | Style du bouton PLAY et des boutons de la barre (icône + mot, pastille de nombre) ; **8 icônes de barre** (Classes, Critters, Upgrades, Inventory, Quests, Ranks, Pass, Shop) ; icônes des classes et de Solo / Friends / Public ; `SettingsUI` d'après la maquette n° 7 ; variables `zone/*` : faites et reliées |
+| art (A01) | Dans le kit : lettres en briques pour les noms de bâtiments (CLASSES, CRITTERS, UPGRADES, INVENTORY, QUESTS, RANKS, PASS, SHOP) et une façade par menu |
+| VFX (A07) | Tourbillon du portail, pop d'équipement, éclat de l'enclume quand une amélioration est abordable |
 
-## 11. Auto-contrôle avant validation
-
-Checklist anti-AI-slop du doc de suivi, appliquée à ce qui existe (un plan et des wireframes, rien de construit) :
+## 11. Auto-contrôle
 
 | # | Point | État |
 | --- | --- | --- |
-| 1 | Guide de style (palette, voxel, proportions) | Non applicable encore : le guide A01 est en cours ; les teintes de zone sont marquées provisoires |
-| 2 | Lisible sur téléphone | Hub : repères de 12 à 44 studs, tout à moins de 10 s. Menus : 3 tailles de téléphone vérifiées par capture |
-| 3 | Silhouette reconnaissable | Non applicable (pas de modèle) |
-| 4 | Aucune sortie brute | Polices Fredoka One + Nunito choisies, pas de dégradé par défaut, composants faits pour le projet |
-| 5 | Une touche d'humour par élément | Gob le gobelin boutiquier, le Gland Grincheux gardien du portail, le Hibou des quêtes, « Do not feed the critters », le casque trop grand du Knight, la statue « Your statue here? » |
-| 6 | quality-score ≥ 8 | **Auto-évaluation seulement** (pas de relecteurs à l'aveugle lancés) sur la grille UI : U1 clarté 2/2, U2 hiérarchie 2/2, U3 cohérence 2/2 (design system A08), U4 mouvement 0/2 (ouverture, fermeture et appui pas encore spécifiés), U5 lisibilité 2/2, U6 perf 1/2 (listes en pool prévues mais non codées) → **7,9 / 10**. Brouillon tant que le mouvement n'est pas spécifié (vague 2, avec le code) |
-| 7 | Vérifié en jeu (capture Studio) | Non : rien n'est construit en vague 1 |
-| 8 | Budget de perf | Budget du hub fixé (§8), à mesurer en vague 2 |
+| 1 | Guide de style | Le village suit `80-direction-artistique.md` (carte de Clément) ; l'UI suit la bibliothèque A08, en refonte |
+| 2 | Lisible sur téléphone | Barre et PLAY entre le joystick et le Saut ; 3 tailles de téléphone vérifiées pour les menus |
+| 4 | Aucune sortie brute | Composants A08 ; pas de texte d'aide sous les boutons |
+| 5 | Humour | Gob le chapelier, le Hibou Plongeur des quêtes, l'enclume qui brille, le podium |
+| 6 | quality-score | Auto-évaluation 7,9 / 10 (mouvement des menus non spécifié) : brouillon |
+| 7 | Vérifié en jeu | Oui pour le HUD, le choix du mode, le menu Classes et PLAY → run (Play Studio, 5 nov., §2.3). Retour au lobby : en attente d'A04 |
 
-## 12. Questions ouvertes pour Clément
+## 12. Décisions de Clément
 
-**Retours de Clément (4 nov. 2026)** : « Je valide » le plan du hub et la structure des 8 écrans. Réponses aux questions :
+**4 nov.** : plan, structure des 8 écrans et habillage validés.
 
 | # | Question | Décision |
 | --- | --- | --- |
-| 1 | Nom du village | Oui : **Hubbub Village** |
-| 2 | Solo mis en avant pour la 1re run, Public ensuite | Oui |
-| 3 | Joueurs par serveur de lobby | **8** (au lieu des 20 proposés) |
+| 1 | Nom du village | **Hubbub Village** |
+| 2 | Solo mis en avant pour la 1re run | Oui (présélectionné dans Queue & Party) |
+| 3 | Joueurs par serveur de lobby | **8** |
 | 4 | File publique dans le même serveur d'abord | Oui |
 | 5 | Essai des classes verrouillées | **Non : cadenas seul** |
 | 6 | Enclos : chacun voit sa collection | Oui |
 
-Questions telles que posées :
+**5 nov.** : bouton Play + barre de menus, village en décor (« oui a tous »).
 
-1. **Nom du village en jeu** : « Hubbub Village » en attendant le nom du jeu (A12 cherche le nom anglais) ? Les noms anglais des mondes (« Grumpy Woods » pour Bois Grognon) sont des exemples à remplacer.
-2. **1re run en Solo mis en avant** (le plus rapide pour apprendre), puis Public mis en avant dès la 2e visite : d'accord ?
-3. **20 joueurs par serveur de lobby** : d'accord ?
-4. **File publique** : on lance avec les joueurs du même serveur (simple), et le matchmaking entre serveurs vient plus tard si besoin ?
-5. **Essai des classes verrouillées** (8 s, sur soi, sans stat) : d'accord ?
-6. **Enclos** : chacun ne voit que sa propre collection ; les autres voient seulement le compagnon équipé qui te suit. D'accord ?
+Questions ouvertes (5 nov.) :
+
+1. **8e bouton Ranks** dans la barre (le classement KO est le pilier du jeu) : d'accord ?
+2. **Même mot sur le bâtiment et sur le bouton** (« UPGRADES » plutôt que « FORGE ») : d'accord ?
+3. **Pass** : aucun palier vendu en Robux, seulement la piste payante : d'accord ?
+4. **Libellés** : « Classes » ou « Class » ; « Critters » ou « Companions » ?
 
 ## Sources vault
 
-- 33 Level Design / **Lobby and Hub Design** : jobs du hub classés, budgets de temps (1re station < 15 s, sortie < 20 s, station → station < 10 s), place de 40-70 studs, prompts espacés de 2 × la portée, pads interrogés par boîte, pas de cercles au sol, budget d'instances (913-4 531 mesurés).
-- skill **fwjelaa-worldbuilding** + `references/budgets.md` : brief, héros ≥ 1,5 × le reste et ≥ 3-5° de champ, chemins 20-34 studs, apparition 12-20 studs par joueur, budgets mobile (300-600 k triangles, 8-12 lumières dont 2-3 avec ombre), streaming.
-- 05 UI and UX / **Onboarding and FTUE** et 10 / **First-Time User Experience and Onboarding** : contrôle en ~10 s, 1re action en 10-20 s, objectif de 8 mots maximum, pas de mur de texte.
-- 05 UI and UX / **Designing Roblox UI in Figma - Frames, Safe Areas and Tokens** : cadres 1920 × 1080 et 844 × 390, texte ≥ 15 px de maquette, zones tactiles ≥ 52 px, couche `skip_safe_area`.
+- 33 Level Design / **Lobby and Hub Design** : jobs du hub classés, budgets de temps, place compacte, pas de cercles au sol, budget d'instances.
+- 05 UI and UX / **Onboarding and FTUE** et 10 / **First-Time User Experience and Onboarding** : contrôle en ~10 s, 1re action en 10-20 s, pas de mur de texte.
+- 05 UI and UX / **Designing Roblox UI in Figma - Frames, Safe Areas and Tokens** : zones réservées, cibles tactiles.
 - 21 / **fwjelaa UI Design System** : une seule action verte par écran, dire pourquoi un bouton est verrouillé.
-- 41 Multiplayer Services / **Matchmaking Queues with MemoryStore** : le groupe est un seul ticket ; d'abord se demander s'il faut une file entre serveurs.
+- 41 Multiplayer Services / **Matchmaking Queues with MemoryStore** : le groupe est un seul ticket.
