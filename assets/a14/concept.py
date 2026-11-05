@@ -61,7 +61,7 @@ class Sprite:
         self.fixed: set = set()               # pixels peints à la main : l'ombrage auto n'y touche pas
 
     def set(self, x, y, key, fixed=True):
-        if -1 <= x <= self.w and -1 <= y <= self.h:   # une marge d un pixel pour le contour
+        if -2 <= x <= self.w + 1 and -2 <= y <= self.h + 1:   # une marge d un pixel pour le contour
             self.px[(x, y)] = key
             if fixed:
                 self.fixed.add((x, y))
@@ -268,42 +268,50 @@ def firestaff() -> Sprite:
 
 
 def bombbag() -> Sprite:
-    """Bomb Bag (porteur et icône). Couleur dominante : raisin. Gros sac grognon au col court ficelé d'or,
-    ouverture froncée d'où dépassent deux bombes rondes, mèches Neon."""
+    """Bomb Bag (porteur et icône). Couleur dominante : raisin. Un sac de toile ventru, épaules, col serré
+    par une cordelette d'or, ouverture en pointes de tissu d'où dépassent deux bombes, une pièce cousue,
+    un air grognon (gag)."""
     s = Sprite("BombBag", 32, 32, grip=(16.0, 12.0))
     s.depth.update({"Grape": 5, "Gold": 5, "Ink": 4, "Cream": 5, "Leather": 2, "Plum": 5, "Steel": 4})
-    s.ell(12.5, 5.0, 3.6, 3.6, "Ink")                              # bombes (derrière l'ourlet)
-    s.ell(20.0, 4.5, 3.1, 3.1, "Ink")
-    for (x, y) in ((11, 3), (12, 3), (11, 4), (19, 3), (19, 2)):    # reflets
+    s.ell(12.8, 4.6, 3.4, 3.4, "Ink")                              # bombes, derrière l'ouverture
+    s.ell(19.6, 4.0, 2.9, 2.9, "Ink")
+    for (x, y) in ((11, 3), (12, 2), (11, 4), (18, 2), (19, 2)):    # reflets
         s.set(x, y, "Cream")
-    s.rect(12, 1, 13, 1, "Steel")                                  # capuchons et mèches
-    s.set(20, 1, "Steel")
-    s.set(13, 0, "Leather")
-    s.set(20, 0, "Leather")
-    s.ell(16.0, 21.0, 11.5, 9.5, "Grape")                          # panse large
-    s.rect(8, 29, 23, 30, "Grape")
-    s.rect(13, 9, 18, 12, "Grape")                                 # col court
-    s.rect(10, 7, 21, 8, "Grape")                                  # ourlet froncé
-    for x in (10, 13, 16, 19):
-        s.set(x, 7, "Grape.l")
-        s.set(x + 1, 8, "Grape.d")
-    s.rect(12, 11, 19, 11, "Gold")                                 # cordelette et nœud
-    s.rect(20, 10, 21, 12, "Gold")
+    s.rect(12, 0, 13, 0, "Steel")
+    s.set(20, 0, "Steel")
+    s.ell(16.0, 23.0, 12.2, 8.6, "Grape")                          # panse ventrue
+    s.rect(6, 28, 25, 30, "Grape")
+    for k, (x0, x1) in enumerate(((11, 20), (10, 21), (9, 22), (8, 23))):   # épaules
+        s.rect(x0, 11 + k, x1, 11 + k, "Grape")
+    s.rect(12, 9, 19, 10, "Grape.d", fixed=True)                   # col serré
+    s.rect(10, 7, 21, 8, "Grape")                                  # ouverture évasée
+    for x in (9, 10, 13, 14, 17, 18, 21, 22):                      # pointes de tissu
+        s.set(x, 6, "Grape")
+    s.rect(11, 10, 20, 10, "Gold")                                 # cordelette et nœud
+    s.rect(21, 10, 22, 11, "Gold")
+    s.set(23, 12, "Gold")
     s.set(22, 13, "Gold")
-    s.set(21, 14, "Gold")
-    s.rect(9, 19, 12, 21, "Cream")                                 # visage grognon
-    s.rect(19, 19, 22, 21, "Cream")
-    s.rect(11, 20, 12, 21, "Ink")
-    s.rect(19, 20, 20, 21, "Ink")
-    s.line((8, 16), (12, 18), "Plum")                              # sourcils froncés
-    s.line((23, 16), (19, 18), "Plum")
-    s.rect(13, 25, 18, 25, "Ink")                                  # bouche boudeuse
-    s.set(12, 26, "Ink")
-    s.set(19, 26, "Ink")
+    s.rect(8, 25, 11, 28, "Plum", fixed=True)                      # pièce cousue
+    for (x, y) in ((8, 25), (10, 25), (11, 26), (11, 28), (9, 28), (8, 27)):
+        s.set(x, y, "Cream")
+    s.rect(10, 18, 12, 20, "Cream")                                # visage grognon
+    s.rect(19, 18, 21, 20, "Cream")
+    s.rect(11, 19, 12, 20, "Ink")
+    s.rect(19, 19, 20, 20, "Ink")
+    s.line((9, 16), (12, 17), "Plum")
+    s.line((22, 16), (19, 17), "Plum")
+    s.rect(14, 24, 18, 24, "Ink")
+    s.set(13, 25, "Ink")
+    s.set(19, 25, "Ink")
+    for (x, y) in ((24, 17), (25, 20), (25, 23)):                  # coutures sur le flanc
+        s.set(x, y, "Grape.d")
     s.shade()
     s.outline()
-    s.set(14, -1, "Gold!")                                         # étincelles (au-dessus du contour)
-    s.set(20, -1, "Gold!")
+    s.set(13, -2, "Gold!")                                         # mèches qui crépitent
+    s.set(14, -2, "Gold!")
+    s.set(20, -2, "Gold!")
+    s.set(13, -1, "Leather")
+    s.set(20, -1, "Leather")
     return s
 
 
@@ -676,7 +684,7 @@ def swing(center, radius=8.0, half=70.0, height=2.9):
     core = ribbon(pts, widths, HX["Sky"], 1.8,
                   across=[(0.0, 1.0), (0.12, 1.0), (0.45, 0.7), (1.0, 0.0)],
                   along=[(0.0, 0.25), (0.5, 0.8), (0.9, 1.0), (1.0, 1.0)],
-                  color_stops=[(0.0, WHITE), (0.45, WHITE), (0.62, "BDF0FF"), (1.0, HX["Sky"])])
+                  color_stops=[(0.0, WHITE), (0.2, "D6F6FF"), (0.45, "8EE6FF"), (1.0, HX["Sky"])])
     return core
 
 
@@ -716,12 +724,13 @@ def blast(center, radius, seed=3, flames=0):
     étincelles, fumée douce. Disparaît en 0,5 s en jeu."""
     rnd = random.Random(seed)
     cx, cy = center
-    disc(center, radius, 0.06, HX["Ember"], 1.3,
-         [(0.0, 0.0), (0.72, 0.0), (0.86, 0.9), (0.93, 1.0), (1.0, 0.0)],
+    disc(center, radius + 0.2, 0.05, "2A1C3D", 0.0, [(0.0, 0.0), (0.9, 0.0), (0.95, 0.5), (1.0, 0.0)], matte=True)
+    disc(center, radius, 0.06, HX["Ember"], 1.4,
+         [(0.0, 0.0), (0.66, 0.0), (0.8, 0.95), (0.95, 1.0), (1.0, 0.0)],
          color_stops=[(0.0, HX["Ember"]), (0.9, "FF9A3C"), (1.0, HX["Ember"])])
     disc(center, radius * 0.95, 0.04, HX["Ember"], 1.0, [(0.0, 0.5), (0.6, 0.28), (1.0, 0.0)])
     glow_ball((cx, cy, 1.4), 0.9, "FFF2C4", 12.0)
-    sprite((cx, cy, 1.5), 3.0, WHITE, 4.0, stops=((0.0, 1.0), (0.3, 0.7), (1.0, 0.0)))
+    sprite((cx, cy, 1.5), 4.0, WHITE, 4.0, stops=((0.0, 1.0), (0.3, 0.75), (1.0, 0.0)))
     sprite((cx, cy, 1.6), 7.5, HX["Ember"], 1.15, stops=((0.0, 0.9), (0.45, 0.5), (1.0, 0.0)))
     for k in range(16):
         a = rnd.uniform(0, math.tau)
@@ -756,10 +765,11 @@ def telegraph(center, radius, progress=0.6, dashes=16):
 
 def danger(center, radius, progress=0.6):
     """Danger ennemi : rouge Tomato, sans Neon (peu lumineux) : bord net, zone translucide, remplissage."""
-    disc(center, radius, 0.07, HX["Tomato"], 0.6, [(0.0, 0.0), (0.88, 0.0), (0.92, 1.0), (0.98, 1.0), (1.0, 0.0)],
+    disc(center, radius + 0.2, 0.05, "2A1C3D", 0.0, [(0.0, 0.0), (0.9, 0.0), (0.95, 0.5), (1.0, 0.0)], matte=True)
+    disc(center, radius, 0.07, HX["Tomato"], 0.25, [(0.0, 0.0), (0.85, 0.0), (0.9, 1.0), (0.98, 1.0), (1.0, 0.0)],
          matte=True)
-    disc(center, radius, 0.05, HX["Tomato"], 0.3, [(0.0, 0.25), (0.9, 0.3), (1.0, 0.0)], matte=True)
-    disc(center, radius * progress, 0.06, HX["Tomato"], 0.5, [(0.0, 0.45), (0.9, 0.5), (1.0, 0.0)], matte=True)
+    disc(center, radius, 0.05, "B8202E", 0.1, [(0.0, 0.4), (0.9, 0.45), (1.0, 0.0)], matte=True)
+    disc(center, radius * progress, 0.06, HX["Tomato"], 0.2, [(0.0, 0.6), (0.9, 0.65), (1.0, 0.0)], matte=True)
 
 
 def enemy_shot(loc, direction):
@@ -865,7 +875,7 @@ def ground_split(sc):
 
 
 R_GRIP = Vector((-1.5, 0.125, 2.3))   # main droite du mannequin (studs, pieds à z 0)
-HELD_SCALE = 1.4                      # arme tenue un peu surdimensionnée : lisible à la caméra dézoomée
+HELD_SCALE = 1.7                      # arme tenue un peu surdimensionnée : lisible à la caméra dézoomée
 HELD = {                              # face plate du sprite vers la caméra (placée derrière le joueur)
     "sword": Euler((0.25, math.radians(-38), 0)),   # lame levée vers la droite de l écran
     "staff": Euler((0.15, math.radians(-6), 0)),
@@ -1070,6 +1080,30 @@ def view_legend(out):
     render(sc, out, res=(2400, 800), samples=48)
 
 
+def view_icons(out):
+    """Icônes pour A08 : chaque arme en léger trois-quarts de face, fond transparent, carré de 512 px.
+    Écrit <dossier>/icons/<Id>.png (le contour encre de l'interface est posé par A08)."""
+    from mathutils import Vector as V
+
+    outdir = os.path.join(os.path.dirname(out), "icons")
+    os.makedirs(outdir, exist_ok=True)
+    for name in ("Broadsword", "Longbow", "FireStaff", "BombBag"):
+        sc = fresh()
+        B.diorama_light(sc, sun_elev=40, sun_az=-30, strength=4.0, world="FFFFFF", world_strength=0.8)
+        root = place_weapon(SPRITES[name], (0, 0, 0), rot=Euler((math.radians(8), 0, math.radians(-22))))
+        bpy.context.view_layer.update()
+        pts = []
+        for ob in root.children:
+            pts += [ob.matrix_world @ V(c) for c in ob.bound_box]
+        lo = V((min(p.x for p in pts), min(p.y for p in pts), min(p.z for p in pts)))
+        hi = V((max(p.x for p in pts), max(p.y for p in pts), max(p.z for p in pts)))
+        mid = (lo + hi) / 2
+        size = max(hi.x - lo.x, hi.z - lo.z) * 1.12
+        B.camera(sc, (mid.x, mid.y - 30.0, mid.z), (mid.x, mid.y, mid.z), ortho=size)
+        sc.view_settings.view_transform = "Standard"
+        B.render(sc, os.path.join(outdir, f"{name}.png"), res=(512, 512), transparent=True, samples=32)
+
+
 def export_sprites(outdir):
     with open(os.path.join(outdir, "sprites.json"), "w", encoding="utf-8") as f:
         json.dump({name: fn().export() for name, fn in SPRITES.items()}, f)
@@ -1077,6 +1111,7 @@ def export_sprites(outdir):
 
 VIEWS = {"lineup": view_lineup, "swing": view_swing, "fireball": view_fireball, "bomb": view_bomb,
          "legend": view_legend, "sequence": view_sequence, "dense": view_dense,
+         "icons": view_icons,
          "sprites": lambda out: None}   # sprites.json seulement
 
 
@@ -1085,5 +1120,5 @@ if __name__ == "__main__":
     which, outdir = argv[0], os.path.abspath(argv[1])
     os.makedirs(outdir, exist_ok=True)
     export_sprites(outdir)
-    for name in ([v for v in VIEWS if v != "sprites"] if which == "all" else which.split(",")):
+    for name in ([v for v in VIEWS if v not in ("sprites", "icons")] if which == "all" else which.split(",")):
         VIEWS[name](os.path.join(outdir, f"a14_{name}.png"))

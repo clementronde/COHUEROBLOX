@@ -490,7 +490,7 @@ Je ne touche pas aux fichiers de ces agents. Chaque demande est petite et sans r
 | A01 | DA §6 : « une couleur par arme » au lieu de « aux couleurs de la classe » ; télégraphes du joueur en Ember ou Gold | décision de Clément du 5 nov. |
 | A04 (option) | Envoyer les coups critiques (un bit dans un évènement existant) | effet de critique pour l'Archer et la Crit Rune |
 | A03 (option) | Distinguer gel et étourdissement (aujourd'hui un seul bit « arrêté », teinte givre) | le Quake Hammer et le Megaphone étourdissent, ils ne gèlent pas |
-| A08 | Icônes d'armes : utiliser les sprites de A14 (`assets/a14/sprites/<Arme>.png`, 32 px, et `@8x`, fond transparent, filtrage au plus proche), téléversés par A14 à la porte 3 ; 4 armes livrées avec la planche, les autres suivent | Clément : « le même sprite sert d'icône » |
+| A08 | Icônes d'armes livrées au format demandé par A08 (PNG carré 512 px, fond transparent, une arme par fichier nommée par son id) dans `docs/dossier/ui-assets/icons/weapons/` : `<Id>.png` = rendu du modèle en léger trois-quarts, `<Id>_flat.png` = le sprite à plat aux pixels nets. 4 armes livrées (Broadsword, Longbow, FireStaff, BombBag), les 12 autres à l'étape 3. Sprites natifs : `assets/a14/sprites/` | Clément : « le même sprite sert d'icône » |
 | A06 | Aucune ; l'arme tenue s'accroche à `RightGripAttachment` sans toucher à l'animation | — |
 
 Ce que je corrige moi-même dans `WeaponFX` (client, mon domaine, étape 4) : le style des carreaux de la tourelle, la couleur de `MiniBomb`, les télégraphes, et le clonage des objets au lieu des Parts fabriquées par script.
