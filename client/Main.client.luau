@@ -30,6 +30,8 @@ local ORDER = {
 	"LoadoutUI",
 	"EndScreen",
 	"SettingsUI",
+	"SoundController",
+	"WorldTransition",
 	"DebugHud",
 }
 
