@@ -35,7 +35,7 @@ Revérifié par A11 dans le code de main (`851322e`, après les fusions A04 `a1e
 | S-16 | **Corrigé** (A11, `claude/a11-failles`) | Nouvelle, Moyenne. `RunManager.onCharacterDied` (correctif S-02 d'A04) faisait réapparaître le joueur à `root.Position`, valeur du client : se téléporter puis se tuer (Reset) = réapparaître n'importe où (cage, autel, arène), sans strike puisque le téléport de réapparition est imposé par le serveur. Il prend maintenant `MovementGuard.getLastValidPosition` (dernière position au sol validée), `root.Position` seulement en secours |
 | S-17 | **Corrigé** (A11, `claude/a11-revue-v3`, `a52bf20`) | Vague 3, Moyenne. Le temps figé du passage de niveau comptait dans la durée de run du classement. `ProgressionService.onRunFrozen` décale les horloges à la reprise |
 | S-18 | **Corrigé** (A11, `claude/a11-revue-v3`, `5d1afa7`) | Vague 3, Basse. `weeklyRank` trahissait une run en quarantaine. Le rang prend aussi les KO de la run |
-| S-19 | À transmettre (A04) | Vague 3, Moyenne. Offre solo sans limite gardée quand un retardataire arrive : il reste figé |
+| S-19 | **Corrigé** (A04, `claude/a04-equilibrage-v4`, `eb15f8a`, pas testé en Play) | Vague 3, Moyenne. Offre solo sans limite gardée quand un retardataire arrive : il reste figé |
 | S-20 | À transmettre (A06 / raccords-v3) | Vague 3, Moyenne. Environ 4 à 5 studs/s de déplacement toléré pendant le gel, sans limite de temps en solo |
 
 Hard gate « serveur autoritaire » : **réussi** depuis S-01 (le Y du client ne protège plus des dégâts après 1,5 s en l'air). À confirmer en Play avec les scripts de `docs/security/tests-exploits.md` (A11-06).
@@ -76,7 +76,7 @@ Hard gate « serveur autoritaire » : **réussi** depuis S-01 (le Y du client ne
 | S-15 | Basse | `server/Services/DataService.luau:453`, `server/Services/ProgressionService.luau:1435-1439` | Deux petites fuites : tables recréées pour un joueur déjà parti | A11 | Vague 2 |
 | S-17 | Moyenne | `server/Services/ProgressionService.luau:1925`, `:2124` | Le gel du passage de niveau (sans limite en solo) gonfle la durée de run : signaux de quarantaine dilués, faux « sans dégât » en Overtime | A11 | **Corrigé** |
 | S-18 | Basse | `server/Services/ProgressionService.luau:2072` | `weeklyRank` calculé sans les KO d'une run en quarantaine : le tricheur voit qu'il n'a pas de rang | A11 | **Corrigé** |
-| S-19 | Moyenne | `server/Services/CardService.luau:394-397`, `:623` | Une offre ouverte en solo reste sans limite quand la run devient coop : le retardataire est figé | A04 | À transmettre |
+| S-19 | Moyenne | `server/Services/CardService.luau:394-397`, `:623` | Une offre ouverte en solo reste sans limite quand la run devient coop : le retardataire est figé | A04 | **Corrigé** |
 | S-20 | Moyenne | `server/Services/MovementGuard.luau:521-576` | Pendant le gel, le garde tolère encore 4 à 5 studs/s (marge et fuite du seau), sans limite de temps en solo | A06 (raccords-v3) | À transmettre |
 
 ## Détail des failles
