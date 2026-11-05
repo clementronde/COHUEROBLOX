@@ -31,7 +31,6 @@ local Bus = require(script.Parent.Parent:WaitForChild("Bus"))
 local WorldPortals = require(script.Parent:WaitForChild("WorldPortals")) -- A02-08 (module simple)
 
 local MAIN_DT = 0.1
-local DEFEAT_LOBBY_DELAY = 5
 local CONTACT_DT = 1 / Run.Player.ContactHz
 
 type PlayerRun = {
@@ -711,7 +710,74 @@ local function startStage(stage: number)
 	end
 end
 
-local function startRun()
+-- A04-v3 : fin de run = retour au lobby dans la place unique (sauf mode deux places, où MatchService
+-- renvoie au lobby et Replay relance la run).
+local function lobbyMode(): boolean
+	return not Run.UseLobbyPlace
+end
+
+-- Équipement de la classe choisie, palier 1, porté au lobby (65-lobby §10).
+local function applyLobbyClass(r: PlayerRun)
+	local progression = find("ProgressionService")
+	if progression then
+		local ok, classId, companionId = safe(progression.getLoadout, r.player)
+		if ok and type(classId) == "string" then
+			r.classId = classId
+		end
+		if ok and type(companionId) == "string" then
+			r.companionId = companionId
+		end
+	end
+	local traits = find("TraitService")
+	if traits then
+		safe(traits.applyClass, r.player, playableClass(r.classId))
+	end
+end
+
+-- Un joueur dont la run est finie revient au point d'apparition du lobby, prêt à rejouer (PLAY).
+local function sendToLobby(r: PlayerRun)
+	local player = r.player
+	r.lobbyAt = nil
+	r.inRun = false
+	r.ready = false
+	r.replay = false
+	r.joinedAt = now()
+	r.cashOutHold = 0
+	r.hp = r.maxHp
+	r.shield = 0
+	r.ghost = false
+	r.downedUntil = nil
+	r.reviveProgress = 0
+	r.deathPos = nil
+	r.frozenSlow = nil
+	setGhostLook(r, false)
+	clearSlow(player)
+	setLifeAttributes(r)
+	player:SetAttribute("InRun", false)
+	player:SetAttribute("Frozen", nil)
+	player:SetAttribute("VictoryChoice", nil)
+	local spawn = Workspace:FindFirstChildWhichIsA("SpawnLocation")
+	if spawn then
+		teleport(player, spawn.Position)
+	end
+	applyLobbyClass(r)
+	state.waitForLobbyPlay = true
+end
+
+-- Résumé envoyé au joueur ; retour au lobby Run.Lobby.ReturnSeconds s plus tard (ou au bouton).
+local function finishPlayer(r: PlayerRun, summary: Types.RunSummary)
+	r.inRun = false
+	r.player:SetAttribute("InRun", false)
+	if lobbyMode() then
+		r.lobbyAt = now() + Run.Lobby.ReturnSeconds
+	end
+	(summary :: any).returnToLobby = r.lobbyAt ~= nil
+	if r.player.Parent then
+		remotes.RunSummary:FireClient(r.player, summary)
+	end
+end
+
+local function startRun(players: { Player })
 	state.runId += 1
 	-- v2 : la run part toujours du monde 1 de Run.WorldChain (la sélection v1 monde/tier est ignorée).
 	state.worldId = worldIdFor(1)
@@ -719,12 +785,14 @@ local function startRun()
 	state.tier = if lobby and type(lobby.tier) == "number" then math.clamp(math.floor(lobby.tier), 1, 3) else 1
 	state.victory = false
 	state.cashOut = nil
-	state.cashOutHold = 0
 	state.cashedOut = false
 	state.firstReplayAt = nil
-	state.lobbyReturnAt = nil
+	state.firstReadyAt = nil
 	table.clear(runPlayers)
-	for _, player in Players:GetPlayers() do
+	for _, player in players do
+		if player.Parent ~= Players then
+			continue
+		end
 		local r = getRecord(player)
 		local progression = find("ProgressionService")
 		if progression then
@@ -745,7 +813,7 @@ local function startRun()
 	startStage(1)
 end
 
-local function buildSummary(r: PlayerRun, victory: boolean): Types.RunSummary
+local function buildSummary(r: PlayerRun, victory: boolean, cashedOut: boolean): Types.RunSummary
 	local player = r.player
 	local stats = find("StatsService")
 	local loot = find("LootService")
@@ -805,8 +873,21 @@ local function buildSummary(r: PlayerRun, victory: boolean): Types.RunSummary
 		level = level,
 		-- Champs v2 en plus du contrat Types.RunSummary (contract request A04)
 		worldsCleared = (if state.victory then worldCount() else state.stage - 1) :: any,
-		cashedOut = state.cashedOut :: any,
+		cashedOut = cashedOut :: any,
 	} :: any
+end
+
+-- Résumé + récompenses (ProgressionService.grantRunRewards renvoie le résumé complété).
+local function rewardSummary(r: PlayerRun, victory: boolean, cashedOut: boolean): Types.RunSummary
+	local summary = buildSummary(r, victory, cashedOut)
+	local progression = find("ProgressionService")
+	if progression then
+		local ok, result = safe(progression.grantRunRewards, r.player, summary)
+		if ok and type(result) == "table" then
+			summary = result
+		end
+	end
+	return summary
 end
 
 local function endRun(victory: boolean)
@@ -837,68 +918,84 @@ local function endRun(victory: boolean)
 	end
 
 	local summaries: { [Player]: Types.RunSummary } = {}
-	local progression = find("ProgressionService")
 	for _, player in runPlayers do
 		local r = records[player]
 		if r then
-			local summary = buildSummary(r, victory)
-			if progression then
-				local ok, result = safe(progression.grantRunRewards, player, summary)
-				if ok and type(result) == "table" then
-					summary = result
-				end
-			end
-			summaries[player] = summary
+			summaries[player] = rewardSummary(r, victory, state.cashedOut)
 		end
 	end
 	Bus.RunEnded:fire(summaries)
-	for _, player in runPlayers do
+	-- Chacun reçoit son résumé ; en place unique, retour au lobby après Run.Lobby.ReturnSeconds
+	-- (défaite, victoire ou Cash out : 65-lobby §10, demande 3).
+	for player, summary in summaries do
 		local rec = records[player]
 		if rec then
-			rec.inRun = false -- le choix de classe redevient possible jusqu'au Replay
-		end
-	end
-	if not victory and not Run.UseLobbyPlace then
-		state.lobbyReturnAt = now() + DEFEAT_LOBBY_DELAY
-	end
-	for player, summary in summaries do
-		(summary :: any).returnToLobby = state.lobbyReturnAt ~= nil
-		if player.Parent then
-			remotes.RunSummary:FireClient(player, summary)
+			finishPlayer(rec, summary)
 		end
 	end
 	state.stateDirty = true
 end
 
-local function resetToLoadout(returnToLobby: boolean?)
-	state.runId += 1
-	state.lobbyReturnAt = nil
-	state.firstReplayAt = nil
-	clearPause()
-	local resetAt = now()
-	local spawn = if returnToLobby then Workspace:FindFirstChildWhichIsA("SpawnLocation") else nil
-	for player, rec in records do
-		rec.inRun = false
-		rec.ready = false
-		rec.replay = false
-		rec.joinedAt = resetAt
-		if returnToLobby and player.Parent == Players then
-			rec.hp = rec.maxHp
-			rec.shield = 0
-			rec.ghost = false
-			rec.downedUntil = nil
-			rec.reviveProgress = 0
-			rec.deathPos = nil
-			setGhostLook(rec, false)
-			clearSlow(player)
-			setLifeAttributes(rec)
-			if spawn then
-				teleport(player, spawn.Position)
-			end
+-- A04-v3 : Cash out par joueur (60-ui-ux, Victory = choix par joueur). Le joueur quitte la run avec
+-- ses gains ; les autres continuent (Keep going). Le dernier à partir termine la run.
+local function cashOutPlayer(r: PlayerRun)
+	if not state.victory or not r.inRun or state.phase == "Ended" or state.phase == "Loadout" then
+		return
+	end
+	local player = r.player
+	player:SetAttribute("VictoryChoice", "CashOut")
+	local others = 0
+	for _, p in runPlayers do
+		if p ~= player then
+			others += 1
 		end
 	end
-	if returnToLobby then
-		state.waitForLobbyPlay = true
+	if others == 0 then
+		state.cashedOut = true
+		endRun(true)
+		return
+	end
+	local summary = rewardSummary(r, true, true)
+	local i = table.find(runPlayers, player)
+	if i then
+		table.remove(runPlayers, i)
+	end
+	r.finishedRunId = state.runId
+	r.cashOutHold = 0
+	r.downedUntil = nil
+	r.ghost = false
+	setGhostLook(r, false)
+	clearSlow(player)
+	setLifeAttributes(r)
+	Bus.PlayerCashedOut:fire(player, summary)
+	announce("CashOut", {
+		en = `{player.DisplayName} cashed out!`,
+		fr = `{player.DisplayName} cashed out!`,
+	}, 2.5)
+	finishPlayer(r, summary)
+	state.stateDirty = true
+end
+
+local function resetToLoadout()
+	state.runId += 1
+	state.firstReplayAt = nil
+	state.firstReadyAt = nil
+	clearPause()
+	local resetAt = now()
+	for player, rec in records do
+		-- Encore dans la run ou en attente du retour : au lobby tout de suite.
+		if (rec.inRun or rec.lobbyAt) and lobbyMode() and player.Parent == Players then
+			sendToLobby(rec)
+		end
+		rec.inRun = false
+		rec.lobbyAt = nil
+		rec.replay = false
+		rec.joinedAt = resetAt
+		player:SetAttribute("InRun", false)
+		-- Au lobby, un joueur qui a déjà appuyé sur PLAY le reste (départ suivant).
+		if not lobbyMode() then
+			rec.ready = false
+		end
 	end
 	setPhase("Loadout")
 	director({ active = false })
@@ -1249,6 +1346,14 @@ function updateDirector(t: number)
 end
 
 local function stepRun(dt: number)
+	-- Retours au lobby échus (fin de run, Cash out d'un joueur pendant que les autres continuent).
+	local clockNow = now()
+	for _, r in records do
+		if r.lobbyAt and clockNow >= r.lobbyAt and r.player.Parent == Players then
+			sendToLobby(r)
+		end
+	end
+
 	local phase = state.phase
 	if phase == "Loadout" then
 		local players = Players:GetPlayers()
@@ -1257,8 +1362,29 @@ local function stepRun(dt: number)
 		end
 		local timeout = if RunService:IsStudio() then Run.StudioLoadoutTimeout else Run.LoadoutTimeout
 		local allReady = true
-		local requirePlay = not Run.UseLobbyPlace
+		local requirePlay = lobbyMode()
 			and (state.waitForLobbyPlay or StarterGui:FindFirstChild("COHUE_Lobby") ~= nil)
+		-- Lobby dans la place unique (65-lobby §10, demande 2) : la run part avec les joueurs qui ont
+		-- appuyé sur PLAY, Run.Lobby.StartDelay s après le premier (tout de suite si tous sont prêts).
+		-- Les autres restent au lobby et pourront entrer en retardataires.
+		if requirePlay and not lobbyConfig() then
+			local ready = {}
+			for _, player in players do
+				if getRecord(player).ready then
+					table.insert(ready, player)
+				end
+			end
+			if #ready == 0 then
+				state.firstReadyAt = nil
+				return
+			end
+			local first = state.firstReadyAt or clockNow
+			state.firstReadyAt = first
+			if #ready == #players or clockNow - first >= Run.Lobby.StartDelay then
+				startRun(ready)
+			end
+			return
+		end
 		-- Mode lobby : on attend aussi les membres de la config encore en téléportation (S-12).
 		local lobby = lobbyConfig()
 		if lobby and type(lobby.members) == "table" then
@@ -1282,16 +1408,19 @@ local function stepRun(dt: number)
 			end
 		end
 		if allReady then
-			startRun()
+			startRun(players)
 		end
 		return
 	end
 	if phase == "Ended" then
-		local returnAt = state.lobbyReturnAt
-		if returnAt then
-			if now() >= returnAt then
-				resetToLoadout(true)
+		-- Place unique : la phase repasse en Loadout quand tous les joueurs de la run sont au lobby.
+		if lobbyMode() then
+			for _, r in records do
+				if r.lobbyAt then
+					return
+				end
 			end
+			resetToLoadout()
 			return
 		end
 		if state.firstReplayAt then
@@ -1302,7 +1431,7 @@ local function stepRun(dt: number)
 				end
 			end
 			if all or now() - state.firstReplayAt >= Run.ReplayTimeout then
-				startRun()
+				startRun(Players:GetPlayers())
 			end
 		end
 		return
@@ -1438,19 +1567,30 @@ local function stepRun(dt: number)
 		end
 	end
 
-	-- Après la victoire : Cash out quand tous les joueurs actifs sont dans le portail doré.
+	-- Après la victoire : Cash out par joueur, HoldSeconds dans le portail doré (A04-v3).
 	local cashOut = state.cashOut
 	if state.victory and cashOut then
-		if t >= state.portalOpensAt and allActiveNear(cashOut, Run.CashOut.Radius) then
-			state.cashOutHold += dt
-			state.stateDirty = true
-			if state.cashOutHold >= Run.CashOut.HoldSeconds then
-				state.cashedOut = true
-				endRun(true)
+		local open = t >= state.portalOpensAt
+		for _, player in table.clone(runPlayers) do
+			local r = records[player]
+			if not r or not r.inRun then
+				continue
 			end
-		elseif state.cashOutHold > 0 then
-			state.cashOutHold = 0
-			state.stateDirty = true
+			local root = rootOf(player)
+			local near = open
+				and isActiveRecord(r)
+				and root ~= nil
+				and Vector3.new(root.Position.X - cashOut.X, 0, root.Position.Z - cashOut.Z).Magnitude <= Run.CashOut.Radius
+			if near then
+				r.cashOutHold += dt
+				state.stateDirty = true
+				if r.cashOutHold >= Run.CashOut.HoldSeconds then
+					cashOutPlayer(r)
+				end
+			elseif r.cashOutHold > 0 then
+				r.cashOutHold = 0
+				state.stateDirty = true
+			end
 		end
 	end
 end
@@ -1481,7 +1621,12 @@ local function onBossDefeated(_bossId: string, _stage: number)
 		-- Victoire : portail doré Cash out ; sinon on continue (Keep going = Overtime infini).
 		state.victory = true
 		state.cashOut = portal
-		state.cashOutHold = 0
+		for _, p in runPlayers do
+			local r = records[p]
+			if r then
+				r.cashOutHold = 0
+			end
+		end
 		if portal and stageService then
 			safe(stageService.showCashOut, portal)
 		end
@@ -1793,11 +1938,15 @@ local function onReady(player: Player)
 		end
 	end
 	r.ready = true
-	-- Late joiner: enter the running run at the stage spawn.
-	if not r.inRun and state.phase ~= "Loadout" and state.phase ~= "Ended" then
+	-- Late joiner: enter the running run at the stage spawn. Un joueur parti en Cash out (ou qui
+	-- attend son retour au lobby) attend la run suivante.
+	local running = state.phase ~= "Loadout" and state.phase ~= "Ended"
+	if not r.inRun and running and r.finishedRunId ~= state.runId and r.lobbyAt == nil then
 		initPlayerForRun(r)
 		teleport(player, spawnPointFor(#runPlayers))
 		state.stateDirty = true
+	elseif not r.inRun then
+		applyLobbyClass(r) -- la classe choisie se voit déjà au lobby (palier 1)
 	end
 end
 
@@ -1854,15 +2003,50 @@ function RunManager.init()
 	end)
 
 	Net.onServerEvent("Replay", 2, function(player: Player)
+		local r = getRecord(player)
+		-- Place unique : Replay = retour au lobby tout de suite (on relance avec PLAY).
+		if r.lobbyAt then
+			r.lobbyAt = now()
+			return
+		end
 		if state.phase ~= "Ended" then
 			return
 		end
-		if state.lobbyReturnAt then
-			state.lobbyReturnAt = now()
+		r.replay = true
+		state.firstReplayAt = state.firstReplayAt or now()
+	end)
+
+	-- A04-v3 : bouton Lobby de l'écran de fin (60-ui-ux, EndScreen). Sans effet hors fin de run.
+	Net.onServerEvent("ReturnToLobby", 2, function(player: Player)
+		local r = records[player]
+		if r and r.lobbyAt then
+			r.lobbyAt = now()
+		end
+	end)
+
+	-- A04-v3 : Victory, choix par joueur. "CashOut" = part tout de suite avec ses gains (comme le
+	-- portail doré) ; "KeepGoing" = reste (attribut VictoryChoice pour l'UI). Refusé pendant le gel.
+	Net.onServerEvent("VictoryChoice", 2, function(player: Player, choice: unknown)
+		if choice ~= "CashOut" and choice ~= "KeepGoing" then
 			return
 		end
-		getRecord(player).replay = true
-		state.firstReplayAt = state.firstReplayAt or now()
+		local r = records[player]
+		if not r or not r.inRun or not state.victory or state.frozenAt then
+			return
+		end
+		if choice == "CashOut" then
+			cashOutPlayer(r)
+		else
+			player:SetAttribute("VictoryChoice", "KeepGoing")
+		end
+	end)
+
+	-- Lobby : l'équipement de la classe choisie (palier 1) dès que le profil est chargé.
+	Bus.ProfileLoaded:connect(function(player: Player)
+		local r = records[player]
+		if r and not r.inRun and player.Parent == Players then
+			applyLobbyClass(r)
+		end
 	end)
 
 	Bus.ChestOpened:connect(function(player: Player)
