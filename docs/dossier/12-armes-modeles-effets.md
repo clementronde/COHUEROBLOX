@@ -634,3 +634,9 @@ Trois relectures à l'aveugle ont noté 6,5, puis 7,2, puis 7,0 sur 10, avant le
 - la variante d'épée ;
 - les pièces en vol : lumière pour tout, ou pixel pour les objets (bombe, boomerang, haches, lames) ;
 - le créneau Studio pour reconstruire `Assets.FX` et adapter `WeaponFX`.
+
+**Bloom de Lighting (pour A01 et A02).** Le coordinateur a donné son accord le 5 nov. : A01 est à l'arrêt, et Clément a validé la direction « effets en lumière ». A14 posera le Bloom pendant son créneau Studio, avec `assets/a14/install/A14_bloom.luau`.
+- S'il existe déjà un BloomEffect dans Lighting, le script le règle au lieu d'en ajouter un.
+- Réglages : Intensity 0,6, Size 24, Threshold 0,95. Seules les parties très claires débordent : effets, Neon, cœurs blancs.
+- Le BloomEffect porte l'attribut `A14`.
+- Quand vous réglerez la lumière des mondes, gardez un Threshold haut. Sinon les briques claires et les chapeaux brilleront aussi.
