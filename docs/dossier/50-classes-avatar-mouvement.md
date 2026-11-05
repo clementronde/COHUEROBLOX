@@ -123,16 +123,16 @@ La règle « la caméra doit tourner de 8° pendant le saut » de la v1 est supp
 
 ### 4.3 Mouvement par classe (ids de `01-decisions-v2.md` §3)
 
-`Config.Movement.Classes[classId]`, lu par le client et par MovementGuard. Une classe absente reçoit le profil normal.
+`Config.Movement.profile(classId)`, lu par le client et par MovementGuard. Les nombres de base et les drapeaux viennent de `Config/Classes` (A04 : `walkSpeed`, `jumpHeight`, `airJumps`, `glide` + `glideSeconds`, `heavyLanding`, `slideBoost`) ; `Config.Movement.Classes` n'ajoute que les réglages fins (vitesse de plané, contrecoup, gravité, frottement de glissade). Une classe inconnue reçoit le profil normal. Les valeurs ci-dessous sont celles d'A04 au 4 nov.
 
 | Classe | Profil | Mesuré en jeu |
 | --- | --- | --- |
 | `Knight`, `Cleric`, `Tamer` | Normal | Saut 7,1 studs, glissade 0,87 s / 12 studs |
-| `Archer` | Saut haut : **11** studs | 10,9 studs |
-| `Rogue` | Double saut : 1 saut en l'air à 90 % de la hauteur, rechargé au sol | 13,4 studs au total |
-| `Mage` | Plané court : Saut maintenu en descente, chute max **6** studs/s pendant **1,1 s** par saut | Vol de 1,17 s au lieu de 0,54 s |
-| `Guardian` | Lent : marche **13,6** (−15 %), saut **6,5**, gravité **×1,2**. Atterrissage lourd après **8** studs de chute : marche ×0,6 pendant 0,25 s, onde au sol, secousse de caméra | Saut 6,4 studs, vol 0,43 s ; chute de 13 studs → atterrissage lourd côté client et `HeavyLandAt` côté serveur |
-| `Barbarian` | Glissade qui charge : boost **1,45**, frottement **6**, fin à 0,5 × marche, 2,2 s au plat, plafond 2,4 ×, braquage 4. Attribut serveur `SlideCharge` | 2,2 s / 36,6 studs |
+| `Archer` | Saut haut : **10** studs | (11 mesuré avec l'ancien réglage) |
+| `Rogue` | Marche **17**, double saut : 1 saut en l'air à 90 % de la hauteur, rechargé au sol | 13,4 studs au total |
+| `Mage` | Plané court : Saut maintenu en descente, chute max **6** studs/s pendant **1,2 s** par saut | Vol de 1,17 s au lieu de 0,54 s |
+| `Guardian` | Lent : marche **14**, saut **6,5**, gravité **×1,2**. Atterrissage lourd après **8** studs de chute : marche ×0,6 pendant 0,25 s, onde au sol, secousse de caméra | Saut 6,4 studs, vol 0,43 s ; chute de 13 studs → atterrissage lourd côté client et `HeavyLandAt` côté serveur |
+| `Barbarian` | Glissade qui charge : boost **1,6**, frottement **6**, fin à 0,5 × marche, 2,2 s au plat, plafond 2,4 ×, braquage 4. Attribut serveur `SlideCharge` | 2,2 s / 36,6 studs (boost 1,45) |
 
 Les passifs liés au mouvement (Shadowstep du Rogue : 0,5 s d'invulnérabilité en glissade ; dégâts de charge du Barbarian ; onde de choc du Guardian) sont du gameplay, donc chez A04 : ils lisent les attributs serveur `Sliding`, `SlideCharge` et `HeavyLandAt`.
 
@@ -207,15 +207,21 @@ API : `onAction(name, fn)`, `isDown(name)`, `bindButton(name, button)` (méthode
 | Contrôle | Règle |
 | --- | --- |
 | Marche | marche(classe) × (1 + MoveSpeed serveur) |
-| Bunny-hop | +3 % par `Hop` reçu pendant que le serveur voit le joueur en l'air (≤ 0,7 + 0,5 s), au plus un hop par **0,4 s** ; perdu après 0,7 s au sol ou sur `HopReset`. `HopChain` et la stat `Hops` ne comptent que ces hops validés |
-| Glissade | Vitesse suivie : départ = vitesse permise × boost de classe × 1,1 ; gain de pente seulement si le rayon serveur voit une pente (gain × 1,5) ; frottement × 0,5 au plat ; plafond de classe. Fin de glissade : crédite le bonus d'entrée + la part gagnée en pente (le hop du saut arrive par `Hop`). `SlideStart` accepté au sol, au plus toutes les 0,5 s et 0,21 s après la fin de la précédente. Une glissade ne garde la chaîne de hops que si elle part juste après un saut, et au plus `maxFlatTime` + 0,3 s : enchaîner des glissades au sol ne la prolonge pas |
-| Seau percé | permis = vitesse × **1,06** × temps + **0,6** stud + vitesse × ping × 0,25 ; excès cumulé − **1,5** stud/s ; au-delà de **20** studs → recalage |
-| Gel réseau | Si le serveur ne voit plus bouger le joueur (< 0,2 stud) alors que sa vitesse répliquée dépasse 2 studs/s, le temps gelé (≤ 1,5 s) s'ajoute au pas suivant : le rattrapage n'est pas puni, mais rester immobile ne donne pas de crédit de distance |
+| Bunny-hop | +3 % par `Hop` reçu si le serveur a vu le joueur en l'air (≤ 1,2 s) puis au sol (≤ 0,3 s, ou rayon au moment du Hop), au plus un hop par **0,4 s** ; perdu après 0,7 s au sol ou sur `HopReset`. `HopChain` et la stat `Hops` ne comptent que ces hops validés |
+| Glissade | Vitesse suivie : départ = vitesse permise × boost de classe × 1,1 ; gain de pente seulement si le rayon serveur voit une pente (gain × 1,5) ; frottement × 0,5 au plat ; plafond de classe. Fin de glissade : crédite le bonus d'entrée + la part gagnée en pente (le hop du saut arrive par `Hop`). `SlideStart` toujours mis en attente (0,5 s) puis accepté dès que le serveur voit : sol, vitesse mesurée ≥ 4,8 studs/s, 0,35 s depuis la fin de la précédente, 0,4 s depuis le début de la précédente. `SlidePose` et `SlideCharge` à chaque glissade acceptée ; l'attribut de gameplay `Sliding` (Shadowstep) une fois par 1,5 s (S-08). Un saut de glissade n'est crédité, et son élan permis, que si le serveur voit le joueur décoller dans les 0,5 s. Gain de pente seulement en descendant (× cos avec la pente), frottement toujours appliqué, gain plafonné. Après la fin, la vitesse de glissade ne reste permise que si un `Hop` suit dans les 0,35 s. Une glissade ne garde la chaîne de hops que si elle part juste après un saut, et au plus `maxFlatTime` + 0,3 s : enchaîner des glissades au sol ne la prolonge pas |
+| Seau percé | permis = vitesse × **1,06** × temps + **0,6** stud ; excès cumulé − **1,5** stud/s ; au-delà de **20** studs + vitesse × ping → recalage (le ping agrandit le seau une fois, pas chaque pas). A11 proposait marge 1,2 et fuite 8 : un hack ×1,5 passerait, d'où ces valeurs plus serrées, à revalider sur téléphone |
+| Ralentis | `SlowMult` tant que `SlowUntil` n'est pas passé : appliqué aussi à la vitesse permise (S-14) |
+| Vertical (S-01) | Montée par échantillon ≤ vitesse de saut de la classe × 1,2 × temps + 1 stud ; plus de **12** studs au-dessus de `Heightmap.getY` pendant plus de **2 s** sans appui (sphère sous le joueur, coéquipiers compris) → recalage |
+| Gel réseau | Si le serveur ne voit plus bouger le joueur (< 0,2 stud) alors que sa vitesse répliquée dépasse 2 studs/s, le rattrapage suivant est permis à hauteur de cette vitesse × temps gelé (≤ 0,75 s), seulement dans sa direction ; au-delà de 5 studs d'excès, strike immédiat |
+| Seau à crédit | Un pas plus court que permis laisse un crédit d'au plus 0,5 s de course : les positions répliquées arrivent par paquets (mesuré sous 150 ms de latence simulée) |
 | Tremplins | 2,5 s de vitesse relevée à 30 studs/s près d'un tremplin du plan ; pas une exemption : téléport et seau restent contrôlés |
 | Téléport | Un pas > max(**45**, vitesse max possible × (temps + ping) × 2,5) → recalage immédiat |
-| Vol | Mode ombre (log seul) : 3,5 s en l'air avec moins de 2 studs d'amplitude, ou monté de plus que les sauts de la classe + 8 studs |
+| Vol stationnaire | 3,5 s en l'air avec moins de 2 studs d'amplitude et sans appui, ou monté de plus que les sauts de la classe + 8 studs → recalage (`HoverEnforce = true`) |
 | Recalage | `PivotTo` de la dernière position valide au sol, vitesse annulée, 0,6 s + ping de grâce. Jamais de kick |
-| Exemptions | `MovementGuard.exempt(player, s, raison?)` ou attribut `MoveExemptUntil` (mouvement causé par le serveur) ; automatiques : 3 s après l'apparition, assis, ancré, à-coup serveur (dt > 0,75 s). La position valide n'avance pas pendant une exemption |
+| Exemptions et grâces | `MovementGuard.exempt(player, s, raison?)` ou attribut `MoveExemptUntil` : le déplacement que le serveur impose juste après est accepté une fois et devient l'ancre ; pendant 0,5 s + ping, les positions du client encore en vol sont acceptées seulement près de l'ancienne position. Ensuite, distance à l'ancre ≤ vitesse max × temps × 1,2 + 12 studs. Grâces d'apparition (3 s) et de recalage (0,6 s + ping) : distance à l'ancre ≤ vitesse normale × 1,06 × temps + 0,6 stud, sans portée de lancement (S-02, suivi A11) |
+| Temps en l'air | Plus de 4 s sans sol ni appui (hors tremplin, hors trajet imposé par le serveur) → recalage |
+| Strikes par run | `MovementGuard.getRunStrikes(player)`, par UserId, remis à 0 sur `Bus.RunStarted`, survit aux réapparitions et aux reconnexions. `MovementGuard.getLastValidPosition(player)` donne la dernière position valide (reset de A04) |
+| Remote | `MoveEvent` à 5/s (regles-v2 §0.3) ; un saut de glissade n'envoie pas `SlideEnd` ; `SlideStart` et `Hop` ignorés pour un joueur à terre |
 
 **Mesures en jeu (Studio, 4 nov.)**
 

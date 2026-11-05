@@ -16,6 +16,12 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
 local Worlds = require(Config:WaitForChild("Worlds"))
 local Heightmap = require(Shared:WaitForChild("Heightmap"))
+local Tiles = require(Config:WaitForChild("Tiles"))
+-- A02 : mondes en tuiles faites main (docs/dossier/21-tuiles-assemblage.md).
+local WorldBuilder = require(script.Parent:WaitForChild("WorldBuilder"))
+local WorldPortals = require(script.Parent:WaitForChild("WorldPortals"))
+local Run = require(Config:WaitForChild("Run"))
+local Registry = require(Shared:WaitForChild("Registry"))
 
 local PART_BUDGET = 900
 
@@ -271,7 +277,9 @@ end
 -- Builds the stage and publishes its key. Returns the layout.
 function StageService.buildStage(worldId: string, stage: number, seed: number, bossId: string): Heightmap.Layout?
 	StageService.clear()
-	local key = Heightmap.makeKey(worldId, stage, seed, bossId)
+	-- A02-01 : disposition tirée parmi les tuiles du monde (nil = pas de tuiles pour ce monde).
+	local tiles = WorldBuilder.plan(worldId, seed, bossId)
+	local key = Heightmap.makeKey(worldId, stage, seed, bossId, tiles)
 	local layout = Heightmap.load(key)
 	if not layout then
 		warn("[StageService] bad stage key", key)
@@ -283,12 +291,19 @@ function StageService.buildStage(worldId: string, stage: number, seed: number, b
 	f.Name = "Stage"
 	folder = f
 	partCount = 0
-	buildGround(layout, world)
-	buildTerrain(layout, world)
-	buildArena(layout, world)
-	buildDecor(layout, world)
-	if partCount > PART_BUDGET then
-		warn(`[StageService] {partCount} parts, over the {PART_BUDGET} budget`)
+	if tiles then
+		partCount = WorldBuilder.build(tiles, layout.worldId, f)
+	elseif Tiles.LegacyFallback then
+		warn(`[StageService] {worldId} : pas de tuiles, ancienne carte en Parts (Tiles.LegacyFallback)`)
+		buildGround(layout, world)
+		buildTerrain(layout, world)
+		buildArena(layout, world)
+		buildDecor(layout, world)
+		if partCount > PART_BUDGET then
+			warn(`[StageService] {partCount} parts, over the {PART_BUDGET} budget`)
+		end
+	else
+		warn(`[StageService] {worldId} : aucune tuile dans ReplicatedStorage.Assets.Worlds.{worldId}, monde vide`)
 	end
 	-- A Studio baseplate above the generated ground hides enemies and intercepts feet checks.
 	local baseplate = Workspace:FindFirstChild("Baseplate")
@@ -301,6 +316,7 @@ function StageService.buildStage(worldId: string, stage: number, seed: number, b
 	f.Parent = Workspace
 	applyLighting(world)
 	Workspace:SetAttribute(Heightmap.Attribute, key)
+	WorldPortals.endTransition() -- A02-08 : le nouveau monde est publié, le client rouvre l'image
 	hazardState.active = false
 	hazardState.nextAt = world.hazard.firstAt
 	hazardState.warned = false
@@ -319,6 +335,7 @@ function StageService.clear()
 	end
 	portal = nil
 	cashOut = nil
+	WorldPortals.clear()
 	partCount = 0
 	Workspace:SetAttribute(Heightmap.Attribute, "")
 	Workspace:SetAttribute("CohueHazard", "")
@@ -387,12 +404,46 @@ local function buildPortal(position: Vector3, name: string, color: Color3, sign:
 	return model
 end
 
+-- A02-08 : point du portail posé dans la tuile d'arène (marqueur Portal), sinon nil.
+function StageService.getPortalPoint(): Vector3?
+	local layout = Heightmap.getLayout()
+	local p = layout and layout.portal
+	if not p then
+		return nil
+	end
+	return Vector3.new(p.x, p.y, p.z)
+end
+
+-- Nom anglais du monde suivant de la run (panneau du portail).
+local function nextWorldName(): string
+	local runManager = Registry.find("RunManager")
+	local ok, info = pcall(function()
+		return runManager.getRunInfo()
+	end)
+	local nextId = if ok and type(info) == "table" then Run.WorldChain[(info.stage or 0) + 1] else nil
+	local world = nextId and Worlds[nextId]
+	return if world then world.name.en else "NEXT WORLD"
+end
+
+-- Portail : gabarit de Clément (WorldPortals) ; ancienne version en Parts si Tiles.LegacyFallback.
+local function showTemplate(kind: WorldPortals.Kind, position: Vector3, title: string): Model?
+	if not folder then
+		return nil
+	end
+	local layout = Heightmap.getLayout()
+	local facing = if layout then Vector3.new(layout.arche.x, 0, layout.arche.z) else nil
+	return WorldPortals.show(kind, position, folder :: Folder, if layout then layout.worldId else nil, title, facing)
+end
+
 -- Portail vers le monde suivant (boss tué, hors dernier monde).
 function StageService.showPortal(position: Vector3)
 	if portal then
 		return
 	end
-	portal = buildPortal(position, "Portal", Color3.fromRGB(120, 255, 200), "NEXT WORLD")
+	portal = showTemplate("NextWorld", position, nextWorldName())
+	if not portal and Tiles.LegacyFallback then
+		portal = buildPortal(position, "Portal", Color3.fromRGB(120, 255, 200), "NEXT WORLD")
+	end
 end
 
 -- Portail doré après le boss du dernier monde (A04-02) : tous les joueurs dedans = Cash out.
@@ -400,7 +451,10 @@ function StageService.showCashOut(position: Vector3)
 	if cashOut then
 		return
 	end
-	cashOut = buildPortal(position, "CashOut", Color3.fromRGB(255, 205, 60), "CASH OUT")
+	cashOut = showTemplate("CashOut", position, "CASH OUT")
+	if not cashOut and Tiles.LegacyFallback then
+		cashOut = buildPortal(position, "CashOut", Color3.fromRGB(255, 205, 60), "CASH OUT")
+	end
 end
 
 -- Hazards (dossier 20 section 3). Called by RunManager with seconds since stage start.

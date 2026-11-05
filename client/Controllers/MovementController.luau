@@ -155,7 +155,7 @@ local function verifiedGround(extraReach: number?): RaycastResult?
 	if not h or not r then
 		return nil
 	end
-	local hit = Workspace:Raycast(r.Position, Vector3.new(0, -(feetReach(h, r) + 0.6 + (extraReach or 0)), 0), rayParams)
+	local hit = Workspace:Raycast(r.Position, Vector3.new(0, -(feetReach(h, r) + M.GroundProbeExtra + (extraReach or 0)), 0), rayParams)
 	if hit and hit.Normal.Y >= M.GroundNormalMinY then
 		return hit
 	end
@@ -173,7 +173,7 @@ local function landingSoon(): boolean
 	if vy >= 0 then
 		return false
 	end
-	local reach = feetReach(h, r) + 0.3 + (-vy) * M.JumpBuffer
+	local reach = feetReach(h, r) + M.LandingSoonExtra + (-vy) * M.JumpBuffer
 	return Workspace:Raycast(r.Position, Vector3.new(0, -reach, 0), rayParams) ~= nil
 end
 
@@ -250,7 +250,8 @@ local function slideCap(): number
 	return baseWalk() * M.slideMaxMult(prof)
 end
 
-local function endSlide()
+-- silent : fin par un saut, le Hop qui suit suffit au serveur (une remote de moins par saut de glissade).
+local function endSlide(silent: boolean?)
 	if not sliding then
 		return
 	end
@@ -261,7 +262,9 @@ local function endSlide()
 		slideMover.Enabled = false
 	end
 	dlog(`slideEnd speed={string.format("%.1f", slideExitSpeed)}`)
-	send("SlideEnd")
+	if not silent then
+		send("SlideEnd")
+	end
 end
 
 local function startSlide()
@@ -287,7 +290,7 @@ local function startSlide()
 	else
 		return
 	end
-	local speed = math.min(math.max(flat.Magnitude, h.WalkSpeed) * slideTune("boost", M.SlideBoost), slideCap())
+	local speed = math.min(math.max(flat.Magnitude, h.WalkSpeed) * slideTune("boost", M.SlideBoost), slideCap() * slowMult())
 	slideVel = dir * speed
 	slideEntrySpeed = speed
 	slideEntryBonus = hopBonus
@@ -342,7 +345,7 @@ local function updateSlide(dt: number)
 			slideVel = dir.Unit * speed
 		end
 	end
-	speed = math.min(slideVel.Magnitude, slideCap())
+	speed = math.min(slideVel.Magnitude, slideCap() * slowMult()) -- ralenti (choix de carte, à terre) compris
 	if speed > 0 then
 		slideVel = slideVel.Unit * speed
 	end
@@ -396,7 +399,7 @@ local function groundJump()
 	local base = math.max(baseWalk(), 1)
 	if sliding or now - slideEndedAt <= M.SlideJumpGrace then
 		local speed = if sliding then slideVel.Magnitude else slideExitSpeed
-		endSlide()
+		endSlide(true)
 		slideEndedAt = -math.huge -- grâce consommée
 		local delta = (speed - slideEntrySpeed) / base
 		local bonus = slideEntryBonus + delta
@@ -506,7 +509,7 @@ local function onLanded()
 	leftGroundAt = -math.huge
 	-- À l'état Landed le personnage est encore un peu au-dessus du sol : rayon plus long. Le pas suivant
 	-- recharge aussi (step), pour les sauts relancés à l'image même de l'atterrissage.
-	if verifiedGround(2) then
+	if verifiedGround(M.LandProbeExtra) then
 		airJumpsLeft = prof.airJumps or 0
 		glideLeft = if prof.glide then prof.glide.duration else 0
 	end
@@ -574,6 +577,9 @@ local function step(dt: number)
 
 	local state = h:GetState()
 	local now = os.clock()
+	if airborne and not isAirState(state) and now - ourJumpAt >= M.LandIgnoreAfterJump and verifiedGround() then
+		onLanded() -- atterrissage que StateChanged a laissé passer (trop tôt après le saut)
+	end
 	if isAirState(state) then
 		peakY = math.max(peakY, r.Position.Y)
 		local glide = prof.glide

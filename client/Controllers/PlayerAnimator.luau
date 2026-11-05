@@ -25,7 +25,8 @@ local POSE = {
 	SlideDrop = 1.35, -- studs : bassin abaissé
 	SlideWaist = math.rad(-22), -- haut du corps qui se redresse pour regarder devant
 	SlideNeck = math.rad(-14),
-	SlideArm = math.rad(-35), -- bras un peu écartés vers l'arrière (équilibre)
+	SlideArm = math.rad(-35), -- bras un peu vers l'arrière (équilibre)
+	SlideArmOut = math.rad(18), -- et écartés
 	ChargeLean = math.rad(-24), -- Barbarian : vers l'avant
 	ChargeDrop = 0.55,
 	ChargeWaist = math.rad(-12),
@@ -54,6 +55,20 @@ type Rig = {
 }
 
 local rigs: { [Player]: Rig } = {}
+
+-- Dernière valeur écrite par joint et valeur de base dessous : si l'Animator n'a pas réécrit le joint
+-- (image sautée, rig distant ralenti), on repart de la base au lieu de cumuler.
+local written: { [Instance]: CFrame } = {}
+local based: { [Instance]: CFrame } = {}
+
+local function pose(joint: any, offset: CFrame)
+	local current: CFrame = joint.Transform
+	local base = if written[joint] == current then (based[joint] or current) else current
+	local result = base * offset
+	based[joint] = base
+	written[joint] = result
+	joint.Transform = result
+end
 local movement: any = nil -- MovementController (joueur local)
 
 local function motor(character: Model, partName: string, jointName: string): Joint?
@@ -85,12 +100,23 @@ local function bind(player: Player, character: Model)
 	}
 end
 
+local function forget(rig: Rig?)
+	if rig then
+		for _, j in { rig.root, rig.waist, rig.neck, rig.leftShoulder, rig.rightShoulder } :: { any } do
+			written[j] = nil
+			based[j] = nil
+		end
+	end
+end
+
 local function watch(player: Player)
 	player.CharacterAdded:Connect(function(character)
+		forget(rigs[player])
 		rigs[player] = nil
 		task.spawn(bind, player, character)
 	end)
 	player.CharacterRemoving:Connect(function()
+		forget(rigs[player])
 		rigs[player] = nil
 	end)
 	player:GetAttributeChangedSignal("HeavyLandAt"):Connect(function()
@@ -118,7 +144,7 @@ local function step(dt: number)
 		if player == localPlayer and movement then
 			sliding = movement.isSliding()
 		else
-			sliding = player:GetAttribute("Sliding") == true
+			sliding = player:GetAttribute("SlidePose") == true or player:GetAttribute("Sliding") == true
 		end
 		local charging = sliding and player:GetAttribute("SlideCharge") == true
 		rig.slide = approach(rig.slide, if sliding and not charging then 1 else 0, dt)
@@ -138,24 +164,20 @@ local function step(dt: number)
 		end
 		local drop = POSE.SlideDrop * s + POSE.ChargeDrop * c + POSE.LandDrop * land
 		local lean = POSE.SlideLean * s + POSE.ChargeLean * c
-		local root = rig.root
-		root.Transform *= CFrame.new(0, -drop, 0) * CFrame.Angles(lean, 0, 0)
-		local waist = rig.waist
-		if waist then
-			waist.Transform *= CFrame.Angles(POSE.SlideWaist * s + POSE.ChargeWaist * c + POSE.LandWaist * land, 0, 0)
+		pose(rig.root, CFrame.new(0, -drop, 0) * CFrame.Angles(lean, 0, 0))
+		if rig.waist then
+			pose(rig.waist, CFrame.Angles(POSE.SlideWaist * s + POSE.ChargeWaist * c + POSE.LandWaist * land, 0, 0))
 		end
-		local neck = rig.neck
-		if neck then
-			neck.Transform *= CFrame.Angles(POSE.SlideNeck * s, 0, 0)
+		if rig.neck then
+			pose(rig.neck, CFrame.Angles(POSE.SlideNeck * s, 0, 0))
 		end
 		if s > 0.001 then
 			local arm = CFrame.Angles(POSE.SlideArm * s, 0, 0)
-			local ls, rs = rig.leftShoulder, rig.rightShoulder
-			if ls then
-				ls.Transform *= arm * CFrame.Angles(0, 0, math.rad(-18) * s)
+			if rig.leftShoulder then
+				pose(rig.leftShoulder, arm * CFrame.Angles(0, 0, -POSE.SlideArmOut * s))
 			end
-			if rs then
-				rs.Transform *= arm * CFrame.Angles(0, 0, math.rad(18) * s)
+			if rig.rightShoulder then
+				pose(rig.rightShoulder, arm * CFrame.Angles(0, 0, POSE.SlideArmOut * s))
 			end
 		end
 	end
@@ -175,6 +197,7 @@ function PlayerAnimator.start(movementController: any)
 	movement = movementController
 	Players.PlayerAdded:Connect(watch)
 	Players.PlayerRemoving:Connect(function(player)
+		forget(rigs[player])
 		rigs[player] = nil
 	end)
 	for _, player in Players:GetPlayers() do
