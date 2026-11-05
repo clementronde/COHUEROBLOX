@@ -32,8 +32,11 @@ Revérifié par A11 dans le code de main (`851322e`, après les fusions A04 `a1e
 | S-13 | **Corrigé** par S-01 à S-03 | Rien à changer dans LootService et ShrineService |
 | S-14 | **Corrigé** (A06) | `MovementGuard` multiplie la vitesse permise par `SlowMult` tant que `SlowUntil` n'est pas passé |
 | S-15 | En cours (A12) | Le correctif DataService (`lastSaveAt` écrit seulement si `sessions[player] == session`) est dans le worktree d'A12, identique à celui prévu ici ; la partie `ProgressionService.writeBoards` (`lastWritten`) tombe avec la réécriture des classements (S-06). A11 n'y touche pas pour éviter un conflit ; à vérifier à la revue de la branche A12 |
-
 | S-16 | **Corrigé** (A11, `claude/a11-failles`) | Nouvelle, Moyenne. `RunManager.onCharacterDied` (correctif S-02 d'A04) faisait réapparaître le joueur à `root.Position`, valeur du client : se téléporter puis se tuer (Reset) = réapparaître n'importe où (cage, autel, arène), sans strike puisque le téléport de réapparition est imposé par le serveur. Il prend maintenant `MovementGuard.getLastValidPosition` (dernière position au sol validée), `root.Position` seulement en secours |
+| S-17 | **Corrigé** (A11, `claude/a11-revue-v3`, `a52bf20`) | Vague 3, Moyenne. Le temps figé du passage de niveau comptait dans la durée de run du classement. `ProgressionService.onRunFrozen` décale les horloges à la reprise |
+| S-18 | **Corrigé** (A11, `claude/a11-revue-v3`, `5d1afa7`) | Vague 3, Basse. `weeklyRank` trahissait une run en quarantaine. Le rang prend aussi les KO de la run |
+| S-19 | À transmettre (A04) | Vague 3, Moyenne. Offre solo sans limite gardée quand un retardataire arrive : il reste figé |
+| S-20 | À transmettre (A06 / raccords-v3) | Vague 3, Moyenne. Environ 4 à 5 studs/s de déplacement toléré pendant le gel, sans limite de temps en solo |
 
 Hard gate « serveur autoritaire » : **réussi** depuis S-01 (le Y du client ne protège plus des dégâts après 1,5 s en l'air). À confirmer en Play avec les scripts de `docs/security/tests-exploits.md` (A11-06).
 
@@ -71,6 +74,10 @@ Hard gate « serveur autoritaire » : **réussi** depuis S-01 (le Y du client ne
 | S-13 | Basse | `server/Services/LootService.luau:623-662`, `server/Services/ShrineService.luau:612-624` | Ramassage, coffres et autels se fient à la position du client : ils dépendent de S-01 à S-03 | A06 | Couvert par S-01 à S-03 |
 | S-14 | Moyenne | `server/Services/RunManager.luau:1160-1177`, `server/Services/MovementGuard.luau:69-86` | Les ralentissements (à terre, choix de carte) ne sont appliqués que par le client | A06 (+ A04) | À transmettre |
 | S-15 | Basse | `server/Services/DataService.luau:453`, `server/Services/ProgressionService.luau:1435-1439` | Deux petites fuites : tables recréées pour un joueur déjà parti | A11 | Vague 2 |
+| S-17 | Moyenne | `server/Services/ProgressionService.luau:1925`, `:2124` | Le gel du passage de niveau (sans limite en solo) gonfle la durée de run : signaux de quarantaine dilués, faux « sans dégât » en Overtime | A11 | **Corrigé** |
+| S-18 | Basse | `server/Services/ProgressionService.luau:2072` | `weeklyRank` calculé sans les KO d'une run en quarantaine : le tricheur voit qu'il n'a pas de rang | A11 | **Corrigé** |
+| S-19 | Moyenne | `server/Services/CardService.luau:394-397`, `:623` | Une offre ouverte en solo reste sans limite quand la run devient coop : le retardataire est figé | A04 | À transmettre |
+| S-20 | Moyenne | `server/Services/MovementGuard.luau:521-576` | Pendant le gel, le garde tolère encore 4 à 5 studs/s (marge et fuite du seau), sans limite de temps en solo | A06 (raccords-v3) | À transmettre |
 
 ## Détail des failles
 
@@ -216,6 +223,40 @@ Variante par reset : le bouton Reset de Roblox n'est pas désactivé et le serve
 **Risque.** Quelques octets et une référence au `Player` par départ malchanceux. Statique, non mesuré.
 
 **Correctif (A11, vague 2).** N'écrire dans ces tables que si la session est toujours celle du joueur (`sessions[player] == session`) ou si `player.Parent` n'est pas `nil`.
+
+### S-17 — Moyenne — Le gel du passage de niveau gonfle la durée de run (corrigé)
+
+Vague 3 (A04-v3, pause globale). Trouvée à la revue du 5 nov. (`docs/security/revues-vague2.md`, section Vague 3).
+
+**Où.** `server/Services/ProgressionService.luau:1925` (`scoreRun`) et `grantRunRewards` mesurent la durée par `os.clock() - info.startedAt`. `checkNoDamage` (`:2124`) compte le temps depuis le dernier dégât. Aucun des deux ne retirait le temps figé.
+
+**Scénario.** En solo, l'offre de cartes n'a pas de limite (`Run.LevelUpPause.SoloSeconds = 0`). Un tricheur laisse une offre ouverte 30 min : sa durée de run double, donc son KO par minute est divisé par deux et sa part de temps invulnérable aussi. Les deux signaux de quarantaine (§2.3) sont dilués à volonté. Une défaite rapide atteint aussi `MinRunSecondsForRewards`. À l'inverse, un joueur honnête qui prend son temps pour choisir en Overtime accumule du temps « sans dégât » et peut lever `NoDamageOvertime` (en log seul aujourd'hui, mais faux positif dès que `NoDamageEnforce` passe à `true`).
+
+**Correctif (A11, `a52bf20`).** `ProgressionService.onRunFrozen` écoute `Bus.RunFrozen(false, d)` et décale `startedAt`, `lastDamagedAt` et `overtimeSince` de `d`, comme RunManager décale ses propres horloges. `checkNoDamage` ne tourne pas pendant le gel.
+
+### S-18 — Basse — `weeklyRank` trahit une run en quarantaine (corrigé)
+
+**Où.** `server/Services/ProgressionService.luau:2072` (`weeklyRankOf`), appelé par `grantRunRewards` pour l'écran de fin.
+
+**Scénario.** Une run en quarantaine n'écrit pas `boards.weekBest`. Le rang était calculé sur ce relevé : un tricheur à 5 000 KO voyait « pas de rang » (ou son rang d'avant) au lieu de la 1re place, et comprenait qu'il était repéré (§0.5).
+
+**Correctif (A11, `5d1afa7`).** Le rang prend le meilleur entre le relevé de la semaine et les KO de cette run. Les tableaux ne changent pas. Reste connu : `koRecord` du profil (`:551`) ne bouge pas en quarantaine (non affiché, mais lisible dans le paquet `Profile`).
+
+### S-19 — Moyenne — Offre solo sans limite quand un retardataire arrive
+
+**Où.** `server/Services/CardService.luau:394-397` : en solo, `seconds = nil` et `offer.expiresAt = math.huge`. La boucle de `CardService.start` (`:623`) ne choisit jamais à la place du joueur. `RunManager.initPlayerForRun` (`server/Services/RunManager.luau:637`) fige le retardataire qui arrive pendant le gel.
+
+**Scénario.** Un joueur seul monte d'un niveau et laisse l'offre ouverte (absent, ou exprès). Un ami le rejoint : il apparaît figé, sans compte à rebours, et le reste tant que le premier ne choisit pas. La règle coop (15 s puis la 1re carte) ne s'applique qu'aux offres ouvertes après son arrivée. Aucun gain ; c'est du blocage de partie.
+
+**Correctif (A04).** Dans la boucle de `CardService.start`, si `offer.expiresAt == math.huge` et que la run compte plus d'un joueur : `offer.expiresAt = os.clock() + RunConfig.LevelUpPause.CoopSeconds`, `sendOffer(player, offer)` et `run.setChoosing(player, true, CoopSeconds)` pour renvoyer `endsIn` à tous. Test : T12.
+
+### S-20 — Moyenne — Déplacement toléré pendant le gel
+
+**Où.** `server/Services/MovementGuard.luau:521-576`. Sur `claude/raccords-v3` (`4e2bd63`), l'attribut `Frozen` multiplie la vitesse permise par 0,05, mais la marge fixe (`SlackStuds` = 0,6 stud par échantillon de 0,25 s) et la fuite du seau (`LeakPerSecond` = 1,5) s'ajoutent toujours.
+
+**Scénario.** Un client modifié ignore le gel et avance d'environ 0,85 + 2,4 + 1,5 ≈ 4,7 studs/s sans strike. En solo, le gel n'a pas de limite : pendant que la horde est figée et que personne ne prend de dégâts, il sort d'un encerclement, se place près d'un coffre, d'un autel ou du portail. raccords-v3 fige le butin et les autels pendant le gel : le gain se limite à la position.
+
+**Correctif (A06, dans raccords-v3 ou après).** Pendant `Frozen`, autoriser seulement `SlackStuds` par échantillon sans crédit de fuite (`allowed = G.SlackStuds`, pas de `LeakPerSecond`), et recaler au-delà d'un petit seau (quelques studs pour l'élan pendant la latence). Autre solution, côté RunManager (A04) : ancrer `HumanoidRootPart` dans `freezePlayer` et le libérer dans `unfreezePlayer` ; le garde ignore déjà un `root.Anchored` (`MovementGuard.luau:463`). Test : T11.
 
 ### Points à tester en Play (A11-06)
 

@@ -1183,6 +1183,21 @@ local function onFinalWaveStarted()
 	end
 end
 
+-- S-17 (A11) : le gel du passage de niveau (sans limite en solo) ne compte ni dans la durée de run
+-- (KO par minute, part d'invulnérabilité, durée minimale des gains) ni dans l'Overtime sans dégât.
+local function onRunFrozen(frozen: any, pausedSeconds: any)
+	if frozen == true or not isFiniteNumber(pausedSeconds) or pausedSeconds <= 0 then
+		return
+	end
+	for _, info in runInfo do
+		info.startedAt += pausedSeconds
+		info.lastDamagedAt += pausedSeconds
+	end
+	if overtimeSince then
+		overtimeSince += pausedSeconds
+	end
+end
+
 -- KO compté par StatsService (A04-03) : on ne recalcule rien, on garde le dernier total.
 local function onKOScored(player: Player, runKills: number)
 	local info = runInfo[player]
@@ -1247,7 +1262,7 @@ end
 
 -- Défini dans la section Leaderboards (plus bas).
 local scoreRun: (player: Player, info: RunInfo, kills: number, ending: string) -> ()
-local weeklyRankOf: (player: Player) -> number?
+local weeklyRankOf: (player: Player, runKo: number?) -> number?
 
 local function num(v: any, lo: number, hi: number): number
 	if not isFiniteNumber(v) then
@@ -1405,7 +1420,7 @@ function ProgressionService.grantRunRewards(player: Player, summary: Types.RunSu
 	out.seasonXp = seasonXp -- champ en plus du contrat RunSummary (écran de fin)
 	-- Rang hebdo (KO en une run) lu dans le cache des tops, sans appel DataStore : nil si inconnu,
 	-- hors du top, banni ou sans relevé valide cette semaine.
-	local okRank, rank = pcall(weeklyRankOf, player)
+	local okRank, rank = pcall(weeklyRankOf, player, kills)
 	out.weeklyRank = if okRank then rank else nil
 
 	-- Quests that moved during this run (completed first, then closest to their goal), max 8.
@@ -2054,7 +2069,7 @@ end
 -- RunSummary.weeklyRank : rang du relevé hebdo du joueur parmi le dernier top lu (cache, jamais
 -- d'appel DataStore). Égalité = même rang. nil : top jamais lu cette semaine, pas de relevé valide,
 -- banni, ou hors du top (cache plein et score sous le dernier).
-function weeklyRankOf(player: Player): number?
+function weeklyRankOf(player: Player, runKo: number?): number?
 	local data = dataService().peek(player)
 	if not data or data.flags.boardBanned or bannedIds[player.UserId] then
 		return nil
@@ -2065,6 +2080,11 @@ function weeklyRankOf(player: Player): number?
 	end
 	local wb = data.boards.weekBest
 	local ko = if type(wb) == "table" and wb.week == week then tonumber(wb.ko) or 0 else 0
+	-- S-18 (§0.5) : le KO de cette run compte même en quarantaine (relevé non écrit), sinon un
+	-- tricheur voit qu'un score énorme ne lui donne aucun rang. Le classement, lui, ne bouge pas.
+	if isFiniteNumber(runKo) then
+		ko = math.max(ko, math.floor(runKo :: number))
+	end
 	if ko <= 0 then
 		return nil
 	end
@@ -2109,6 +2129,9 @@ local function checkNoDamage()
 	local now = os.clock()
 	local thresholdAt = now - (ot - QC.NoDamageAfterOvertime)
 	local run = runManager()
+	if safeCall(run, "isFrozen") == true then
+		return -- S-17 : aucun coup n'existe pendant le gel ; onRunFrozen décale les horloges à la reprise
+	end
 	for player, info in runInfo do
 		if info.noDamage then
 			continue
@@ -2248,6 +2271,7 @@ function ProgressionService.init()
 	Bus.CompanionEvolved:connect(onCompanionEvolved)
 	Bus.FinalWaveStarted:connect(onFinalWaveStarted)
 	Bus.KOScored:connect(onKOScored)
+	Bus.RunFrozen:connect(onRunFrozen)
 
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
