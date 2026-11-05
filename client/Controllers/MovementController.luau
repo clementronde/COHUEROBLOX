@@ -19,6 +19,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
@@ -28,6 +29,7 @@ local Net = require(Shared:WaitForChild("Net"))
 local Registry = require(Shared:WaitForChild("Registry"))
 local M = require(Shared:WaitForChild("Config"):WaitForChild("Movement"))
 local PlayerAnimator = require(script.Parent:WaitForChild("PlayerAnimator"))
+local TraversalController = require(script.Parent:WaitForChild("TraversalController"))
 
 type ClassMove = typeof(M.profile(nil))
 
@@ -455,6 +457,10 @@ local function onJumpAction(pressed: boolean)
 		h.Jump = true
 		return
 	end
+	if TraversalController.isRiding() then
+		TraversalController.drop() -- Saut sur la tyrolienne : lâcher
+		return
+	end
 	local now = os.clock()
 	local state = h:GetState()
 	if state == HST.Swimming then
@@ -477,7 +483,7 @@ local function onSlideAction(pressed: boolean)
 	if not h or h.Health <= 0 then
 		return
 	end
-	if not pressed then
+	if not pressed or TraversalController.isRiding() then
 		return -- la fin au relâchement est gérée par updateSlide (hors tactile)
 	end
 	if sliding then
@@ -721,6 +727,26 @@ local function bindCharacter(character: Model)
 	refreshClass()
 end
 
+-- SetCore échoue tant que le CoreScript n'a pas enregistré le réglage : on réessaie quelques fois.
+local resetAllowed: boolean? = nil
+local function setResetAllowed(allowed: boolean)
+	if resetAllowed == allowed then
+		return
+	end
+	resetAllowed = allowed
+	task.spawn(function()
+		for _ = 1, 10 do
+			if resetAllowed ~= allowed then
+				return -- un autre changement a pris le relais
+			end
+			if pcall(StarterGui.SetCore, StarterGui, "ResetButtonCallback", allowed) then
+				return
+			end
+			task.wait(1)
+		end
+	end)
+end
+
 -- ---------------------------------------------------------------- API
 
 function MovementController.isSliding(): boolean
@@ -729,6 +755,37 @@ end
 
 function MovementController.getHopBonus(): number
 	return hopBonus
+end
+
+-- Marche de la classe x stat MoveSpeed, sans bunny-hop ni ralenti (TraversalController : vitesse de lâcher).
+function MovementController.getBaseWalk(): number
+	return baseWalk()
+end
+
+function MovementController.cancelSlide()
+	endSlide()
+end
+
+-- Lancer par un objet du monde (tremplin, geyser) : hauteur en studs (gravité de la classe comprise),
+-- vitesse horizontale imposée si non nulle. Le serveur exempte MovementGuard de son côté (TraversalGuard).
+-- Ce n'est pas un saut du joueur : pas de hop, le double saut et le plané restent disponibles.
+function MovementController.externalLaunch(height: number, horizontal: Vector3)
+	local h, r = humanoid, root
+	if not h or not r or h.Health <= 0 or type(height) ~= "number" or height <= 0 then
+		return
+	end
+	endSlide()
+	local vy = math.sqrt(2 * gravity() * height)
+	ourJumpAt = os.clock()
+	jumpedSinceGrounded = true
+	jumpPressedAt = -math.huge
+	airborne = true
+	peakY = r.Position.Y
+	h:ChangeState(HST.Jumping)
+	local v = r.AssemblyLinearVelocity
+	local flat = if horizontal.Magnitude > 0 then horizontal else Vector3.new(v.X, 0, v.Z)
+	r.AssemblyLinearVelocity = Vector3.new(flat.X, vy, flat.Z)
+	dlog(`launch h={string.format("%.1f", height)} fwd={string.format("%.1f", horizontal.Magnitude)}`)
 end
 
 -- Lecture pour les tests et le HUD de debug.
@@ -771,6 +828,7 @@ function MovementController.start()
 
 	RunService.PreSimulation:Connect(step)
 	PlayerAnimator.start(MovementController)
+	TraversalController.start(MovementController)
 
 	if IS_STUDIO then
 		-- Point d'inspection pour les tests MCP : ("state") / ("log") / ("trigger", action, pressed) /
@@ -809,6 +867,14 @@ function MovementController.start()
 
 	-- Remotes en dernier (elles peuvent attendre le dossier du serveur).
 	moveEvent = Net.event("MoveEvent")
+	-- Bouton Reset du menu Roblox coupé pendant une run (regles-v2 §1 : un reset ne doit pas servir de
+	-- téléport). Rendu hors run (Loadout, Ended) et au lobby, où RunState n'arrive pas.
+	Net.event("RunState").OnClientEvent:Connect(function(payload: any)
+		local phase = if type(payload) == "table" then payload.phase else nil
+		if type(phase) == "string" then
+			setResetAllowed(phase == "Loadout" or phase == "Ended")
+		end
+	end)
 	Net.event("Build").OnClientEvent:Connect(function(payload: any)
 		if type(payload) ~= "table" or type(payload.stats) ~= "table" then
 			return

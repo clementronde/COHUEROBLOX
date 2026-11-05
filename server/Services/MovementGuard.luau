@@ -20,6 +20,8 @@
 -- Exemptions (mouvement causé par le serveur : tremplins, geysers, tyroliennes, téléports, recul) :
 --   MovementGuard.exempt(player, seconds, reason?)
 --   ou attribut serveur Player.MoveExemptUntil = workspace:GetServerTimeNow() + seconds
+--   MovementGuard.endExempt(player, after?) raccourcit une exemption (fin de trajet, TraversalGuard)
+-- Tremplins, geysers, tyroliennes du level design : TraversalGuard (A06-07), appelé à chaque image.
 -- Lecture : getStrikes(player) -> number · getRunStrikes(player) -> number · getLastValidPosition(player) -> Vector3?
 -- Règles v2 appliquées : docs/security/regles-v2.md §1 (S-01 vol, S-02 exemptions bornées, S-03 bonus
 -- validés, S-08 SlideStart / Hop validés, S-14 ralentis appliqués).
@@ -34,6 +36,7 @@ local Net = require(Shared:WaitForChild("Net"))
 local Registry = require(Shared:WaitForChild("Registry"))
 local Movement = require(Shared:WaitForChild("Config"):WaitForChild("Movement"))
 local Heightmap = require(Shared:WaitForChild("Heightmap"))
+local TraversalGuard = require(script.Parent:WaitForChild("TraversalGuard"))
 
 local G = Movement.Guard
 
@@ -694,6 +697,16 @@ function MovementGuard.exempt(player: Player, seconds: number, _reason: string?)
 	end
 end
 
+-- Raccourcit une exemption en cours (fin d'un trajet de TraversalGuard) : elle finit au plus tard dans
+-- `after` secondes. Ne prolonge jamais rien.
+function MovementGuard.endExempt(player: Player, after: number?)
+	local s = states[player]
+	if s then
+		local delay = if type(after) == "number" and after == after then math.max(0, after) else 0
+		s.exemptUntil = math.min(s.exemptUntil, os.clock() + delay)
+	end
+end
+
 -- Strikes depuis le début de la run en cours (quarantaine du classement, regles-v2 §4.5).
 function MovementGuard.getRunStrikes(player: Player): number
 	return runStrikes[player.UserId] or 0
@@ -875,6 +888,7 @@ function MovementGuard.init()
 	Players.PlayerAdded:Connect(watchPlayer)
 	Players.PlayerRemoving:Connect(function(player)
 		states[player] = nil
+		TraversalGuard.forget(player)
 		task.defer(refreshFilter)
 	end)
 end
@@ -906,7 +920,10 @@ function MovementGuard.start()
 	end
 	refreshFilter()
 	local acc = 0
+	-- Tremplins, geysers, tyroliennes (A06-07) : l'exemption est posée avant les échantillons de cette image.
+	local traversalApi = { exempt = MovementGuard.exempt, endExempt = MovementGuard.endExempt }
 	RunService.Heartbeat:Connect(function(dt)
+		TraversalGuard.step(traversalApi)
 		local clock = os.clock()
 		for player in states do
 			probeGround(player, clock)

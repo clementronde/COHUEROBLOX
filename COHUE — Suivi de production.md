@@ -312,13 +312,13 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 
 | ID | Tâche | Livrable | Dépend de | Priorité | Statut |
 | --- | --- | --- | --- | --- | --- |
-| A06-01 | Caméra 3e personne pensée mobile : dézoom pour lire la horde, pas de caméra dans les murs, sensibilité réglable | CameraController |  | P0 — bloquant | En cours |
-| A06-02 | Revoir bunny-hop, glissade, glissade en pente et saut tampon avec la nouvelle caméra | MovementController, Config/Movement | A06-01 | P0 — bloquant | En cours |
-| A06-03 | Mouvement par classe : double saut (Rogue), saut haut (Archer), plané (Mage), atterrissage lourd (Guardian) | Config/Movement | A04-01 | P1 — lancement | En cours |
-| A06-04 | Contrôles tactiles et manette avec l'Input Action System | InputController |  | P0 — bloquant | En cours |
-| A06-05 | MovementGuard calé sur les nouvelles vitesses max | MovementGuard | A06-03 | P0 — bloquant | En cours |
+| A06-01 | Caméra 3e personne pensée mobile : dézoom pour lire la horde, pas de caméra dans les murs, sensibilité réglable | CameraController |  | P0 — bloquant | À valider |
+| A06-02 | Revoir bunny-hop, glissade, glissade en pente et saut tampon avec la nouvelle caméra | MovementController, Config/Movement | A06-01 | P0 — bloquant | À valider |
+| A06-03 | Mouvement par classe : double saut (Rogue), saut haut (Archer), plané (Mage), atterrissage lourd (Guardian) | Config/Movement | A04-01 | P1 — lancement | À valider |
+| A06-04 | Contrôles tactiles et manette avec l'Input Action System | InputController |  | P0 — bloquant | À valider |
+| A06-05 | MovementGuard calé sur les nouvelles vitesses max | MovementGuard | A06-03 | P0 — bloquant | À valider |
 | A06-06 | Animations du joueur : glissade, atterrissage, 5 gestes d'attaque, capture | Animations publiées | A06-02 | P1 — lancement | À faire |
-| A06-07 | Tremplins, tyroliennes et geysers pour la verticalité | Modules + fiches pour A02 |  | P2 — après lancement | À faire |
+| A06-07 | Tremplins, tyroliennes et geysers pour la verticalité | Modules + fiches pour A02 |  | P2 — après lancement | À valider |
 
 ### A08 — UI et HUD
 

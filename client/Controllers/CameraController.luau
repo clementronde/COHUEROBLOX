@@ -16,7 +16,8 @@
 -- API (client) :
 --   CameraController.getYaw() -> number              -- radians, 0 = regarde vers -Z
 --   CameraController.setEnabled(on)                  -- off = rend la caméra à Roblox (Custom), ex. cinématique
---   CameraController.setSensitivity(mult)            -- réglage joueur (SettingsUI), 0.25..3
+--   CameraController.setSensitivity(mult)            -- réglage joueur, 0.25..3 ; lu aussi dans le profil
+--                                                       (remote Profile, settings.cameraSensitivity)
 --   CameraController.setDistance(studs) / getDistance() · setPitch(degrees) / getPitch()
 --   CameraController.shake(strength 0..1, seconds?)  -- secousse additive, ne dérive jamais
 
@@ -27,6 +28,7 @@ local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Net = require(Shared:WaitForChild("Net"))
 local Registry = require(Shared:WaitForChild("Registry"))
 local Movement = require(Shared:WaitForChild("Config"):WaitForChild("Movement"))
 
@@ -566,6 +568,16 @@ function CameraController.start()
 	end)
 
 	RunService:BindToRenderStep("CohueCamera", Enum.RenderPriority.Camera.Value + 1, step)
+
+	-- Sensibilité enregistrée dans le profil (domaine data ; réglage posé par SettingsUI). Remote en dernier :
+	-- elle peut attendre le dossier du serveur.
+	Net.event("Profile").OnClientEvent:Connect(function(profile: any)
+		local settings = if type(profile) == "table" then profile.settings else nil
+		local value = if type(settings) == "table" then settings.cameraSensitivity else nil
+		if type(value) == "number" then
+			CameraController.setSensitivity(value)
+		end
+	end)
 end
 
 return CameraController

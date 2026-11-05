@@ -168,6 +168,50 @@ local Movement = {
 		ShakeTime = 0.3,
 	},
 
+	-- Verticalité (A06-07) : tremplins, geysers, tyroliennes posés par le level design (fiche : dossier 50 §11).
+	-- Les objets sont trouvés par tag (CollectionService) ou dans Workspace.CohueTraversal. Leurs attributs
+	-- remplacent ces valeurs par défaut, bornés par les Max.
+	Traversal = {
+		PadTag = "CohueLaunchPad",
+		GeyserTag = "CohueGeyser",
+		ZiplineTag = "CohueZipline",
+		Folder = "CohueTraversal", -- Workspace.CohueTraversal.{LaunchPads, Geysers, Ziplines}
+		RescanEvery = 2, -- s entre deux relevés des objets (ajouts du level design en cours de partie)
+		ZoneHeight = 5, -- studs au-dessus du dessus de l'objet où le HumanoidRootPart déclenche
+		ZoneBelow = 1, -- studs sous le dessus encore acceptés
+		-- Tremplin : attributs LaunchHeight (studs), LaunchForward (studs/s le long du LookVector de la pièce)
+		PadHeight = 18,
+		PadMaxHeight = 60,
+		PadForward = 0,
+		PadMaxForward = 28, -- reste sous la vitesse max permise pendant l'exemption (S-02)
+		-- Geyser : attributs Height, Period, Active, Offset (s). Éruption quand (temps serveur + Offset) mod
+		-- Period < Active. Les effets nommés « Eruption... » sous l'objet s'allument pendant l'éruption.
+		GeyserHeight = 30,
+		GeyserMaxHeight = 60,
+		GeyserPeriod = 6,
+		GeyserActive = 1.5,
+		GeyserMinPeriod = 2,
+		-- Tyrolienne : enfants Start et End (BasePart ou Attachment), attribut Speed (studs/s).
+		ZiplineSpeed = 26,
+		ZiplineMaxSpeed = 28, -- sous la vitesse max permise de la classe la plus lente x 1,2 (Guardian : 37)
+		ZiplineGrab = 4, -- studs autour de Start pour s'accrocher
+		ZiplineHang = 3.5, -- studs entre le câble et le HumanoidRootPart
+		ZiplineCorrect = 8, -- 1/s : rappel vers le câble
+		ZiplineCooldown = 1.5, -- s avant de pouvoir se raccrocher
+		ZiplineReleaseMult = 1.2, -- vitesse horizontale au lâcher, x marche (le garde reprend la main)
+		-- Côté serveur (TraversalGuard)
+		ServerExtraRadius = 2, -- studs de plus que le client (positions répliquées en retard)
+		ServerExtraHeight = 6,
+		GeyserLateSlack = 0.3, -- s (+ ping) après la fin d'une éruption encore acceptées
+		FlightSlack = 1.5, -- s ajoutées au temps de vol calculé
+		MaxFlight = 6, -- s d'exemption au plus pour un lancer
+		MinFlight = 0.3, -- s avant de pouvoir finir l'exemption au sol
+		EndGrace = 0.3, -- s d'exemption gardées après l'atterrissage ou la fin de tyrolienne
+		ZiplineOffLine = 8, -- studs : plus loin du câble, la tyrolienne est finie
+		ZiplineLagStart = 0.4, -- s (+ ping) avant d'exiger que le joueur avance le long du câble
+		ZiplineProgressMin = 0.5, -- part de la progression attendue exigée
+	},
+
 	-- MovementGuard (vérification serveur, mode classique)
 	Guard = {
 		Interval = 0.25, -- s entre deux échantillons
