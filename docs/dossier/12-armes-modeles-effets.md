@@ -541,4 +541,14 @@ Commités :
 | Fusions (16) | RoyalGreatsword, StormBow, SunStaff, MountainMaul, DaggerFlurry, GrandChime, AxeTornado, RingmasterLash, ThunderWeb, BlizzardGlobe, ComebackRang, ClusterSack, CometJavelin, StarShower, BuzzsawHalo, SiegeBallista |
 | Pièces (3 en plus) | Bomb, Arrow, Bolt ; la dague, la hache, le boomerang, la lance, le météore et la lame reprennent le modèle de leur arme |
 
-Reste pour finir l'étape 3 : importer les GLB dans COHUE (`ReplicatedStorage.Assets.Weapons`), ce qui demande le téléversement des mailles avec l'accord de Clément et un passage dans Studio annoncé au coordinateur.
+**Import dans COHUE** (téléversement sur le compte de Clément, avec son accord ; passage dans Studio annoncé au coordinateur) :
+1. Régénérer si besoin : `blender -b --factory-startup --python assets/a14/export.py -- glb,pack assets/a14/out`, puis `python assets/a14/make_install.py`.
+2. Dans Studio, place COHUE, faire **un seul Import 3D** de `assets/a14/out/A14_Weapons.glb` (64 mailles : 35 corps et 29 parties Neon). Réglages :
+   - Scale Unit = Studs ;
+   - Upload to Roblox activé ;
+   - Merge Meshes désactivé ;
+   - Use Imported Pivot activé ;
+   - Ignore Vertex Colors désactivé.
+   `AssetService:CreateAssetAsync` n'est pas ouvert (A01, 4 nov.), d'où l'Import 3D.
+3. Lancer `assets/a14/install/A14_weapons_install.luau` (par `execute_luau`). Il range chaque modèle dans `ReplicatedStorage.Assets.Weapons.<Nom>` : `Body` et `Neon` (matériau Neon), pivot au point de prise, attributs `Kind`, `WeaponId`, `Dominant`, `A14`. Il affiche les MeshId et signale ce qui manque. Les anciens `Weapon_*` de A01 ne sont pas touchés.
+4. Ctrl+S par Clément.
