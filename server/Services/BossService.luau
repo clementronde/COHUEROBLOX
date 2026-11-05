@@ -1,9 +1,10 @@
 --!strict
 -- Stage bosses as server data (dossier 20 section 5).
 -- The boss is an EnemyService entity (weapons hit it through queryRadius/damage); this service
--- moves it, runs its phases (100/66/33 %), telegraphed attacks and terrain weakness, and sends
--- BossState. Every attack: ground telegraph >= 0.6 s, following markers lock 0.5 s before the
--- hit (vault: "Boss Animation and Phases", "Combat Arena and Encounter Layout").
+-- moves it, runs its telegraphed attacks and terrain weakness, and sends BossState. v2 (décisions
+-- §6) : une seule phase (Bosses.PhaseEnabled = false), 3 attaques, chacune annoncée au sol au moins
+-- Bosses.MinTelegraph (1 s) avant ; les marqueurs qui suivent un joueur se figent 0,5 s avant
+-- l'impact. Tout s'arrête pendant le gel du passage de niveau (Workspace.RunFrozen).
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -40,6 +41,7 @@ type Telegraph = {
 	follow: Player?,
 	color: Color3,
 	resolve: "Damage" | "Summon" | "Fan" | "Charge",
+	uid: number?, -- numéro stable du télégraphe (le client y accroche l'objet d'impact)
 }
 
 type BossRuntime = {
@@ -65,6 +67,8 @@ type BossRuntime = {
 	standTime: { [Player]: number },
 	charge: { dirX: number, dirZ: number, left: number, damage: number, hit: { [Player]: boolean } }?,
 	dirty: boolean,
+	spawnedAt: number,
+	announced: { [string]: boolean }, -- attaques déjà annoncées par une bannière dans ce combat
 }
 
 local BossService = {}
@@ -72,6 +76,7 @@ local BossService = {}
 local boss: BossRuntime? = nil
 local stateRemote: RemoteEvent
 local sendAcc = 0
+local nextUid = 0
 
 -- Helpers ------------------------------------------------------------------------------------
 
@@ -142,9 +147,14 @@ local function inShape(t: Telegraph, x: number, z: number, feetAboveGround: numb
 	end
 end
 
-local function telegraphPayload(t: Telegraph)
+local function telegraphPayload(b: BossRuntime, t: Telegraph)
 	local y = Heightmap.getY(t.x, t.z)
+	local folder, fx = b.def.fxFolder, t.attack.fx
 	return {
+		attack = t.attack.id,
+		uid = t.uid,
+		-- Objet d'impact (BossRenderer, Assets.FX.Bosses.<fxFolder>.<fx>) : facultatif.
+		fx = if folder and fx then `Bosses.{folder}.{fx}` else nil,
 		kind = t.kind,
 		position = Vector3.new(t.x, y, t.z),
 		radius = t.radius,
@@ -162,7 +172,7 @@ local function sendState(b: BossRuntime, defeated: boolean?)
 	local hp = if enemies then enemies._getHp(b.entity) else nil
 	local list = {}
 	for _, t in b.telegraphs do
-		table.insert(list, telegraphPayload(t))
+		table.insert(list, telegraphPayload(b, t))
 	end
 	local weakPoints = {}
 	local layout = Heightmap.getLayout()
@@ -210,6 +220,8 @@ local function startAttack(b: BossRuntime, attack: Bosses.Attack, targets: { { p
 	local target = targets[math.random(#targets)]
 	local color = if attack.kind == "Summon" then Bosses.Colors.Summon else Bosses.Colors.Normal
 	local function add(t: Telegraph)
+		nextUid += 1
+		t.uid = nextUid
 		table.insert(b.telegraphs, t)
 	end
 	if attack.kind == "TargetCircle" then
@@ -261,6 +273,32 @@ local function startAttack(b: BossRuntime, attack: Bosses.Attack, targets: { { p
 	b.readyAt[attack.id] = now + attack.cooldown * b.cooldownMult * Bosses.PhaseCooldownMult[b.phase]
 	b.nextAttackAt = now + windup + Bosses.GlobalAttackGap
 	b.dirty = true
+	-- Nom de l'attaque (humour, textes en anglais) en bannière, seulement au premier usage du combat :
+	-- 3 bannières au plus, pour ne pas encombrer la file d'annonces du HUD.
+	if Bosses.AnnounceAttacks > 0 and not b.announced[attack.id] then
+		b.announced[attack.id] = true
+		announce("BossAttack", attack.label, Bosses.AnnounceAttacks)
+	end
+end
+
+-- Gel coop du passage de niveau (Workspace.RunFrozen) : le boss ne bouge plus et ses horloges
+-- glissent avec le gel, pour qu'un télégraphe en cours ne tombe pas d'un coup au dégel.
+local function shiftClocks(b: BossRuntime, dt: number)
+	for _, t in b.telegraphs do
+		t.startAt += dt
+		t.hitAt += dt
+	end
+	for id, at in b.readyAt do
+		b.readyAt[id] = at + dt
+	end
+	b.nextAttackAt += dt
+	b.rootedUntil += dt
+	if b.nextRootAt < math.huge then
+		b.nextRootAt += dt
+	end
+	b.vulnerableUntil += dt
+	b.weakReadyAt += dt
+	b.spawnedAt += dt
 end
 
 local function resolveTelegraph(b: BossRuntime, t: Telegraph, targets: { { player: Player, x: number, z: number, feet: number } })
@@ -345,6 +383,14 @@ local function stepCharge(b: BossRuntime, targets: { { player: Player, x: number
 				return
 			end
 		end
+	end
+	-- La ruée s'arrête au bord de l'arène (sinon le pas de marche suivant le ramènerait d'un bond).
+	local ox, oz = b.x - b.cx, b.z - b.cz
+	local maxR = Run.ArenaRadius - 8
+	local r = math.sqrt(ox * ox + oz * oz)
+	if r > maxR then
+		b.x, b.z = b.cx + ox / r * maxR, b.cz + oz / r * maxR
+		c.left = 0
 	end
 	if c.left <= 0 then
 		b.charge = nil
@@ -541,7 +587,8 @@ function BossService.spawnBoss(bossId: string, centre: Vector3, stage: number, t
 		standTime = {},
 		charge = nil,
 		dirty = true,
-		spawnedAt = os.clock(),
+		spawnedAt = now,
+		announced = {},
 	}
 	announce("BossStart", name, 3)
 	return true
@@ -618,8 +665,7 @@ local function onEnemyKilled(id: number, _kind: number, _x: number, _z: number)
 	sendState(b, true)
 	-- Boss chests are spawned by LootService on Bus.BossDefeated (review finding 8: no duplicates here).
 	-- Quest counter for Q_BossFast_*: boss killed within 30 s of spawning (review finding 13).
-	local spawnedAt = (b :: any).spawnedAt
-	if type(spawnedAt) == "number" and os.clock() - spawnedAt <= 30 then
+	if os.clock() - b.spawnedAt <= 30 then
 		local prog = Registry.find("ProgressionService")
 		local run = Registry.find("RunManager")
 		if prog and prog.recordStat and run then
@@ -651,6 +697,8 @@ function BossService.start()
 		acc = math.min(acc - TICK, TICK)
 		if not Workspace:GetAttribute("RunFrozen") then -- gel coop du passage de niveau, comme EnemyService
 			step()
+		elseif boss then
+			shiftClocks(boss, TICK)
 		end
 		local b = boss
 		if b and (b.dirty or sendAcc >= 1 / Bosses.SendHz) then
