@@ -83,6 +83,38 @@ Règles propres à chaque format :
 
 Fonds : `concept/run_scene.py` rend maintenant les trois formats (`run_landscape.png`, `run_portrait.png`, `run_pc.png`). Planches : `concept/captures/v3-planche-*.png` et `v3-composants.png`.
 
+**Lobby piloté par l'interface (décision de Clément du 5 nov. 2026, transmise par le lead)**
+
+Le lobby est piloté par l'interface : un gros bouton **PLAY** au centre bas, et une **barre de boutons** en bas de l'écran. Le village reste du décor. Page Figma **Lobby v3 — barre et Play** : LB01 (paysage), LB02 (choix du mode), LB03 (portrait), LB04 (PC). Captures : `concept/captures/lobby-*.png`. Fond : `concept/lobby_scene.py` (lobby en tenons d'A01, rendu Blender).
+
+Composants ajoutés à « Components v3 — briques » :
+
+| Composant | Règle |
+| --- | --- |
+| `Lobby/PlayButton` | Brique verte de 280 × 76 à tenons, avec deux tenons qui dépassent sur le dessus. « PLAY » en 44 px. Elle ouvre `Lobby/ModeChoice`. |
+| `Lobby/ModeChoice` | « PLAY WITH… » : trois briques SOLO (bleu, 1 portrait), FRIENDS (vert, 2) et PUBLIC (or, 3). Le flux est d'A09. |
+| `Lobby/BarButton` | Tuile sombre cerclée d'une couleur par menu. Grosse icône 3D en briques qui dépasse en haut, libellé de 15 px, badge rouge avec le nombre de nouveautés. |
+| `Lobby/Currency` | Plaque de Silver en haut à gauche. |
+
+Liste proposée pour la barre (finale avec A09) :
+
+| Bouton | Icône | Couleur du liseré |
+| --- | --- | --- |
+| Upgrades | Enclume | Orange |
+| Inventory | Sac à dos | Bleu |
+| Class | Casque de chevalier d'A01 | Violet |
+| Shop | Bourse | Or |
+| Quests | Parchemin | Vert |
+| Pass | Ticket | Ciel |
+| Pets (Companions) | Gland à frimousse | Vert clair |
+
+Placement selon le format :
+- **Paysage** : une rangée de 7 boutons au-dessus de la barre du bas de l'écran.
+- **Portrait** : deux rangées, 4 puis 3.
+- **PC** : Entrée lance PLAY, et les touches 1 à 7 ouvrent les menus.
+
+**Icônes d'armes** : A14 passe les armes en pixel art extrudé et livrera les PNG. Ces sprites remplaceront mes icônes d'armes en briques (épée, chaîne d'éclairs, bâton de feu, haches) dans la barre d'armes, l'inventaire et le passage de niveau. Les effets restent lisses et lumineux, c'est le domaine d'A14.
+
 **Décision de Clément (5 nov. 2026)** : au passage de niveau, le jeu se met en pause, **pour tout le monde en coop**. Cela remplace « cartes sans pause, 8 s » de la section 4.
 
 Pour qu'un joueur ne bloque pas l'équipe, l'interface prévoit en coop :

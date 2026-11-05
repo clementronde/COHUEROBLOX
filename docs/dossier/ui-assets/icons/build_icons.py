@@ -362,6 +362,80 @@ ICONS: dict[str, tuple[int, list[str]]] = {
         "..BBBBBBBBBB..",
         ".BB.BB..BB.BB.",
     ]),
+    # ---- barre du lobby (5 nov. 2026)
+    "anvil": (4, [
+        ".....H....H...",
+        "...H...H......",
+        "UUUUUUUUUUU...",
+        "TTTTTTTTTTTTTT",
+        ".TTTTTTTTTTTt.",
+        "....TTTTTt....",
+        "....TTTTTt....",
+        "...TTTTTTTt...",
+        "..tttttttttt..",
+    ]),
+    "backpack": (4, [
+        "....BBBB....",
+        "...B....B...",
+        "..LLLLLLLL..",
+        ".LLLLLLLLLL.",
+        ".LBBBBBBBBl.",
+        ".LLLLGGLLLl.",
+        ".LLLLLLLLLl.",
+        ".LLBBBBBBLl.",
+        ".LLBLLLLBLl.",
+        ".LLBBBBBBLl.",
+        "..llllllll..",
+    ]),
+    "coinbag": (4, [
+        "....BBBB....",
+        ".....LL.....",
+        "....LLLL....",
+        "...LLLLLL...",
+        "..LLLLLLLL..",
+        ".LLLLGGGLLL.",
+        ".LLLGYGGGLL.",
+        ".LLLGGGGGLl.",
+        ".LLLLGGGLLl.",
+        "..llllllll..",
+    ]),
+    "scroll": (3, [
+        "BBBBBBBBBB.",
+        "BCCCCCCCCB.",
+        ".CCCCCCCC..",
+        ".CKKKKKKC..",
+        ".CCCCCCCC..",
+        ".CKKKKKCC..",
+        ".CCCCCCCC..",
+        ".CKKKKCRR..",
+        ".CCCCCCRR..",
+        "BBBBBBBBBB.",
+        "BcccccccB..",
+    ]),
+    "ticket": (2, [
+        "GGGGGGGGGGGGGG",
+        "GYYYYYYYYYYYYg",
+        "gGGGGGCGGGGGGg",
+        "GGGGGCCCGGGGGG",
+        "gGGCCCCCCCGGGg",
+        "GGGGGCCCGGGGGG",
+        "gGGGCGGGCGGGGg",
+        "GGGGGGGGGGGGGG",
+        "gggggggggggggg",
+    ]),
+    "acorn": (4, [
+        "....BB......",
+        "..BBBBBBBB..",
+        ".BBlBBBlBBB.",
+        "BBBBBBBBBBBB",
+        ".LLLLLLLLLL.",
+        ".LCCLLLLCCL.",
+        ".LCKLLLLCKL.",
+        ".LLLLLLLLLL.",
+        ".LLLKKKKLLl.",
+        "..LLLLLLll..",
+        "...llllll...",
+    ]),
     "trophy": (3, [
         ".GGGGGGGGGG.",
         "GGYYGGGGGGgG",
@@ -447,7 +521,7 @@ def reset_scene():
 
 
 # Icônes tirées directement des modèles d'A01 (assets/voxel/models.py) : (fonction, inclinaison en degrés)
-MODELS = {"capture_cage": ("capture_icon", 0.0), "axes": ("weapon_spinningaxe", -35.0)}
+MODELS = {"capture_cage": ("capture_icon", 0.0), "axes": ("weapon_spinningaxe", -35.0), "helm": ("knight_helm", 0.0)}
 
 
 def render_icon(name: str, depth: int, rows: list[str], out_dir: str, vox=None, tilt=0.0):
