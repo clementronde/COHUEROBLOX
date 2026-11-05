@@ -403,13 +403,15 @@ def quakehammer(raw=False) -> Sprite:
 
 
 def throwingdagger(raw=False) -> Sprite:
-    """Rogue. Couleur dominante : prune. Dague en feuille, garde et poignée prune, gemme Neon raisin au
-    pommeau, un ruban qui flotte (gag). Sert aussi de pièce en vol."""
+    """Rogue. Couleur dominante : prune. Deux dagues en feuille (on lit le pluriel), garde et poignée prune,
+    gemme Neon raisin, un petit nœud de ruban au pommeau (gag). La dague de devant sert de pièce en vol."""
     s = Sprite("ThrowingDaggers", 32, 32, grip=(15.5, 22.5))
     s.depth.update({"Steel": 2, "Plum": 3, "Grape": 3, "Cream": 2})
+    s.thick((20, 19), (25, 4), 1.4, "Steel.d")                     # seconde dague, derrière
+    s.thick((19, 21), (21, 19), 1.2, "Plum.d")
     for y, w in zip(range(2, 18), (2, 2, 4, 4, 4, 6, 6, 6, 6, 6, 6, 4, 4, 4, 4, 4)):   # lame en feuille
         s.rect(16 - w // 2, y, 15 + w // 2, y, "Steel")
-    s.rect(15, 5, 15, 15, "Steel.l", fixed=True)                   # fil clair
+    s.rect(15, 5, 15, 15, "Steel.l", fixed=True)
     s.set(14, 8, "Cream")
     s.rect(10, 18, 21, 19, "Plum")                                 # garde
     s.set(9, 17, "Plum")
@@ -419,10 +421,9 @@ def throwingdagger(raw=False) -> Sprite:
         s.rect(14, y, 17, y, "Ink", fixed=True)
     s.rect(14, 27, 17, 29, "Grape!")                               # gemme au pommeau
     s.set(15, 27, "Cream!")
-    s.line((18, 28), (22, 30), "Grape")                            # ruban
-    s.line((18, 29), (24, 27), "Grape")
-    s.set(25, 26, "Grape.l")
-    s.set(23, 31, "Grape.l")
+    s.rect(18, 27, 19, 28, "Grape")                                # ruban noué d'un côté
+    s.line((19, 29), (22, 31), "Grape")
+    s.line((20, 28), (23, 28), "Grape")
     if raw:                                                        # base d'une fusion
         return s
     s.shade()
@@ -487,23 +488,26 @@ def spinningaxe(raw=False) -> Sprite:
 
 
 def beastwhip(raw=False) -> Sprite:
-    """Tamer. Couleur dominante : braise et crème (cirque). Manche rayé, lanière de cuir enroulée, pompon
-    Neon au bout (gag de cirque)."""
+    """Tamer. Couleur dominante : braise et crème (cirque). Manche rayé, lanière de cuir en S qui claque,
+    claquoir jaune au bout et une empreinte de patte sur le manche (gag du dompteur)."""
     s = Sprite("BeastWhip", 32, 32, grip=(7.0, 24.0))
-    s.depth.update({"Leather": 2, "Ember": 3, "Cream": 3, "Gold": 3})
-    s.rect(5, 17, 8, 30, "Ember")                                  # manche rayé
+    s.depth.update({"Leather": 2, "Ember": 3, "Cream": 3, "Gold": 3, "Bark": 3})
+    s.rect(5, 17, 8, 30, "Ember")                                  # manche rayé (14 px)
     for y in range(18, 30, 3):
         s.rect(5, y, 8, y, "Cream", fixed=True)
     s.rect(4, 30, 9, 31, "Gold")                                   # pommeau
-    s.rect(4, 16, 9, 16, "Gold")
-    s.ring(19.0, 14.0, 7.6, 9.6, "Leather")                        # lanière enroulée
-    s.ring(19.0, 14.0, 4.0, 5.8, "Leather")
-    s.thick((8, 16), (11, 17), 1.0, "Leather")
-    s.thick((25, 6), (29, 2), 0.9, "Leather")                      # bout qui s'échappe
-    s.ell(29.5, 2.0, 2.2, 2.2, "Gold!")                            # pompon Neon
-    s.set(29, 1, "Cream!")
-    for (x, y) in ((14, 7), (24, 21), (12, 18)):                   # coutures de la lanière
+    s.rect(4, 15, 9, 16, "Gold")
+    pts = [(7, 14), (9, 9), (14, 6), (19, 8), (21, 13), (24, 17), (28, 16), (30, 12)]
+    for a, b in zip(pts, pts[1:]):                                 # lanière en S, 3 px
+        s.thick(a, b, 1.3, "Leather")
+    for (x, y) in ((11, 7), (17, 7), (22, 15)):                    # tresse
         s.set(x, y, "Leather.d")
+    s.ell(30.0, 9.5, 1.8, 2.2, "Gold!")                            # claquoir
+    s.set(30, 8, "Cream!")
+    s.set(6, 21, "Bark")                                           # empreinte de patte
+    s.set(7, 21, "Bark")
+    s.set(5, 20, "Bark")
+    s.set(8, 20, "Bark")
     if raw:                                                        # base d'une fusion
         return s
     s.shade()
@@ -636,17 +640,24 @@ def meteor(raw=False) -> Sprite:
 
 
 def sawblade(raw=False) -> Sprite:
-    """Orbiting Blades (pool). Couleur dominante : acier. Lame de scie ronde à 8 dents, moyeu Neon Sky.
-    Sert aussi de pièce en orbite."""
+    """Orbiting Blades (pool). Couleur dominante : acier bleuté. Trois lames en croissant autour d'un moyeu
+    doré à cœur Neon, pointes vers l'avant (sens de rotation). Une lame sert de pièce en orbite."""
     s = Sprite("OrbitingBlades", 32, 32, grip=(15.5, 15.5))
     s.depth.update({"Steel": 2, "Sky": 3, "Gold": 3, "Cream": 2})
-    s.ring(15.5, 15.5, 4.0, 11.0, "Steel")
-    s.ring(15.5, 15.5, 11.0, 14.5, "Steel", keep=lambda a: (a % 45) < 18)   # dents
-    s.ring(15.5, 15.5, 6.0, 7.0, "Steel.d", fixed=True)            # gorge
-    s.ring(15.5, 15.5, 2.0, 4.0, "Gold")                           # moyeu
-    s.ell(15.5, 15.5, 2.0, 2.0, "Sky!")
-    for (x, y) in ((9, 9), (8, 11), (10, 8)):                      # reflet
-        s.set(x, y, "Cream")
+    for k in range(3):                                             # 3 lames en croissant
+        a0 = math.radians(k * 120)
+        for t in range(0, 26):
+            a = a0 + math.radians(t * 4.0)
+            r = 4.5 + t * 0.42
+            w = 2.4 - t * 0.07
+            s.ell(15.5 + math.cos(a) * r, 15.5 + math.sin(a) * r, w, w, "Steel")
+        for t in range(4, 26, 2):                                  # fil Sky sur le bord avant
+            a = a0 + math.radians(t * 4.0 + 6)
+            r = 4.5 + t * 0.42 + 1.2
+            s.set(round(15.5 + math.cos(a) * r - 0.5), round(15.5 + math.sin(a) * r - 0.5), "Sky")
+    s.ell(15.5, 15.5, 4.2, 4.2, "Gold")                            # moyeu
+    s.ell(15.5, 15.5, 2.2, 2.2, "Sky!")
+    s.set(15, 14, "Cream!")
     if raw:                                                        # base d'une fusion
         return s
     s.shade()
@@ -768,35 +779,51 @@ def sunstaff() -> Sprite:
 
 
 def mountainmaul() -> Sprite:
-    """Mountain Maul (Quake Hammer + Armor Rune) : tête en montagne avec pics, lave Neon plus vive, deux
-    pansements, une petite fleur qui pousse au sommet (gag)."""
+    """Mountain Maul (Quake Hammer + Armor Rune) : tête élargie en montagne, deux pics de pierre nets, faces
+    d'or, lave Neon, deux pansements, une petite fleur au sommet (gag)."""
     s = _fusion(quakehammer, "MountainMaul")
-    for x0, h in ((9, 2), (13, 4), (18, 3), (22, 2)):              # pics de roche sur la tête
-        for k in range(h):
-            s.rect(x0 + k // 2, 1 - k, x0 + 2 - k // 2, 1 - k, "Stone")
-    s.line((8, 9), (11, 11), "Ember!")
-    s.line((19, 3), (21, 5), "Ember!")
-    s.rect(8, 9, 11, 10, "Cream", fixed=True)                      # second pansement
-    s.set(14, -4, "Leaf")                                          # fleur au sommet
-    s.set(13, -5, "Gold")
-    s.set(15, -5, "Gold")
-    s.set(14, -6, "Gold")
-    s.set(14, -5, "Cream")
+    s.rect(4, 2, 27, 12, "Stone")                                  # tête élargie de 4 px
+    s.rect(0, 3, 3, 11, "Steel")
+    s.rect(28, 3, 31, 11, "Steel")
+    for x0 in (8, 19):                                             # deux pics nets (3 x 5)
+        for k in range(5):
+            w = 3 - k // 2
+            s.rect(x0 + (3 - w) // 2, 1 - k, x0 + (3 - w) // 2 + w - 1, 1 - k, "Stone")
+    s.line((10, 4), (12, 7), "Ember!")
+    s.line((12, 7), (11, 10), "Ember!")
+    s.line((21, 10), (22, 7), "Ember!")
+    s.line((6, 5), (7, 9), "Ember!")
+    s.rect(14, 6, 19, 7, "Cream", fixed=True)
+    s.rect(16, 4, 17, 9, "Cream", fixed=True)
+    s.rect(24, 8, 26, 9, "Cream", fixed=True)                      # second pansement
+    s.set(20, -5, "Leaf")                                          # fleur au sommet d'un pic
+    s.set(20, -6, "Gold")
     s.recolor({"Steel": "Gold"})
     return _done(s)
 
 
 def daggerflurry() -> Sprite:
-    """Dagger Flurry (Throwing Daggers + Projectile Rune) : lame à fil d'or, garde dorée, trois rubans de
-    couleur qui flottent."""
-    s = _fusion(throwingdagger, "DaggerFlurry", {"Sky": 3, "Gold": 3})
-    s.recolor({"Plum": "Grape"})
-    for y in range(4, 16):
-        s.set(13 if y % 2 else 18, y, "Gold", fixed=False)
-    s.rect(9, 18, 22, 19, "Gold")
-    s.line((18, 28), (25, 25), "Sky")                              # rubans
-    s.line((18, 29), (26, 29), "Gold")
-    s.line((17, 30), (22, 32), "Grape")
+    """Dagger Flurry (Throwing Daggers + Projectile Rune) : trois lames en éventail sur une seule garde dorée,
+    un seul pommeau, rubans de trois couleurs."""
+    s = Sprite("DaggerFlurry", 32, 32, grip=(15.5, 22.5))
+    s.depth.update({"Steel": 2, "Plum": 3, "Grape": 3, "Gold": 3, "Sky": 2, "Cream": 2})
+    for ang in (-22, 22):                                          # lames de côté
+        a = math.radians(ang)
+        tip = (15.5 + math.sin(a) * 15, 17 - math.cos(a) * 15)
+        s.thick((15.5, 16), tip, 1.5, "Steel")
+        s.thick((15.5 + math.sin(a) * 4, 13), tip, 0.5, "Steel.l", fixed=True)
+    for y, w in zip(range(1, 18), (2, 2, 4, 4, 4, 6, 6, 6, 6, 6, 6, 6, 4, 4, 4, 4, 4)):   # lame centrale
+        s.rect(16 - w // 2, y, 15 + w // 2, y, "Steel")
+    s.rect(15, 4, 15, 15, "Gold", fixed=True)                      # fil d'or
+    s.rect(8, 17, 23, 19, "Gold")                                  # garde dorée commune
+    s.rect(14, 20, 17, 26, "Grape")                                # poignée
+    for y in (21, 23, 25):
+        s.rect(14, y, 17, y, "Ink", fixed=True)
+    s.rect(14, 27, 17, 29, "Grape!")
+    s.set(15, 27, "Cream!")
+    s.line((18, 28), (24, 26), "Sky")                              # rubans
+    s.line((18, 29), (25, 30), "Gold")
+    s.line((13, 29), (8, 31), "Grape")
     return _done(s)
 
 
@@ -819,9 +846,9 @@ def grandchime() -> Sprite:
 
 
 def axetornado() -> Sprite:
-    """Axe Tornado (Spinning Axes + Duration Rune) : hache à double fer, toujours souriante, prise dans un
-    tourbillon d'air Neon."""
-    s = _fusion(spinningaxe, "AxeTornado", {"Sky": 1})
+    """Axe Tornado (Spinning Axes + Duration Rune) : hache à double fer, toujours souriante, deux tourbillons
+    de vent de chaque côté."""
+    s = _fusion(spinningaxe, "AxeTornado", {"Sky": 2})
     for y in range(2, 19):                                         # second fer, en miroir
         u = (y - 2) / 16.0
         edge = 31 - (3 + round(3 * (1 - math.sin(math.pi * u))))
@@ -831,25 +858,21 @@ def axetornado() -> Sprite:
     s.rect(24, 7, 24, 8, "Ink")
     for (x, y) in ((20, 11), (21, 12), (22, 13), (23, 13), (24, 12), (25, 11)):
         s.set(x, y, "Ink")
-    for a in range(200, 340, 12):                                  # tourbillon
-        x = round(16 + math.cos(math.radians(a)) * 15)
-        y = round(21 + math.sin(math.radians(a)) * 5)
-        s.set(x, y + 8, "Sky!")
+    s.ring(16.0, 34.0, 9.5, 11.0, "Sky", keep=lambda a: 205 <= a <= 335)    # arcs de tourbillon
+    s.ring(16.0, 37.0, 12.5, 14.0, "Sky", keep=lambda a: 215 <= a <= 325)
     return _done(s)
 
 
 def ringmasterlash() -> Sprite:
-    """Ringmaster Lash (Beast Whip + Agility Rune) : manche rayé or et raisin, double lanière, pompon doré
-    et étoiles de cirque."""
+    """Ringmaster Lash (Beast Whip + Agility Rune) : manche rayé or et raisin, lanière plus longue qui fait
+    une boucle, claquoir étoile Neon, trois étoiles groupées."""
     s = _fusion(beastwhip, "RingmasterLash")
     s.recolor({"Ember": "Grape", "Cream": "Gold"})
-    s.ring(19.0, 14.0, 10.6, 11.8, "Leather")
-    for (x, y) in ((3, 6), (11, 2), (28, 27), (24, 28)):           # étoiles
-        s.set(x, y, "Gold!")
-        s.set(x - 1, y, "Gold!")
-        s.set(x + 1, y, "Gold!")
-        s.set(x, y - 1, "Gold!")
-        s.set(x, y + 1, "Gold!")
+    s.ring(21.0, 21.0, 3.2, 4.6, "Leather")                        # boucle
+    s.thick((24, 17), (22, 18), 1.2, "Leather")
+    for (x, y) in ((25, 26), (28, 28), (26, 30)):                  # étoiles groupées
+        for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)):
+            s.set(x + dx, y + dy, "Gold!")
     return _done(s)
 
 
@@ -868,45 +891,59 @@ def thunderweb() -> Sprite:
 
 
 def blizzardglobe() -> Sprite:
-    """Blizzard Globe (Frost Nova + Cooldown Rune) : globe plus grand, tempête de neige, socle doré."""
-    s = _fusion(snowglobe, "BlizzardGlobe")
-    s.ell(15.5, 12.5, 12.2, 12.2, "Sky")
-    s.recolor({"Plum": "Gold"})
-    for a in range(0, 360, 30):                                    # tempête qui tourne dans le globe
-        r = 6.5 + (a % 60) / 20
-        s.set(round(15.5 + math.cos(math.radians(a)) * r), round(12.5 + math.sin(math.radians(a)) * r), "Cream")
-    for k in range(-5, 6):                                         # grand flocon Neon
-        s.set(15 + k, 12, "Cream!")
-        s.set(15, 12 + k, "Cream!")
+    """Blizzard Globe (Frost Nova + Cooldown Rune) : globe plus grand qui dépasse du socle doré, deux
+    stalactites de glace en haut, flocon d'or Neon, tempête de neige."""
+    s = Sprite("BlizzardGlobe", 32, 32, grip=(15.5, 27.0))
+    s.depth.update({"Sky": 6, "Gold": 6, "Cream": 6, "Plum": 6})
+    s.ell(15.5, 12.0, 13.0, 12.5, "Sky")
+    s.ell(15.5, 1.2, 8.0, 2.4, "Cream")                            # tas de neige sur le globe
+    s.ell(12.0, 0.4, 3.0, 1.6, "Cream")
+    s.rect(9, 24, 22, 27, "Gold")                                  # socle doré
+    s.rect(6, 28, 25, 31, "Gold")
+    s.rect(6, 28, 25, 28, "Plum", fixed=True)
+    for k in range(-5, 6):                                         # flocon d'or Neon
+        s.set(15 + k, 12, "Gold!")
+        s.set(15, 12 + k, "Gold!")
     for k in (-4, -3, 3, 4):
-        s.set(15 + k, 12 + k, "Cream!")
-        s.set(15 + k, 12 - k, "Cream!")
+        s.set(15 + k, 12 + k, "Gold!")
+        s.set(15 + k, 12 - k, "Gold!")
+    s.set(15, 12, "Cream!")
+    for a in range(0, 360, 24):                                    # tempête qui tourne
+        r = 7.5 + (a % 48) / 16
+        s.set(round(15.5 + math.cos(math.radians(a)) * r), round(12 + math.sin(math.radians(a)) * r), "Cream")
+    for (x, y) in ((6, 6), (5, 8), (7, 5)):
+        s.set(x, y, "Cream")
     return _done(s)
 
 
 def comebackrang() -> Sprite:
-    """Comeback Rang (Boomerang + Magnet Rune) : deux boomerangs bleu roi et or croisés, un aimant au coude."""
-    s = _fusion(boomerang, "ComebackRang", {"Royal": 2, "Steel": 3})
-    s.recolor({"Gold": "Royal", "Ember": "Gold"})
+    """Comeback Rang (Boomerang + Magnet Rune) : le même boomerang en V, plus épais, liseré Neon cyan sur le
+    bord intérieur, un petit cristal cyan au sommet (il revient toujours)."""
+    s = Sprite("ComebackRang", 32, 32, grip=(15.5, 9.0))
+    s.depth.update({"Gold": 3, "Ember": 3, "Cream": 3, "Sky": 3})
     for (p0, p1) in (((15, 7), (9, 15)), ((9, 15), (4, 26)), ((15, 7), (22, 14)), ((22, 14), (28, 25))):
-        s.thick(p0, p1, 0.8, "Gold")                               # fil d'or sur les bras
-    s.rect(12, 2, 19, 7, "Steel")                                  # aimant en U au coude
-    s.rect(14, 2, 17, 5, "Royal")
-    s.rect(12, 7, 13, 8, "Sky!")
-    s.rect(18, 7, 19, 8, "Sky!")
-    for (x, y) in ((9, 3), (8, 1), (22, 3), (23, 1)):              # lignes d'attraction
-        s.set(x, y, "Sky!")
+        s.thick(p0, p1, 3.4, "Gold")                               # bras plus épais
+    s.thick((4, 26), (5, 23), 3.0, "Ember")
+    s.thick((28, 25), (27, 22), 3.0, "Ember")
+    for (p0, p1) in (((15, 11), (11, 17)), ((11, 17), (7, 25)), ((16, 11), (20, 17)), ((20, 17), (25, 25))):
+        s.line(p0, p1, "Sky!")                                     # liseré Neon intérieur
+    s.rect(14, 3, 17, 5, "Sky!")                                   # cristal au sommet
+    s.set(15, 3, "Cream!")
+    for (x, y) in ((8, 19), (23, 18)):
+        s.set(x, y, "Ember")
     return _done(s)
 
 
 def clustersack() -> Sprite:
-    """Cluster Sack (Bomb Bag + Projectile Rune) : le sac déborde de petites bombes, pièces dorées cousues."""
+    """Cluster Sack (Bomb Bag + Projectile Rune) : trois mini-bombes de plus dépassent de l'ouverture, pièces
+    dorées cousues sur les épaules."""
     s = _fusion(bombbag, "ClusterSack")
-    for (cx, cy, r) in ((7.0, 6.5, 2.2), (25.0, 5.5, 2.4), (4.5, 12.0, 1.8), (27.5, 12.5, 1.8), (16.0, 1.0, 2.0)):
-        s.ell(cx, cy, r, r, "Ink")
-        s.set(round(cx - 1), round(cy - 1), "Cream")
-        s.set(round(cx), round(cy - r - 1), "Gold!")
-    s.rect(7, 14, 9, 16, "Gold", fixed=True)                       # pièces dorées cousues sur les épaules
+    for (x0, y0) in ((4, 3), (24, 3), (16, -3)):                   # mini-bombes 4 x 4
+        s.rect(x0, y0 + 1, x0 + 3, y0 + 3, "Ink")
+        s.rect(x0 + 1, y0, x0 + 2, y0 + 4, "Ink")
+        s.set(x0 + 1, y0 + 1, "Cream")
+        s.set(x0 + 2, y0 - 1, "Gold!")
+    s.rect(7, 14, 9, 16, "Gold", fixed=True)
     s.rect(22, 14, 24, 16, "Gold", fixed=True)
     return _done(s)
 
@@ -923,40 +960,38 @@ def cometjavelin() -> Sprite:
 
 
 def starshower() -> Sprite:
-    """Star Shower (Meteor Rain + Luck Rune) : une étoile dorée à cinq branches, queue d'étincelles."""
-    s = Sprite("StarShower", 32, 32, grip=(20.0, 20.0))
-    s.depth.update({"Gold": 5, "Cream": 3, "Sky": 2})
-    for k in range(8):                                             # queue d'étincelles
-        t = k / 7
-        s.ell(16 - 13 * t, 16 - 13 * t, 3.2 - 2.4 * t, 3.2 - 2.4 * t, "Gold" if k < 4 else "Cream")
-    for y in range(9, 32):                                         # étoile
-        for x in range(9, 32):
-            dx, dy = x + 0.5 - 20.5, y + 0.5 - 20.5
-            a = math.atan2(dy, dx) + math.pi / 2
-            r = math.hypot(dx, dy)
-            lim = 4.2 + 6.8 * (0.5 + 0.5 * math.cos(5 * a)) ** 2.2
-            if r <= lim:
-                s.set(x, y, "Gold", fixed=False)
-    s.ell(20.5, 20.5, 2.2, 2.2, "Cream!")
-    s.rect(19, 18, 19, 19, "Ink")                                  # visage content (gag)
-    s.rect(22, 18, 22, 19, "Ink")
-    s.rect(19, 22, 22, 22, "Ink")
+    """Star Shower (Meteor Rain + Luck Rune) : le même météore en feu, roche dorée et souriante, couronné de
+    trois petites étoiles Neon."""
+    s = _fusion(meteor, "StarShower", {"Gold": 5})
+    s.recolor({"Stone": "Gold", "Ember": "Ember"})
+    s.rect(18, 19, 18, 20, "Ink")                                  # visage content
+    s.rect(22, 19, 22, 20, "Ink")
+    s.rect(18, 23, 22, 23, "Ink")
+    s.set(17, 22, "Ink")
+    s.set(23, 22, "Ink")
+    for (cx, cy) in ((14, 13), (21, 10), (27, 14)):                # couronne de 3 étoiles 5 x 5
+        for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1), (2, 0), (-2, 0), (0, -2), (0, 2)):
+            if abs(dx) + abs(dy) <= 2:
+                s.set(cx + dx, cy + dy, "Gold!")
+        s.set(cx, cy, "Cream!")
     return _done(s)
 
 
 def buzzsawhalo() -> Sprite:
-    """Buzzsaw Halo (Orbiting Blades + Area Rune) : scie plus grande à 12 dents d'or, moyeu Neon ; le halo
-    lumineux qui l'entoure en jeu est un effet."""
+    """Buzzsaw Halo (Orbiting Blades + Area Rune) : six lames en croissant, anneau doré de 2 px, gros cœur
+    Neon ; le halo lumineux autour est un effet en jeu."""
     s = Sprite("BuzzsawHalo", 32, 32, grip=(15.5, 15.5))
-    s.depth.update({"Steel": 2, "Gold": 3, "Sky": 2, "Cream": 2})
-    s.ring(15.5, 15.5, 4.0, 11.5, "Steel")
-    s.ring(15.5, 15.5, 11.5, 14.0, "Gold", keep=lambda a: (a % 30) < 13)
-    # le halo est un effet de lumière en jeu (Assets.FX), pas des pixels du modèle
-    s.ring(15.5, 15.5, 6.5, 7.5, "Gold", fixed=True)
-    s.ell(15.5, 15.5, 2.6, 2.6, "Sky!")
-    s.set(15, 15, "Cream!")
-    for (x, y) in ((9, 9), (8, 11), (10, 8)):
-        s.set(x, y, "Cream")
+    s.depth.update({"Steel": 2, "Gold": 3, "Sky": 3, "Cream": 2})
+    for k in range(6):
+        a0 = math.radians(k * 60)
+        for t in range(0, 22):
+            a = a0 + math.radians(t * 3.6)
+            r = 6.0 + t * 0.42
+            w = 2.0 - t * 0.06
+            s.ell(15.5 + math.cos(a) * r, 15.5 + math.sin(a) * r, w, w, "Steel")
+    s.ring(15.5, 15.5, 5.0, 7.0, "Gold")                           # anneau doré
+    s.ell(15.5, 15.5, 4.2, 4.2, "Sky!")                            # gros cœur Neon
+    s.ell(15.5, 15.5, 1.6, 1.6, "Cream!")
     return _done(s)
 
 

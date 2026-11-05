@@ -110,6 +110,21 @@ def do_glb(outdir):
         json.dump(manifest, f, indent=1, ensure_ascii=False)
 
 
+def do_pack(outdir):
+    """Un seul GLB pour l'Import 3D de Studio : toutes les armes, fusions et pièces, chaque maille nommée
+    <Nom> (corps) ou <Nom>_Neon, origine à la prise (réglage « Use Imported Pivot »)."""
+    C.fresh()
+    obs = []
+    for name, fn, kind, wid in catalog():
+        made, _sp = build(fn)
+        for ob in made:
+            ob.name = name if ob.name.startswith("Body") else name + "_Neon"
+            ob.data.name = ob.name
+            obs.append(ob)
+    export_glb(obs, os.path.join(outdir, "A14_Weapons.glb"))
+    print("pack :", len(obs), "mailles")
+
+
 def do_icons(outdir):
     idir = os.path.join(outdir, "icons")
     os.makedirs(idir, exist_ok=True)
@@ -158,4 +173,4 @@ if __name__ == "__main__":
     which, outdir = argv[0], os.path.abspath(argv[1])
     os.makedirs(outdir, exist_ok=True)
     for step in (("glb", "icons", "boards") if which == "all" else which.split(",")):
-        {"glb": do_glb, "icons": do_icons, "boards": do_boards}[step](outdir)
+        {"glb": do_glb, "icons": do_icons, "boards": do_boards, "pack": do_pack}[step](outdir)
