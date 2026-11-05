@@ -469,6 +469,16 @@ local function buildView(player: Player, data: Data): { [string]: any }
 		end
 		unlocks[kind] = bucket
 	end
+	-- shortcut: l'UI du lobby (LobbyController, Config.UI.ClassOrder) lit encore les ids v1 ; on publie aussi
+	-- l'alias v1 de chaque classe débloquée. À retirer quand l'UI passe aux ids v2 (docs/attentes-clement.md).
+	local classBucket = unlocks.Class
+	if classBucket then
+		for v1, v2 in Progression.LegacyClassIds do
+			if classBucket[v2] then
+				classBucket[v1] = true
+			end
+		end
+	end
 	local itemBucket: { [string]: boolean } = {}
 	local items = optionalConfig("Items")
 	if items and type(items.Defs) == "table" then
