@@ -29,7 +29,7 @@ local Bus = require(script.Parent.Parent:WaitForChild("Bus"))
 
 local CFG = Progression.Data
 local IS_STUDIO = RunService:IsStudio()
-local CURRENT_SCHEMA = 2 -- 2 : v2 (A12-01). Publier la place de run avant le lobby.
+local CURRENT_SCHEMA = 3 -- 2 : v2 (A12-01) ; 3 : ids de classe v2 partout (A12, v3). Publier la place de run avant le lobby.
 
 export type LoadStatus = "loading" | "ready" | "locked" | "failed" | "left" | "released"
 type SessionState = "active" | "lost" | "released"
@@ -221,7 +221,16 @@ local function newProfile(): { [string]: any }
 		-- Collection v2 (A12-01, dossier 40 §3.1) : owned[espèce] = { n = captures, at = 1re capture },
 		-- equipped = { espèce1, espèce2? (Tamer) }, keys[captureKey] = os.time (idempotence, 200 max).
 		companions = { v = 1, owned = {}, equipped = {}, keys = {} },
-		settings = { keepHat = false, colorblind = false, reduceFlashes = false, textScale = 1 },
+		-- Volumes 0..1 (dossier 90 §1, Config.Sounds.Volumes.Default) : écrits par UpdateSettings.
+		settings = {
+			keepHat = false,
+			colorblind = false,
+			reduceFlashes = false,
+			textScale = 1,
+			masterVolume = 1,
+			musicVolume = 0.7,
+			sfxVolume = 1,
+		},
 		loadout = { classId = Progression.DefaultLoadout.classId, companionId = Progression.DefaultLoadout.companionId },
 		weekly = { week = -1, done = false, bestSeconds = 0, everDone = false },
 		-- kills / bestFinalWave : compteurs v1 (plus écrits au classement). best / weekBest : relevé
@@ -235,12 +244,15 @@ local function newProfile(): { [string]: any }
 			best = {},
 			weekBest = {},
 			quarantined = {},
+			bestKills = 0, -- record perso de KO en une run (Profile.bestKills), toutes runs comprises
 		},
 		receipts = {},
 		receiptOrder = {},
 		purchaseLog = {},
 		vipRoomId = "",
 		flags = { boardBanned = false },
+		-- Données v1 sans place en v2, gardées telles quelles (migration 2 -> 3) : jamais lues par le jeu.
+		legacy = {},
 	}
 end
 
@@ -249,16 +261,242 @@ local STEPS: { [number]: (any) -> any } = {}
 
 -- 1 -> 2 (A12-01, v2) : classes classiques et compagnons capturés (dossier 40 §3.1). Les classes et
 -- lignées v1 n'existent plus : le dernier choix repasse au défaut (sans compagnon). Les traces v1
--- (maîtrise, Lien, unlocks.Companion, cosmétiques) restent dans le profil, ignorées par le code v2.
+-- (maîtrise, Lien, unlocks.Companion, cosmétiques) restent dans le profil ; l'étape 2 -> 3 les remappe.
+-- Retouche v3 (avant toute publication live : Places = 0) : une classe v1 garde son équivalent v2
+-- (Cornu -> Knight) au lieu du défaut. Les deux résultats sont des schémas 2 valides.
 STEPS[1] = function(data: any): any
 	local loadout = data.loadout
 	local classId = if type(loadout) == "table" then loadout.classId else nil
+	if type(classId) == "string" and Progression.LegacyClassIds[classId] then
+		classId = Progression.LegacyClassIds[classId]
+	end
 	if type(classId) ~= "string" or not table.find(Progression.Classes, classId) then
 		classId = Progression.DefaultLoadout.classId
 	end
 	data.loadout = { classId = classId, companionId = "" }
 	if type(data.companions) ~= "table" then
 		data.companions = { v = 1, owned = {}, equipped = {}, keys = {} }
+	end
+	return data
+end
+
+-- 2 -> 3 (A12 v3) : ids de classe v2 partout. Rien n'est perdu : chaque valeur v1 déplacée est
+-- recopiée telle quelle dans legacy.classesV1 avant d'être fusionnée sous l'id v2.
+--   masteryXp : somme (v1 + v2 déjà gagnée) ; mastery recalculée depuis l'XP fusionnée, et les
+--               cosmétiques de maîtrise des niveaux atteints accordés sous l'id v2.
+--   stats Class_<v1>_* : record (clé contenant « Best ») = max, compteur = somme.
+--   cosmetics / equipped : Tint_Cornu_M3 -> Tint_Knight_M3, emplacement Tint:Cornu -> Tint:Knight
+--               (un choix v2 déjà fait est gardé).
+--   questsDone : Q_Class_<v1>_* et quête de déblocage v1 (Q_Felyne -> Q_Rogue) recopiées si absentes,
+--               même horodatage, sans récompense (déjà donnée en v1) ; les entrées v1 restent.
+--   Astrel / Cristallin (sans équivalent v2) : déplacés dans legacy.classesV1 seulement.
+--   boards.bestKills : initialisé depuis le meilleur relevé existant.
+local function v1Class(id: any): (boolean, string?)
+	if type(id) ~= "string" then
+		return false, nil
+	end
+	local v2 = Progression.LegacyClassIds[id]
+	if v2 then
+		return true, v2
+	end
+	return table.find(Progression.LegacyClassesWithoutV2, id) ~= nil, nil
+end
+
+-- "Tint_Cornu_M3" -> (true, "Tint_Knight_M3") ; id sans classe v1 au milieu -> false.
+local function remapClassToken(id: any, sep: string): (boolean, string?)
+	if type(id) ~= "string" then
+		return false, nil
+	end
+	local head, mid, tail = string.match(id, "^([^" .. sep .. "]+)" .. sep .. "([^" .. sep .. "]+)(.*)$")
+	if not head then
+		return false, nil
+	end
+	local isV1, v2 = v1Class(mid)
+	if not isV1 then
+		return false, nil
+	end
+	return true, if v2 then `{head}{sep}{v2}{tail}` else nil
+end
+
+local function masteryLevel(xp: number): number
+	local cfg = Progression.Mastery
+	local level, remaining = 1, xp
+	while level < cfg.MaxLevel do
+		local need = cfg.XpBase + cfg.XpStep * (level - 1)
+		if remaining < need then
+			break
+		end
+		remaining -= need
+		level += 1
+	end
+	return level
+end
+
+-- Valeur gardée dans legacy : NaN et infini (illisibles en JSON, la sauvegarde échouerait) -> 0.
+local function storable(v: any): any
+	return if type(v) == "number" and not (v == v and v > -math.huge and v < math.huge) then 0 else v
+end
+
+local function num(v: any): number
+	return if type(v) == "number" and v == v and v > -math.huge and v < math.huge then v else 0
+end
+
+STEPS[2] = function(data: any): any
+	if type(data.legacy) ~= "table" then
+		data.legacy = {}
+	end
+	local stash: { [string]: any } = { mastery = {}, masteryXp = {}, stats = {}, cosmetics = {}, equipped = {} }
+	data.legacy.classesV1 = stash
+
+	-- Maîtrise
+	local touched: { [string]: boolean } = {}
+	if type(data.masteryXp) == "table" then
+		local keys = {}
+		for k in data.masteryXp do
+			table.insert(keys, k)
+		end
+		table.sort(keys, function(a, b)
+			return tostring(a) < tostring(b)
+		end)
+		for _, k in keys do
+			local isV1, v2 = v1Class(k)
+			if isV1 then
+				local xp = data.masteryXp[k]
+				stash.masteryXp[k] = storable(xp)
+				data.masteryXp[k] = nil
+				if v2 then
+					data.masteryXp[v2] = num(data.masteryXp[v2]) + num(xp)
+					touched[v2] = true
+				end
+			end
+		end
+	end
+	if type(data.mastery) == "table" then
+		for k, lvl in table.clone(data.mastery) do
+			if v1Class(k) then
+				stash.mastery[k] = storable(lvl)
+				data.mastery[k] = nil
+			end
+		end
+	else
+		data.mastery = {}
+	end
+
+	-- Cosmétiques possédés (avant les récompenses de maîtrise, pour garder les deux)
+	if type(data.cosmetics) == "table" then
+		for id, v in table.clone(data.cosmetics) do
+			local isV1, newId = remapClassToken(id, "_")
+			if isV1 then
+				stash.cosmetics[id] = v
+				data.cosmetics[id] = nil
+				if newId then
+					data.cosmetics[newId] = v
+				end
+			end
+		end
+	else
+		data.cosmetics = {}
+	end
+
+	for classId, isTouched in touched do
+		if isTouched then
+			local level = math.max(masteryLevel(num(data.masteryXp[classId])), num(data.mastery[classId]))
+			level = math.clamp(math.floor(level), 1, Progression.Mastery.MaxLevel)
+			data.mastery[classId] = level
+			for lvl, template in Progression.Mastery.Rewards do
+				if lvl <= level then
+					data.cosmetics[(string.gsub(template, "<C>", classId))] = true
+				end
+			end
+		end
+	end
+
+	-- Équipement cosmétique
+	if type(data.equipped) == "table" then
+		local slots = {}
+		for slot in data.equipped do
+			table.insert(slots, slot)
+		end
+		table.sort(slots, function(a, b)
+			return tostring(a) < tostring(b)
+		end)
+		for _, slot in slots do
+			local value = data.equipped[slot]
+			local slotV1, newSlot = remapClassToken(slot, ":")
+			local valueV1, newValue = remapClassToken(value, "_")
+			if slotV1 or valueV1 then
+				stash.equipped[slot] = value
+				data.equipped[slot] = nil
+				local targetSlot = if slotV1 then newSlot else slot
+				local targetValue = if valueV1 then newValue else value
+				if targetSlot and targetValue ~= nil and data.equipped[targetSlot] == nil then
+					data.equipped[targetSlot] = targetValue
+				end
+			end
+		end
+	end
+
+	-- Stats de classe
+	if type(data.stats) == "table" then
+		local keys = {}
+		for k in data.stats do
+			table.insert(keys, k)
+		end
+		table.sort(keys, function(a, b)
+			return tostring(a) < tostring(b)
+		end)
+		for _, k in keys do
+			if type(k) == "string" and string.sub(k, 1, 6) == "Class_" then
+				local isV1, newKey = remapClassToken(k, "_")
+				if isV1 then
+					local v = data.stats[k]
+					stash.stats[k] = storable(v)
+					data.stats[k] = nil
+					if newKey then
+						local current = num(data.stats[newKey])
+						data.stats[newKey] = if string.find(newKey, "Best", 1, true)
+							then math.max(current, num(v))
+							else current + num(v)
+					end
+				end
+			end
+		end
+	end
+
+	-- Quêtes terminées (copie, les entrées v1 restent)
+	if type(data.questsDone) == "table" then
+		local done = data.questsDone
+		for id, at in table.clone(done) do
+			local target: string? = Progression.LegacyClassQuests[id]
+			if not target and type(id) == "string" and string.sub(id, 1, 8) == "Q_Class_" then
+				local rest = string.sub(id, 9)
+				local isV1, newRest = remapClassToken("Q_" .. rest, "_")
+				-- "Q_Cornu_Win_1" -> "Q_Knight_Win_1" -> "Q_Class_Knight_Win_1"
+				if isV1 and newRest then
+					target = "Q_Class_" .. string.sub(newRest, 3)
+				end
+			end
+			if target and done[target] == nil then
+				done[target] = at
+			end
+		end
+	end
+
+	-- Dernier choix (un profil schéma 2 n'a normalement que des ids v2)
+	if type(data.loadout) == "table" then
+		local isV1, v2 = v1Class(data.loadout.classId)
+		if isV1 then
+			stash.loadout = data.loadout.classId
+			data.loadout.classId = v2 or Progression.DefaultLoadout.classId
+		end
+	end
+
+	-- Record perso de KO en une run
+	local boards = data.boards
+	if type(boards) == "table" then
+		local best = if type(boards.best) == "table" then num(boards.best.ko) else 0
+		local week = if type(boards.weekBest) == "table" then num(boards.weekBest.ko) else 0
+		boards.bestKills = math.max(num(boards.bestKills), best, week)
 	end
 	return data
 end

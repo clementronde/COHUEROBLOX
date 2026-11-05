@@ -434,6 +434,10 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 | A12-04 | Boutique cosmétique, pass VIP et pass saisonnier conformes aux règles Roblox | MonetizationService, Products |  | P1 — lancement | À valider |
 | A12-05 | Modèle de revenus et grille de prix (agent revenue-modeler) | Note | A12-04 | P1 — lancement | À faire |
 | A12-06 | 10 propositions de nom anglais (agent market-analyst) | Note |  | P1 — lancement | À faire |
+| A12-07 | Ids de classe v2 partout dans le domaine data (profil, Unlocks, SelectLoadout, quêtes) et migration des profils v1 (schéma 3) | DataService, Progression, Quests ; test `tools/tests/a12-migration.sh` (branche `claude/a12-v3`) | A12-01 | P0 — bloquant | À valider |
+| A12-08 | `Profile.bestKills`, `Profile.classes`, `RunSummary.weeklyRank` (lu dans le cache, sans bloquer) | ProgressionService (branche `claude/a12-v3`) | A12-02 | P1 — lancement | À valider |
+| A12-09 | Sauvegarde des volumes (master, musique, effets) dans `settings` via `UpdateSettings`, bornés à 0..1 | ProgressionService, DataService (branche `claude/a12-v3`) | A10 | P1 — lancement | À valider |
+| A12-10 | PERF-09 : envoi complet du butin étalé, un paquet par tick | LootService, LootRenderer (branche `claude/a12-v3`) |  | P1 — lancement | À valider |
 
 ### A13 — Perf mobile et QA (vague 3, mesures dès la vague 2)
 

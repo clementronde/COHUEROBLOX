@@ -19,6 +19,30 @@ Progression.Classes = {
 	"Tamer",
 } :: { string }
 
+-- Ids de classe v1 -> v2 : migration du profil (schéma 2 -> 3, DataService) et alias acceptés par
+-- SelectLoadout / setLoadout. Astrel et Cristallin n'ont pas d'équivalent v2 : leurs données restent
+-- dans profile.legacy.
+Progression.LegacyClassIds = {
+	Cornu = "Knight",
+	Plumeline = "Archer",
+	Mecano = "Mage",
+	Rocailleux = "Guardian",
+	Felyne = "Rogue",
+	Sporelin = "Cleric",
+	Ecaille = "Barbarian",
+	Tentaculos = "Tamer",
+} :: { [string]: string }
+Progression.LegacyClassesWithoutV2 = { "Astrel", "Cristallin" } :: { string }
+
+-- Quête de déblocage v1 -> quête v2 de la même classe : une classe débloquée en v1 le reste.
+Progression.LegacyClassQuests = {
+	Q_Rocailleux = "Q_Guardian",
+	Q_Felyne = "Q_Rogue",
+	Q_Sporelin = "Q_Cleric",
+	Q_Ecaille = "Q_Barbarian",
+	Q_Tentaculos = "Q_Tamer",
+} :: { [string]: string }
+
 -- Lignées v1 (évolution, Lien, œufs) : plus de contenu en v2 (capture et collection, dossier 40).
 -- Gardées pour lire les vieux profils et les cosmétiques de Lien déjà accordés.
 Progression.Lines = { "Braise", "Ronce", "Maree", "Volt", "Givre", "Echo" } :: { string }
@@ -50,23 +74,26 @@ Progression.Unlocks = {
 		Barbarian = { quest = "Q_Barbarian" },
 		Tamer = { quest = "Q_Tamer" },
 	},
+	-- Armes v2 (shared/Config/Weapons.luau, 16) : l'arme de départ d'une classe à quête entre dans le
+	-- pool avec la classe ; les autres sont libres. Les ids v1 (HacheBoomerang...) achetés restent
+	-- dans profile.unlocks.Weapon, ignorés.
 	Weapon = {
-		HacheBoomerang = { free = true },
-		PlumesDards = { free = true },
-		CleTourelle = { free = true },
-		ToupieScie = { free = true },
-		BouleBowling = { free = true },
-		PistoletBulles = { free = true },
-		GriffesEclair = { classId = "Felyne" },
-		PoingSeisme = { classId = "Rocailleux" },
-		NuageSpores = { classId = "Sporelin" },
-		SouffleBraise = { classId = "Ecaille" },
-		Meteorite = { classId = "Astrel" },
-		EclatsPrisme = { classId = "Cristallin" },
-		FouetTentacule = { classId = "Tentaculos" },
-		CerfVolantLaser = { silver = 150 },
-		ParapluieBouclier = { silver = 150 },
-		BombePaillettes = { silver = 200 },
+		Broadsword = { free = true },
+		Longbow = { free = true },
+		FireStaff = { free = true },
+		QuakeHammer = { classId = "Guardian" },
+		ThrowingDaggers = { classId = "Rogue" },
+		HolyAura = { classId = "Cleric" },
+		SpinningAxes = { classId = "Barbarian" },
+		BeastWhip = { classId = "Tamer" },
+		LightningChain = { free = true },
+		FrostNova = { free = true },
+		Boomerang = { free = true },
+		BombBag = { free = true },
+		SpearThrow = { free = true },
+		MeteorRain = { free = true },
+		OrbitingBlades = { free = true },
+		CrossbowTurret = { free = true },
 	},
 	Grimoire = {
 		Degats = { free = true },

@@ -7,7 +7,7 @@ Principe : tout ce qui donne de la puissance se gagne en jouant. Le serveur calc
 
 ---
 
-## 1. Profil joueur — schéma 2 (v2, A12-01)
+## 1. Profil joueur — schéma 3 (v2 A12-01, ids de classe v2 A12 v3)
 
 Une clé par joueur : `User_<UserId>` dans le DataStore `PlayerData_v1` (≤ 50 caractères, motif statique `{UserId}` pour les demandes d'effacement). En Studio, l'attribut `ServerStorage.TestProfileKey = "nom"` (≤ 20 car.) joue sur `TEST_<nom>_<UserId>` : les tests ne touchent jamais la vraie sauvegarde, et les classements ne sont pas écrits.
 
@@ -21,7 +21,7 @@ Le **Profil** (`Data`), valeurs par défaut d'un nouveau joueur (nouvelle table 
 
 | Champ | Type | Défaut | Rôle |
 | --- | --- | --- | --- |
-| `schema` | number | 2 | Version de schéma (section 2) |
+| `schema` | number | 3 | Version de schéma (section 2) |
 | `createdAt` | number | `os.time()` | Première connexion (bucket de retour J1/J8-28) |
 | `lastJoinAt` | number | `os.time()` | Dernière connexion |
 | `sessions` | number | 0 | Nombre de sessions |
@@ -43,23 +43,38 @@ Le **Profil** (`Data`), valeurs par défaut d'un nouveau joueur (nouvelle table 
 | `eggsHatched` | number | 0 | Compteur |
 | `cosmetics` | `{[cosmeticId]: true}` | `{}` | Cosmétiques possédés (hors gratuits, pass et saison, dérivés) |
 | `equipped` | `{[slot]: cosmeticId}` | `{}` | Équipement cosmétique |
-| `settings` | `{ keepHat, colorblind, reduceFlashes: boolean, textScale: number }` | `false, false, false, 1` | Réglages |
+| `settings` | `{ keepHat, colorblind, reduceFlashes: boolean, textScale, masterVolume, musicVolume, sfxVolume: number }` | `false, false, false, 1, 1, 0.7, 1` | Réglages. Volumes 0..1 (dossier 90), arrondis au centième, via `UpdateSettings` |
 | `loadout` | `{ classId, companionId }` | `Knight`, `""` | Dernier choix (companionId = 1re espèce équipée, compat) |
 | `companions` | `{ v, owned, equipped, keys }` | `1, {}, {}, {}` | Collection capturée (section 5, Compagnons v2) |
 | `seasons` | `{[seasonId]: number}` | `{}` | XP de pass saisonnier (section 9) |
 | `weekly` | `{ week, done, bestSeconds, everDone }` | `-1, false, 0, false` | Défi hebdo (section 10) |
-| `boards` | `{ week, kills, bestFinalWave, lastRunKey, best, weekBest, quarantined }` | `-1, 0, 0, "", {}, {}, {}` | Relevés du classement KO en une run (section 13) ; `kills`/`bestFinalWave` : compteurs v1 conservés |
+| `boards` | `{ week, kills, bestFinalWave, lastRunKey, best, weekBest, quarantined, bestKills }` | `-1, 0, 0, "", {}, {}, {}, 0` | Relevés du classement KO en une run (section 13) ; `kills`/`bestFinalWave` : compteurs v1 conservés ; `bestKills` : record perso de KO en une run (toutes runs, même en quarantaine) |
 | `receipts` | `{[PurchaseId]: number}` | `{}` | Marqueurs de reçus traités (même document que l'objet accordé) |
 | `receiptOrder` | `{string}` | `{}` | Ordre d'arrivée, pour garder les 100 plus récents |
 | `purchaseLog` | `{{k, r, t}}` | `{}` | Journal d'achats (clé produit, Robux payés, date), 50 derniers |
 | `vipRoomId` | string | `""` | GUID du salon VIP réservé (section 9) |
 | `flags` | `{ boardBanned: boolean }` | `false` | Retrait des classements (outil admin) |
+| `legacy` | `{ classesV1? }` | `{}` | Valeurs v1 d'origine déplacées par la migration 2 → 3 (jamais lues par le jeu, gardées pour un retour en arrière ou un support) |
 
 Règles de forme (vault « Data Schema Design and Migrations ») : tableaux denses uniquement (`receiptOrder`, `purchaseLog`), tout le reste en dictionnaires à clés texte ; aucun type moteur (Vector3, Color3) ; nombres bornés (pas d'`inf`/`nan`) ; taille mesurée par `#HttpService:JSONEncode(profil)`, avertissement au-delà de 200 000 caractères (limite 4 194 304). Estimation : ~160 stats × 30 o + 160 quêtes × 25 o + 100 reçus × 45 o ≈ 14 Ko.
 
 ## 2. Migrations
 
-- `schema` entier sur chaque profil, `CURRENT_SCHEMA = 2` dans `DataService`. **Étape 1 → 2** (A12-01) : `loadout` repasse à une classe v2 (défaut `Knight` si la classe v1 est inconnue) sans compagnon, `companions` créé ; maîtrise, Lien, `unlocks.Companion` et cosmétiques v1 restent dans le profil, ignorés. Un serveur v1 refusera un profil v2 : publier la place de run avant le lobby.
+- `schema` entier sur chaque profil, `CURRENT_SCHEMA = 3` dans `DataService`. **Étape 1 → 2** (A12-01) : `loadout` repasse à l'équivalent v2 de la classe v1 (`Progression.LegacyClassIds`, défaut `Knight` si inconnue) sans compagnon, `companions` créé. Un serveur v1 refusera un profil v2 : publier la place de run avant le lobby.
+- **Étape 2 → 3** (A12 v3, ids de classe v2 partout) : chaque valeur v1 déplacée est d'abord recopiée telle quelle dans `legacy.classesV1` (NaN/infini → 0, sinon la sauvegarde JSON échouerait).
+
+  | Donnée v1 | Devient | Fusion si la clé v2 existe déjà |
+  | --- | --- | --- |
+  | `masteryXp.Cornu` | `masteryXp.Knight` | somme ; `mastery` recalculée sur l'XP fusionnée, cosmétiques de maîtrise des niveaux atteints accordés en v2 |
+  | `stats.Class_Cornu_*` | `stats.Class_Knight_*` | record (`Best` dans la clé) = max, compteur = somme |
+  | `cosmetics.Tint_Cornu_M3` (et `Pose_`, `Title_`) | `Tint_Knight_M3` | — |
+  | `equipped["Tint:Cornu"]` (et `Pose:`), valeurs `*_Cornu_*` | `equipped["Tint:Knight"]` | le choix v2 déjà fait est gardé |
+  | `questsDone.Q_Felyne` (quête de déblocage v1) | `questsDone.Q_Rogue` (même horodatage, sans récompense) : la classe reste débloquée | horodatage v2 gardé ; l'entrée v1 reste |
+  | `questsDone.Q_Class_Cornu_*` | `Q_Class_Knight_*` (copie) | idem |
+  | Astrel, Cristallin (sans équivalent v2) | seulement `legacy.classesV1` | — |
+  | — | `boards.bestKills` = max(`best.ko`, `weekBest.ko`) | — |
+
+  Correspondances : `Cornu → Knight`, `Plumeline → Archer`, `Mecano → Mage`, `Rocailleux → Guardian`, `Felyne → Rogue`, `Sporelin → Cleric`, `Ecaille → Barbarian`, `Tentaculos → Tamer`. Gardés tels quels (ignorés) : `unlocks.Weapon` v1 achetés (`CerfVolantLaser`…, armes absentes de la v2, pas de remboursement), `stats.DamageWeapon_<arme v1>`, quêtes d'arme v1, Lien et `unlocks.Companion`. Test hors Studio : `bash tools/tests/a12-migration.sh` (profil v1 fabriqué, profil schéma 2 mixte, stabilité, refus d'un schéma plus récent, valeurs corrompues ; 93 asserts).
 - Chaîne d'étapes `STEPS[n]` (n → n+1) : ordonnées, déterministes, sans `yield`, jamais modifiées après publication ; on ajoute une étape.
 - **Schéma plus récent que le serveur → chargement refusé** (statut `failed`, rien n'est écrit, le joueur est renvoyé avec un message). Indispensable avec deux places publiées séparément et les mises à jour progressives.
 - Champs **ajoutés** sans changement de structure : `reconcile` les remplit au chargement sans jamais écraser.
@@ -130,12 +145,12 @@ Ids : ARCHITECTURE section 3. Un déblocage est **dérivé** des quêtes termin�
 | Barbarian | Quête | `Q_Barbarian` | `BossesDefeated` ≥ 5 |
 | Tamer | Quête | `Q_Tamer` | `CompanionsCaptured` ≥ 10 |
 
-Les ids v1 envoyés par l'UI (`Cornu`…) sont acceptés par `SelectLoadout` via les alias de `Config.Classes` (transition), stockés en v2. Les quêtes v1 `Q_Felyne`… `Q_Tentaculos`, `Q_Volt`, `Q_Givre`, `Q_Echo` sont retirées (leurs entrées de `questsDone` restent, ignorées).
+`SelectLoadout` / `setLoadout` attendent les ids v2 (`Knight`…). Les ids v1 encore envoyés par l'UI (`Cornu`…) restent acceptés (`Progression.LegacyClassIds`, puis les alias de `Config.Classes`) ; le profil ne stocke que l'id v2 (migration 2 → 3, section 2). Les quêtes v1 `Q_Felyne`… `Q_Tentaculos`, `Q_Volt`, `Q_Givre`, `Q_Echo` sont retirées (leurs entrées de `questsDone` restent ; celles des classes sont recopiées sur la quête v2). Le `Profile` porte `classes = {[classId] = { unlocked, quest?, progress?, goal? }}` pour le menu Classes ; le texte de la quête est `Config.Quests.ById[quest].name`.
 
-### Armes (16)
-- Gratuites (pool de départ, 6 pour la phase 0) : `HacheBoomerang`, `PlumesDards`, `CleTourelle`, `ToupieScie`, `BouleBowling`, `PistoletBulles`.
-- Arme de départ d'une classe à débloquer : entre dans le pool quand la classe est débloquée (`GriffesEclair`, `PoingSeisme`, `NuageSpores`, `SouffleBraise`, `Meteorite`, `EclatsPrisme`, `FouetTentacule`).
-- Boutique d'argent : `CerfVolantLaser` 150, `ParapluieBouclier` 150, `BombePaillettes` 200.
+### Armes v2 (16, `shared/Config/Weapons.luau`)
+- Libres : `Broadsword`, `Longbow`, `FireStaff` (départ des classes gratuites) et les 8 du pool commun (`LightningChain`, `FrostNova`, `Boomerang`, `BombBag`, `SpearThrow`, `MeteorRain`, `OrbitingBlades`, `CrossbowTurret`).
+- Arme de départ d'une classe à quête : avec la classe (`QuakeHammer` Guardian, `ThrowingDaggers` Rogue, `HolyAura` Cleric, `SpinningAxes` Barbarian, `BeastWhip` Tamer). CardService ne bloque une arme que si sa définition a un champ `unlock` (aucune aujourd'hui).
+- Plus d'arme en boutique d'argent. Les armes v1 achetées (`CerfVolantLaser`…) restent dans `unlocks.Weapon`, ignorées.
 
 ### Grimoires (14)
 - Gratuits : `Degats`, `VitesseAttaque`, `Quantite`, `Taille`, `Duree`, `Vitalite`.
@@ -223,7 +238,7 @@ Chaque quête : `id` stable, `category`, `stat` (clé), `goal`, `reward = { toke
 | --- | --- | --- |
 | `Unlock` | `Q_Felyne`, `Q_Rocailleux`, `Q_Sporelin`, `Q_Ecaille`, `Q_Astrel`, `Q_Cristallin`, `Q_Tentaculos`, `Q_Volt`, `Q_Givre`, `Q_Echo`, `Q_GrimoireInterdit` | 11 |
 | `Kill` | `Q_Kill_Total_1..7` (500 → 100 000), `Q_Kill_Elite_1..3` (10/50/200), `Q_Kill_<famille>_1..3` (Swarm, Jumper, Shooter, Armored), `Q_Boss_Total_1..3` (1/10/50), `Q_Boss_<monde>_1..2` (1/10) | 31 |
-| `Weapon` | `Q_Weapon_<arme>` : 50 000 dégâts cumulés avec chaque arme (`DamageWeapon_<arme>`) | 16 |
+| `Weapon` | `Q_Weapon_<arme>` : 50 000 dégâts cumulés avec chaque arme v2 (`DamageWeapon_<arme>`, ids de `Config.Weapons`) | 16 |
 | `Survive` | `Q_FinalWave_Total_1..4` (60/300/900/1 800 s), `Q_FinalWave_Best_1..4` (60/120/180/300 s en une run), `Q_Runs_1..5` (1/10/50/100/250), `Q_Wins_1..3` (1/10/50), `Q_Win_<monde>_T<n>` (9) | 25 |
 | `Explore` | `Q_Chests_1..3` (25/250/1 000), `Q_Shrines_1..3` (10/50/200), `Q_Trials_1..2` (25/100), `Q_Coins_1..3` (1 000/10 000/50 000), `Q_Stages_1..3` (5/25/100) | 14 |
 | `Mastery` | `Q_BossNoDamage_1..2` (1/5), `Q_BossFast_1..2` (1/5, boss en < 30 s), `Q_Fusion_1..2` (1/10), `Q_RunLevel_1..3` (record 20/30/40), `Q_WinNoDown_1..2` (1/10) | 11 |
@@ -281,6 +296,10 @@ Run en quarantaine : rien n'est écrit au tableau, le relevé (avec `reasons`) v
 
 **Lecture** : `GetSortedAsync(false, 100)` par tableau, toutes les 120 s + gigue 0-30 s, bannis filtrés, cache serveur, envoyé à tous par `Leaderboards` = `{ KoRunWeekly = {{ userId, value }}, KoRunAllTime = {...} }` et à chaque arrivée. Le client calcule la fin de semaine avec `Progression.weekEndsAt` ; le profil donne `koRecord = { weekly, allTime, weekEndsAt }`. Les noms sont affichés par le client (domaine ui).
 
+**Record perso et rang de fin de run** (demandes du dossier 60) :
+- `Profile.bestKills` = max(`boards.bestKills`, `koRecord.allTime`) : record de KO en une run, mis à jour par `scoreRun` pour **toute** run (même en quarantaine ou banni : l'écran ne trahit rien).
+- `RunSummary.weeklyRank` (champ en plus, rempli par `grantRunRewards`) : rang du relevé hebdo du joueur parmi le dernier top hebdo lu (cache des 120 s, **aucun appel DataStore**, rien ne bloque). Égalité = même rang. `nil` si le top n'a pas encore été lu cette semaine, sans relevé valide, banni, ou hors du top (100 lignes et score sous la dernière). Les scores faits par d'autres serveurs depuis la dernière lecture ne sont pas vus.
+
 **Studio** : toujours un **magasin en mémoire** (même logique, avertissement clair dans la console), jamais d'écriture réelle depuis Studio, avec ou sans accès API. Les scores disparaissent à l'arrêt du serveur.
 
 **Budget ordonné** (4 joueurs) : au plus 2 `UpdateAsync` par joueur et par run (≈ 8 par run de 15 min) contre 50/min ; lecture 2 pages / 120 s.
@@ -328,8 +347,8 @@ Budget MemoryStore : 1 000 + 120 × CCU unités/min ; ≈ 3 unités par run (éc
 
 | Remote | Sens | Charge | Débit |
 | --- | --- | --- | --- |
-| `Profile` (contrat) | S→C | Vue du profil + champs en plus : `eggs`, `eggOdds`, `shop`, `metaBonuses`, `worlds = {[monde]=tierMax}`, `weekly`, `passes`, `vip` | à chaque changement, regroupé 0,25 s |
-| `SelectLoadout` / `EquipCosmetic` / `UpdateSettings` (contrat) | C→S | voir ARCHITECTURE | 2 / 4 / 2 par s |
+| `Profile` (contrat) | S→C | Vue du profil + champs en plus : `eggs`, `eggOdds`, `shop`, `metaBonuses`, `worlds = {[monde]=tierMax}`, `weekly`, `passes`, `vip`, `koRecord`, `bestKills`, `classes`, `season` | à chaque changement, regroupé 0,25 s |
+| `SelectLoadout` / `EquipCosmetic` / `UpdateSettings` (contrat) | C→S | voir ARCHITECTURE. `UpdateSettings({ [clé] = valeur })`, 8 clés max, une clé inconnue ou un mauvais type refuse tout : booléens `keepHat`, `colorblind`, `reduceFlashes` ; `textScale` 0,8..1,5 ; `masterVolume`, `musicVolume`, `sfxVolume` bornés à 0..1 (arrondis au centième, NaN refusé). Volumes seuls : pas de renvoi du `Profile` | 2 / 4 / 2 par s |
 | `ShopBuy` | C→S | `(offerId: string)` | 3/s |
 | `HatchEgg` | C→S | `()` | 1/s |
 | `RequestPurchase` | C→S | `(productKey: string)` | 1/s |
