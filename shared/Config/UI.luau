@@ -223,7 +223,7 @@ UI.Cards = {
 	PortraitRows = 6,
 	ItemsShown = 8, -- 4 when weapons or Runes need a second row
 	FlySeconds = 0.35, -- picked icon flies into its inventory cell
-	-- Optional remote (A04, contract request): LevelUpPause { active, choosers = { userId }, endsIn }.
+	-- Optional remote (Ironix, contract request): LevelUpPause { active, choosers = { userId }, endsIn }.
 	PauseRemote = "LevelUpPause",
 }
 
