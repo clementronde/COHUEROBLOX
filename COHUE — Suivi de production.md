@@ -81,7 +81,7 @@ Une chose à savoir sur « aucun ennemi max » : pour le joueur, la horde ne pla
 | A10 | Sound design | Musiques et sons du Creator Store, SoundController, mixage | Studio, fwjelaa-sfx | 2 | En cours | Cantin (code), Clément (sons) |
 | A11 | Anti-triche et sécurité | Audit des remotes, de l'économie et des achats ; correctifs ; revue à chaque vague | anti-exploit-review, secure-remotes, agent red-team, /audit | 1 | En cours | Cantin (dev) |
 | A12 | Données, progression et monétisation | Sauvegarde, collection, quêtes, classements hebdo, boutique cosmétique, nom anglais | datastore-safety, monetization-compliance, agents revenue-modeler et market-analyst | 2 | À faire | Cantin (dev) |
-| A13 | Perf mobile et QA | Budgets de perf, plafond d'ennemis, tests, équilibrage, liste de bugs | performance-audit, debugging, agent scope-auditor | 3 | À faire | Cantin (dev) |
+| A13 | Perf mobile et QA | Budgets de perf, plafond d'ennemis, tests, équilibrage, liste de bugs | performance-audit, debugging, agent scope-auditor | 3 | En cours | Cantin (dev) |
 
 ## Éléments à réaliser
 
@@ -426,12 +426,12 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 
 | ID | Tâche | Livrable | Dépend de | Priorité | Statut |
 | --- | --- | --- | --- | --- | --- |
-| A13-01 | Mesurer le plafond d'ennemis sur un téléphone milieu de gamme | Rapport |  | P0 — bloquant | À faire |
-| A13-02 | Budgets de perf par domaine : mémoire, triangles, particules, réseau | Note |  | P0 — bloquant | À faire |
-| A13-03 | Plan de test et liste de bugs | Doc de test |  | P0 — bloquant | À faire |
+| A13-01 | Mesurer le plafond d'ennemis sur un téléphone milieu de gamme | Rapport |  | P0 — bloquant | En cours (scripts prêts : tools/perf, docs/qa/mesure-horde.md ; mesure téléphone à faire par Cantin) |
+| A13-02 | Budgets de perf par domaine : mémoire, triangles, particules, réseau | Note |  | P0 — bloquant | Fait (docs/qa/budgets-perf.md) |
+| A13-03 | Plan de test et liste de bugs | Doc de test |  | P0 — bloquant | Fait (docs/qa/plan-de-test.md, 11 bugs ouverts) |
 | A13-04 | Playtests d'équilibrage : taux de victoire par classe | Rapport | A04-12 | P1 — lancement | À faire |
 | A13-05 | Test de charge à 4 joueurs et téléportations | Rapport | A09-05 | P1 — lancement | À faire |
-| A13-06 | Checklist de lancement : Select 9-15, monétisation, miniatures | Checklist |  | P1 — lancement | À faire |
+| A13-06 | Checklist de lancement : Select 9-15, monétisation, miniatures | Checklist |  | P1 — lancement | Fait (docs/qa/checklist-lancement.md) |
 
 ## Vagues et jalons
 
