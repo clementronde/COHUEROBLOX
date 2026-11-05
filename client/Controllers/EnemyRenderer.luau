@@ -943,7 +943,7 @@ local function render(dt: number)
 	end
 	if n > 0 then
 		-- PERF-06 : personne n'écoute le CFrame de ces pièces.
-		Workspace:BulkMoveTo(moveParts, moveCFrames, Enum.BulkMoveMode.FireCFrameNotChanged)
+		Workspace:BulkMoveTo(moveParts, moveCFrames, Enum.BulkMoveMode.FireCFrameChanged)
 	end
 	visibleCount = drawn
 end
