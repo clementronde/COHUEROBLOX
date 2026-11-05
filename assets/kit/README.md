@@ -33,13 +33,13 @@ Total : 29 assets, 237 Parts.
 | --- | --- | --- |
 | Portal_GoblinHead | Tête de gobelin en pierre endormie (28 de large, oreilles comprises 63). La bouche de 12 × 12 est le portail, la langue fait un tapis rouge. | `PortalSwirl` (Neon) : sortie vers la run |
 | Pad_Solo, Pad_Friends, Pad_Public | Pads de départ de 8, 11 et 14 de côté. Bleu, vert et jaune, avec 1, 2 et 4 silhouettes et deux mâts à fanions. | Zone `Pad` à lire par GetPartBoundsInBox |
-| Station_Knight | Cour d'armes : râtelier d'épées, mannequin, bouclier, fanion. | attribut `ClassId` = Knight |
+| Station_Knight | Cour d'armes : râtelier d'épées, mannequin d'entraînement, enclume, bouclier, fanion. | attribut `ClassId` = Knight |
 | Station_Archer | Pas de tir : trois cibles fléchées, carquois-tonneau, fanions. | `ClassId` = Archer |
 | Station_Mage | Tour au toit en chapeau pointu, fenêtre Neon, chaudron. | `ClassId` = Mage |
 | Station_LockedClasses | Charrette chargée de cinq caisses cadenassées (classes à débloquer). | |
 | Station_GobShop | Échoppe à auvent rayé, chapeau haut-de-forme sur le toit, étagères de chapeaux. | comptoir pour le ShopPrompt |
 | Station_CritterPen | Enclos des compagnons : clôture, portail à os, niche, abreuvoir, botte de foin. | portail pour le CrittersPrompt |
-| Station_HallOfFame | Panthéon : deux grands panneaux violets et un trophée. | `BoardWeekly`, `BoardAllTime`, `StatueSlot1..3` |
+| Station_HallOfFame | Panthéon : deux grands panneaux violets, trois socles de statue en gradins et un trophée. | `BoardWeekly`, `BoardAllTime`, `StatueSlot1..3` |
 | Station_QuestBoard | Tableau de liège à toit, notes épinglées, affiche « gobelin recherché », hibou facteur. | `Board` pour le SurfaceGui des quêtes |
 | Arrival_Haystack | Meule de foin en gradins, deux jambes qui dépassent, échelle. On revient de run en tombant dedans. | point d'apparition (rôle Arrival) |
 | Campfire | Feu Neon avec PointLight, cercle de pierres, trois bancs. | |
