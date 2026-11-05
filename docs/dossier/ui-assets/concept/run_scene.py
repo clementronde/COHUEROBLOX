@@ -92,7 +92,10 @@ def main():
     horde()
     BD.dressed("Knight", 3, 0.0, y=0.0, rot=math.pi)
     aspect = res[0] / res[1]
-    B.camera(sc, (0, -21, 12.5), (0, 18, 0.0), lens=24 if aspect > 1.9 else 28)
+    if aspect < 1:      # téléphone portrait : caméra plus haute, champ plus large
+        B.camera(sc, (0, -15, 12), (0, 9, 0.0), lens=17)
+    else:
+        B.camera(sc, (0, -21, 12.5), (0, 18, 0.0), lens=24 if aspect > 1.9 else 28)
     B.render(sc, out, res=res, samples=32)
     print("rendered", out)
 

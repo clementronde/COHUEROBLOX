@@ -63,6 +63,26 @@ Fond des maquettes : `docs/dossier/ui-assets/concept/run_scene.py`, une arène e
 | Victory | L'enjeu est écrit : « Your loot is safe. Pick one: », « Leave now with your loot », « Overtime: more KO! ». Plus de pastille dans le coin (elle ressemblait à une croix) : une barre « AUTO CASH OUT IN 12s » se vide en bas, Cash out par défaut à 0 (proposition, à valider). Le joueur peut changer d'avis tant que la barre n'est pas vide. Portraits des équipiers sur la carte choisie. |
 | **Niveau gagné** (nouveau) | Le jeu se fige et pâlit, des rayons tournent derrière. Fenêtre au centre « LEVEL 13! » : 3 offres en cartes de rareté (icône, nom, effet, étiquette NEW! ou Lv 2 → 4, rareté écrite), Reroll / Skip / Banish avec leurs compteurs. Inventaire à gauche (armes, Runes, objets, avec leur niveau), stats à droite : la stat que l'offre sélectionnée change s'allume en vert avec sa future valeur. Choisir une offre fait voler son icône dans la case d'inventaire, puis le jeu reprend. |
 
+**v3 étendue à tous les écrans (5 nov. 2026, direction validée par Clément : « Oui, étends-la »)**
+
+Figma, nouvelles pages :
+- **Components v3 — briques** : la bibliothèque, réutilisable par A09 pour les menus.
+  - Bases : Button (8 couleurs × 2 tailles, compteur en option), Tile (tuiles tactiles, 3 couleurs × 3 tailles), Tag, Slot, Portrait.
+  - Fenêtres et cartes : Window (5 couleurs, titre en propriété), OfferCard (4 raretés), ChoiceCard, Bar (6 sortes).
+  - Blocs du HUD : Vitals, Team, Timer (normal, alerte, Overtime), KO (normal, record), Minimap, Settings, Hotbar, KeyHint, PadGlyph.
+  - Overlays : Banner, BossBar, BossArrow, CapturePrompt (3 états), PingMarker (6), PingWheel, PingFeed, Downed (à terre, fantôme), ReviveMarker.
+  - Trois HUD de base : téléphone paysage, téléphone portrait et PC.
+- **Run v3 — Phone landscape**, **Run v3 — Phone portrait**, **Run v3 — PC** : 13 écrans chacun (L01 à L11, plus L04b et L04c pour le passage de niveau en coop), avec leurs notes.
+- Les anciennes pages v2 sont renommées « Archive v2 — … ».
+
+Règles propres à chaque format :
+- **Portrait** : le chrono et le KO passent sous l'encoche, puis viennent les vitals et la mini-carte, puis les équipiers. Les armes sont au-dessus des boutons. Le passage de niveau met les offres en haut, l'inventaire et les stats côte à côte en bas (6 stats principales, plus « +6 more »). Victory empile les deux cartes. L'écran de fin tient en une colonne.
+- **PC** : l'UI est posée sur 1200 × 675 logiques puis agrandie ×1,6, avec 24 px de marge et sans boutons tactiles. La légende des touches est en bas à droite (clavier et manette).
+  - Raccourcis : 1, 2, 3 pour les offres ; R, X et B pour reroll, skip et banish ; C et K pour Victory ; Entrée et L pour l'écran de fin.
+  - C06 devient la fenêtre CONTROLS, avec un exemple de focus manette (contour crème de 4 px).
+
+Fonds : `concept/run_scene.py` rend maintenant les trois formats (`run_landscape.png`, `run_portrait.png`, `run_pc.png`). Planches : `concept/captures/v3-planche-*.png` et `v3-composants.png`.
+
 **Décision de Clément (5 nov. 2026)** : au passage de niveau, le jeu se met en pause, **pour tout le monde en coop**. Cela remplace « cartes sans pause, 8 s » de la section 4.
 
 Pour qu'un joueur ne bloque pas l'équipe, l'interface prévoit en coop :
