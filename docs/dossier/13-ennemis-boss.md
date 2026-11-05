@@ -1,6 +1,8 @@
 # 13 — Ennemis et boss : modèles et rendu (A03)
 
-**Statut : porte 1 validée par Clément le 5 nov. 2026 (« Yes, approved », roster et 4 recommandations de la section 8). Étape 2 en cours : planche concept.**
+**Statut : porte 1 validée par Clément le 5 nov. 2026 (« Yes, approved », roster et 4 recommandations de la section 8). Porte 2 (planche concept) présentée, en attente de Clément.**
+
+**Partage du travail depuis le 5 nov.** (décisions v2 §13) : A03 fait les **modèles** des ennemis et des boss, et les **objets d'effet** de leurs attaques. Il les pose dans COHUE, puis passe le contrôle qualité. Le branchement dans le code (`EnemyRenderer`, `BossRenderer`, tirs, télégraphes, rosters, comportements) revient à **Ironix** : A03 ne modifie plus ces scripts. Le contrat entre les deux côtés est la section 9.
 
 Rédigé le 5 nov. 2026 par l'agent A03 (ennemis et boss). Sources :
 - `01-decisions-v2.md`, sections 6, 7 et 12 ;
@@ -224,7 +226,7 @@ Objets à poser (proposition, en suivant le contrat d'attributs d'A14 : `S`, `Ba
 
 ---
 
-## 6. Rendu : ce qui doit changer (étape 4)
+## 6. Rendu : ce qui doit changer (étape 4, à faire par Ironix depuis le 5 nov.)
 
 - `EnemyRenderer` et `BossRenderer` **clonent** `Assets.Creatures.<Modèle>` et ne fabriquent plus rien : je supprime les branches Parts, la table `MODELS` et les champs `model` de la config. Si un modèle manque, le renderer le signale une fois dans la sortie, sans repli (décisions v2 §12).
 - La correspondance entre un ennemi et son modèle passe par un champ `asset` de `Config/Enemies` (par exemple `asset = "Enemy_GoblinGrunt"`), et non plus par le nom.
@@ -277,49 +279,112 @@ La question des gobelins v1 (les refaire dans la DA actuelle ou les garder) vien
 
 ---
 
-## 9. Contract requests
+## 9. Contrat avec Ironix (modèles, effets, Contract requests)
 
-| Pour | Demande | Pourquoi |
+### 9.1 Les modèles que A03 pose dans COHUE
+
+**Dossier.** Tous les modèles sont rangés dans `ReplicatedStorage.Assets.Creatures`. C'est le seul dossier que je propose (décisions v2 §12). Les dossiers `EnemyVisualRigs` et `EnemyVisualMeshes` de Codex : voir §6 et Contract request 7.
+
+**Forme de chaque modèle :**
+- Un `Model` nommé comme dans le tableau ci-dessous.
+- `PrimaryPart` = `Root` : une `Part` invisible, ancrée, sans collision ni requête.
+  - **Pivot** : le centre du dessous, c'est-à-dire les pieds au sol.
+  - **Avant** : vers `-Z` (le `LookVector` du pivot).
+- `Body` : une `MeshPart`, la maille fusionnée en briques, avec couleurs par sommet. Les tenons viennent de la MaterialVariant de Resurface.
+- `Eyes` : une `MeshPart` lisse, sans tenons (guide DA, règle 4).
+- `LOD` (horde seulement) : une `MeshPart` simplifiée de 200 triangles au plus, masquée (`Transparency` 1), pour 80 à 150 studs.
+- Les mini-boss et les boss peuvent avoir plusieurs `MeshPart` (`Body`, `Lid`, `Hands`…), toutes soudées à `Root`.
+
+**Échelle.** Chaque modèle est posé à sa **taille finale en studs**, à l'échelle 1. Le renderer ne le redimensionne plus : le `ART_SCALE` de 1,3 disparaît. Les élites restent à ×1,3 (`Run.EliteSizeMult`).
+
+**Attributs de chaque `Model` :**
+
+| Attribut | Rôle |
+| --- | --- |
+| `Height` | hauteur dessinée, en studs |
+| `Radius` | demi-largeur au sol, pour l'anneau d'élite et le marqueur de capture |
+| `Float` | hauteur de vol au-dessus du sol, en studs : 1 pour les fantômes, 0 sinon |
+| `Family` | Goblin, Fauna, Zombie, Ghost |
+| `Role` | Melee, Jumper, Shooter, Support, Kamikaze, Armored, MiniBoss, Boss |
+| `A03` | `true` : posé par A03 |
+
+**Noms et tailles** (les tailles sont provisoires jusqu'à l'étape 3 ; ✓ = déjà dessiné sur la planche) :
+
+| Monde | Modèle | Hauteur (studs) | | Monde | Modèle | Hauteur (studs) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | `Enemy_GoblinGrunt` ✓ | 4,5 | | 2 | `Enemy_ZombieShambler` | 4 |
+| 1 | `Enemy_GoblinArcher` ✓ | 5 (plume) | | 2 | `Enemy_ZombieRunner` ✓ | 4,25 |
+| 1 | `Enemy_GoblinShaman` ✓ | 4,75 | | 2 | `Enemy_ZombieGravedigger` | 4,25 |
+| 1 | `Enemy_GoblinBomber` ✓ | 3,75 | | 2 | `Enemy_ZombieBloater` | 4,5 |
+| 1 | `Enemy_GrumpyAcorn` | 3,1 | | 2 | `MiniBoss_ZombieOgre` | 9,5 |
+| 1 | `Enemy_Hopshroom` | 3,6 | | 2 | `Boss_HungryCoffin` ✓ | 16 |
+| 1 | `Enemy_DivingOwl` | 3,4 | | 3 | `Enemy_GhostWisp` | 3,5 |
+| 1 | `MiniBoss_GoblinChief` | 9 | | 3 | `Enemy_GhostPoltergeist` ✓ | 3 + 1 de vol |
+| 1 | `Boss_GrumpyGreatOak` | 18 | | 3 | `Enemy_GhostBanshee` | 4,25 |
+| | | | | 3 | `Enemy_HauntedArmor` | 5 |
+| | | | | 3 | `MiniBoss_SpectralProctor` | 9 |
+| | | | | 3 | `Boss_EternalHeadmistress` | 18 |
+
+**Les gobelins v1 d'A01.** Si Clément valide leur refonte (porte 2), les v2 prennent les mêmes noms. Les v1 d'A01 sont alors rangés dans `ServerStorage.A03_Backup.A01_GoblinsV1`, sans être détruits.
+
+### 9.2 Les objets d'effet que A03 pose
+
+Ce sont des objets visuels, donc côté créatif. Ils suivent le contrat d'attributs d'A14 (`A14_fx_install.luau` : `Life`, `Height`, `S`, `Base`, `Fade0`, `Fade1`, `Grow`, `Burst`…).
+
+| Objet | Où |
+| --- | --- |
+| Télégraphes ennemis : `Circle`, `Ring` (avec sa zone sûre), `Line` ; Tomato mat. Les invocations sont en Grape et les points faibles en Gold : la couleur est posée par le code | `Assets.FX.Enemies.Telegraphs` |
+| Tirs ennemis : `Default` (boule Tomato mate à liseré Cream), `Arrow`, `Feather`, `DirtClod`, `Book` | `Assets.FX.Enemies.Projectiles` |
+| Objets d'attaque des boss : glands (Acorn Rain), os (Bone Spit), avions en papier (Paper Planes), règle (Ruler Smack) | `Assets.FX.Bosses.<Boss>.<Attaque>` |
+| Anneau et couronne d'élite (or, Neon) | `Assets.FX.Enemies.EliteRing`, `EliteCrown` |
+| Point faible et pilier de l'Arche | `Assets.FX.Bosses.WeakPoint`, `ArcheBeam` |
+
+### 9.3 Contract requests pour Ironix
+
+Elles reprennent celles qui étaient adressées à A04, A02 et A05.
+
+| # | Demande | Pourquoi |
 | --- | --- | --- |
-| A04 (`EnemyService`) | Deux comportements : `Support` (protection ou accélération des voisins, toutes les 6 s, 12 studs) et `Kamikaze` (mèche de 1 s à 6 studs, explosion de rayon 5, mort). Ajouter les clés `Support` et `Kamikaze` aux rosters de `Worlds` (chaque clé optionnelle) | Shaman, Banshee, Bomber, Bloater (section 2) |
-| A04 (`EnemyService`) + A03 (`EnemyCodec`) | Ajouter un octet `kind` du tireur à chaque projectile ennemi ; passer la couleur à Tomato | Choisir l'objet projectile (flèche, plume, motte, gomme) |
-| A04 (`RunManager`, `BossService`) | Optionnel : une attaque pour les mini-boss (Big Ladle, Tombstone Slam, Whistle Blast) | Aujourd'hui, les mini-boss ne font que du contact |
-| A02 (`Worlds`, `StageService`) | Créer le monde 2 cimetière-marais (id et nom) et retirer `DunesCroustillantes` ; `Run.WorldChain` = Bois → cimetière → Récré quand les cartes existent | Les zombies et le Hungry Coffin n'apparaîtront qu'avec ce monde |
-| A05 (capture) | Le marqueur de capture d'A01 (`ArtLibrary.cloneCaptureMarker`) s'accroche au modèle cloné de l'ennemi capturable | Contrat d'A01 avec A03 (note A01) |
-
-Je modifie moi-même, dans mon domaine :
-- `Config/Enemies` et `Config/Bosses` (contenu, noms, champ `asset`) ;
-- `EnemyRenderer`, `BossRenderer` et `EnemyMotion` ;
-- le décodage des projectiles dans `EnemyCodec`.
-
-Les ids d'ennemis utilisés par le serveur (`Worlds.roster`, `Bosses.kind`, `summonKind`, `Worlds.miniBoss`) changent avec le roster : je le coordonne avec A04 et A02 au moment de la bascule, sans casser la run du monde 1.
+| 1 | `EnemyRenderer` et `BossRenderer` clonent `Assets.Creatures.<Modèle>` à partir d'un champ `asset` de `Config/Enemies` et `Config/Bosses`, au lieu de fabriquer des Parts. Ils retirent les modèles en Parts et `ART_SCALE`, et lisent `Float`, `Radius` et `LOD`. Ils gardent la réplication binaire, le pooling, `BulkMoveTo` et `EnemyMotion` (section 6) | Règle « rien construit par script » (décisions v2 §12) ; c'est la cause du « je ne vois pas les bons ennemis » |
+| 2 | Écrire le roster v2 dans `Config/Enemies`, `Bosses` et `Worlds` (section 3) : ids, chiffres, monde 2 cimetière-marais, retrait des Dunes, `Run.WorldChain` à 3 mondes | Les zombies, les fantômes et leurs boss n'apparaissent qu'avec ce roster |
+| 3 | Deux comportements : `Support` (protège ou accélère les voisins à moins de 12 studs, toutes les 6 s) et `Kamikaze` (mèche de 1 s à 6 studs, explosion de rayon 5, puis mort) | Shaman, Banshee, Bomber, Bloater (section 2) |
+| 4 | Ajouter un octet `kind` du tireur à chaque projectile ennemi (`EnemyCodec`, `EnemyService`) ; les tirs et les télégraphes clonent les objets de §9.2 | Choisir la flèche, la plume, la motte ou le livre |
+| 5 | Optionnel : une attaque pour les mini-boss (Big Ladle, Tombstone Slam, Whistle Blast) | Aujourd'hui, les mini-boss ne font que du contact |
+| 6 | Accrocher le marqueur de capture d'A01 (`ArtLibrary.cloneCaptureMarker`) au modèle cloné de l'ennemi capturable, avec `Radius` et `Height` | Reprend la demande d'A01, qui était adressée à A03 et A05 |
+| 7 | Trancher avec Clément : un seul dossier de modèles (`Assets.Creatures`), ou garder `EnemyVisualRigs` et `EnemyVisualMeshes` de Codex (section 6) | Éviter deux sources pour le même ennemi |
+| 8 | Optionnel : distinguer le gel de l'étourdissement à l'affichage (aujourd'hui, un seul bit « arrêté » et une teinte givre) | Demande d'A14 : le Quake Hammer étourdit, il ne gèle pas |
 
 ---
 
-## 10. Étape 2 : planche concept (en cours, porte 2 pas encore présentée)
+## 10. Étape 2 : planche concept (porte 2 présentée à Clément)
 
-Planche : `assets/a03/01-ennemis-boss-concept.jpg`. Sources : `assets/a03/creatures.py` (modèles sur grille), `assets/a03/concept.py` (rendus Blender 5.2 en ligne de commande), `assets/a03/board.py` (montage).
+Planche : `assets/a03/01-ennemis-boss-concept.jpg`. Sources :
+- `assets/a03/creatures.py` : les modèles sur grille ;
+- `assets/a03/concept.py` : les rendus Blender 5.2 en ligne de commande ;
+- `assets/a03/board.py` : le montage.
 
-Modélisés : Goblin Grunt, Archer, Shaman, Bomber (v2), Zombie Runner, Poltergeist, The Hungry Coffin. La horde est rendue en maille fusionnée du jeu (technique B) : 694 à 760 triangles par ennemi, plus les yeux. En briques chanfreinées, un ennemi en coûte environ 3 500 à 4 200.
+Modélisés : Goblin Grunt, Archer, Shaman et Bomber (v2), Zombie Runner, Poltergeist et The Hungry Coffin. La horde est rendue en maille fusionnée du jeu (technique B) : environ 700 triangles par ennemi, plus les yeux. En briques chanfreinées, un ennemi en coûterait 3 500 à 4 900.
 
 **Relectures à l'aveugle** (2 relecteurs par tour, seuil 8,5) :
-- tour 1 : 7,2 et 6 ;
-- tour 2 : 7,1 et 7,0.
 
-**À corriger au tour 3** (convergence des relecteurs du tour 2) :
-1. **Ressemblances avec des licences** :
-   - chapeau-champignon à pois du Shaman (un personnage Nintendo connu) : le remplacer par une théière violette, dans la lignée de la cocotte du Grunt ;
-   - tête brune du boss à sourcils noirs (idem) ;
-   - zombie bleu aux yeux globuleux (« Blue » de Rainbow Friends, un jeu Roblox connu) : peau vert éteint Leaf.d (à valider par Clément, le guide dit Sky.d), rendu de trois-quarts pour montrer le Γ.
-2. **Boss** : cercueil en bois clair (tons de Leather), hexagonal à sommet plat, liseré Leather.dd. Le haut du couvercle est soulevé : dans le noir, deux gros yeux blancs, des dents sur les bords, une langue Tomato. Pas de sourcils, poignées Steel, pas de Gold, serviette Cream à carreaux Tomato 2 × 2, mains Leaf.d. 5 couleurs principales au plus.
-3. **Grunt** :
-   - cocotte haute de 4 briques, bouton 2 × 2, anses à mi-hauteur collées aux parois ;
-   - louche en bois avec un cuilleron rond 4 × 4 : plus d'acier qui scintille comme de l'XP ;
-   - bouche ouverte sur 2 rangées, intérieur Plum.dd et dents : plus de moustache sous le nez.
-4. **Archer** : capuche Leaf.d (guide §6), pointe qui tombe dans le dos. Le brun se confondait avec l'orange du Bomber.
-5. **Bomber** : retirer le sac d'XP, qui se lit comme un cupcake.
-6. **Poltergeist** : pile de 3 livres décalés d'une brique, tranches Cream, dos visibles ; bouche Ink.
-7. **Test de horde** :
-   - sol calme (Leaf.d à ±4 %, sans dalles claires) ;
-   - horde plus serrée autour du joueur ;
-   - quelques XP, 2 tirs Tomato, 1 capturable, 2 élites.
+| Tour | Notes | Moyenne | Ce qui a changé ensuite |
+| --- | --- | --- | --- |
+| 1 | 7,2 et 6 | 6,6 | cocotte sans bord crème, 3 gobelins v2 de plus, test de horde du monde 1 avec les 4 rôles |
+| 2 | 7,1 et 7,0 | 7,05 | ressemblances retirées (chapeau-champignon, tête brune à sourcils, zombie bleu), Grunt sans moustache, sol calme |
+| 3 | 7,6 et 7,5 | 7,55 | zombie gris, yeux blancs cerclés pour le fantôme, cercueil à bouche noire, capturable et tirs visibles, test des mondes 2 et 3 |
+| 4 | 8,4 et 7,6 | 8,0 | corrections légères : plume crème de l'Archer, livres verts, théière redessinée, légendes corrigées |
+
+Le coordinateur a demandé de présenter la planche après ce tour, même sous 8,5.
+
+**Points encore ouverts** (relecteur le plus sévère du tour 4) :
+- le zombie se lit encore mal comme zombie (« un rat ou un pigeon en tutu ») ;
+- le cercueil se lit comme un coffre piégé ;
+- la louche et la théière restent difficiles à lire.
+
+Ces trois points se règlent à l'étape 3, modèle par modèle, avec un contrôle qualité à 8,5 (étape 5).
+
+**Écarts au guide DA, à valider par Clément** :
+- peau des zombies grise (Stone.d) au lieu de Sky.d : en bleu, le zombie rappelait un monstre bleu connu, et en vert, un dinosaure connu ;
+- théière violette pour le Shaman au lieu du champignon : le chapeau-champignon à pois rappelait un personnage connu ;
+- yeux blancs cerclés d'Ink sur les fantômes, au lieu d'yeux Ink : deux yeux noirs faisaient une tache sombre, et de loin le fantôme passait pour un mouton ;
+- couleur du sauteur : Tomato, comme la mêlée.
