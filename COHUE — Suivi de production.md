@@ -64,24 +64,24 @@ Une chose à savoir sur « aucun ennemi max » : pour le joueur, la horde ne pla
 
 ## L'équipe d'agents
 
-14 rôles : 13 agents spécialisés, chacun dans sa propre conversation, plus le chef de projet qui intègre leur travail. Un agent ne modifie que les fichiers de son périmètre (`docs/ARCHITECTURE.md`, section Ownership).
+14 rôles : 13 agents spécialisés, chacun dans sa propre conversation, plus le chef de projet qui intègre leur travail. Un agent ne modifie que les fichiers de son périmètre (`docs/ARCHITECTURE.md`, section Ownership). Depuis le 5 novembre, Cantin fait tout le développement et Clément le design et la 3D ; pour les agents mixtes (A02, A07, A08, A09, A10), Clément fait le visuel et Cantin le code.
 
 | ID | Agent | Périmètre | Outils et skills | Vague | Statut | Conversation |
 | --- | --- | --- | --- | --- | --- | --- |
 | A00 | Chef de projet | Doc de suivi, dossier, intégration des branches, place Studio partagée, portes de vague | Studio, git, Docs | 0 | En cours | Conversation principale |
 | A01 | DA et modeling | Guide de style voxel, équipement des 8 classes, créatures, boss, props | Blender, Meshy, Asset Pack, make-model, blender-modeling | 1 | En cours | a01-da-voxel |
 | A02 | Mondes et level design | Tuiles voxel des 3 mondes, assemblage semi-procédural, autels, lumière | Studio, make-map, worldbuilding | 2 | À faire | À lancer |
-| A03 | Ennemis et boss | Familles d'ennemis, IA, Overtime, variantes capturables, 3 mini-boss, 3 boss | Studio, systems | 2 | À faire | À lancer |
-| A04 | Gameplay | 8 classes, 16 armes, 14 Runes, 40 objets, cartes, fusion, run de 3 mondes, compteur de KO | Studio, system-builder | 1 | En cours | a04-gameplay |
-| A05 | Compagnons et capture | Capture, collection, IA des compagnons, personnalisation | Studio, systems | 2 | À faire | À lancer |
-| A06 | Mouvement et caméra | Caméra 3e personne, bunny-hop, glissade, contrôles tactiles, MovementGuard | Studio, make-anim | 1 | En cours | a06-mouvement |
+| A03 | Ennemis et boss | Familles d'ennemis, IA, Overtime, variantes capturables, 3 mini-boss, 3 boss | Studio, systems | 2 | À faire | Cantin (dev) |
+| A04 | Gameplay | 8 classes, 16 armes, 14 Runes, 40 objets, cartes, fusion, run de 3 mondes, compteur de KO | Studio, system-builder | 1 | En cours | Cantin (dev) |
+| A05 | Compagnons et capture | Capture, collection, IA des compagnons, personnalisation | Studio, systems | 2 | À faire | Cantin (dev) |
+| A06 | Mouvement et caméra | Caméra 3e personne, bunny-hop, glissade, contrôles tactiles, MovementGuard | Studio, make-anim | 1 | En cours | Cantin (dev) |
 | A07 | VFX | Armes, impacts, KO, capture, télégraphes de boss, ambiance Overtime | Studio, fwjelaa-vfx, VFX de l'Asset Pack | 2 | À faire | À lancer |
 | A08 | UI et HUD | Maquettes Figma puis HUD de run, cartes, chrono, compteur de KO, écran de fin | Figma, Studio, fwjelaa-ui, ui-builder | 1 | En cours | a08-ui-hud |
 | A09 | Menus et lobby | Maquettes Figma puis hub 3D, choix de classe, collection, boutique, tableaux de classement | Figma, Studio, make-map | 1 | En cours | a09-menus-lobby |
 | A10 | Sound design | Musiques et sons du Creator Store, SoundController, mixage | Studio, fwjelaa-sfx | 2 | À faire | À lancer |
-| A11 | Anti-triche et sécurité | Audit des remotes, de l'économie et des achats ; correctifs ; revue à chaque vague | anti-exploit-review, secure-remotes, agent red-team, /audit | 1 | En cours | a11-anti-triche |
-| A12 | Données, progression et monétisation | Sauvegarde, collection, quêtes, classements hebdo, boutique cosmétique, nom anglais | datastore-safety, monetization-compliance, agents revenue-modeler et market-analyst | 2 | À faire | À lancer |
-| A13 | Perf mobile et QA | Budgets de perf, plafond d'ennemis, tests, équilibrage, liste de bugs | performance-audit, debugging, agent scope-auditor | 3 | À faire | À lancer |
+| A11 | Anti-triche et sécurité | Audit des remotes, de l'économie et des achats ; correctifs ; revue à chaque vague | anti-exploit-review, secure-remotes, agent red-team, /audit | 1 | En cours | Cantin (dev) |
+| A12 | Données, progression et monétisation | Sauvegarde, collection, quêtes, classements hebdo, boutique cosmétique, nom anglais | datastore-safety, monetization-compliance, agents revenue-modeler et market-analyst | 2 | À faire | Cantin (dev) |
+| A13 | Perf mobile et QA | Budgets de perf, plafond d'ennemis, tests, équilibrage, liste de bugs | performance-audit, debugging, agent scope-auditor | 3 | À faire | Cantin (dev) |
 
 ## Éléments à réaliser
 
@@ -487,6 +487,7 @@ Le plus gros risque est que plusieurs agents écrivent en même temps dans la m�
 
 | Date | Événement |
 | --- | --- |
+| 2026-11-05 | Partage du travail : Cantin reprend tout le développement (A03 à A06, A11 à A13, et la partie code de A02, A07 à A10) ; Clément garde le design et la 3D. A06 (garde serveur durci, suivis A11, relecture 3) et A03 (dossier 13) fusionnés dans main (384fc3c), 84 fichiers passent tools/check.sh. Les 5 scripts A06 rechargés dans COHUE, identiques à main. Play test : apparition OK, MovementGuard actif sans strike, aucune erreur de script. A14 (effets v2 non testés en Play) laissé à Clément. |
 | 2026-11-05 | Clément étend la règle « rien construit par script » à l'UI et aux effets. 23 modules fabriquent encore du visible (UI A08, rendus A03 et A05, équipement A04, mondes A02, effets A07) : chaque agent convertit les siens à son tour. Lobby Hubbub Village sauvegardé dans COHUE ; A01 prépare le test Resurface (style tout en tenons). |
 | 2026-11-04 | Un seul jeu : tout fusionné dans main (A04, A06, A01, A08, A09, plus le travail de Codex) et chargé dans la place COHUE. Run de test sans erreur : HUD glossy, World 1/3, KO, cartes. main poussé sur GitHub (5acfa4d). |
 | 2026-11-04 | main poussé sur github.com/clementronde/COHUEROBLOX (dd65a9c). A04 (a1e45bb) et A06 (145ade3) ont corrigé les failles de A11 ; A11 relit les deux branches. A01, A06 et A08 relancés après la limite d'usage. |
