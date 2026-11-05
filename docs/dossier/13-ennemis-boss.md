@@ -395,7 +395,7 @@ Branche `claude/a03-familles-comportements`. Rien n'a été testé en Play.
 
 ### 11.1 Ids et gabarits attendus de Clément
 
-Chaque ennemi cherche le gabarit `asset` dans `ReplicatedStorage.Assets` (récursif), puis dans `ReplicatedStorage.EnemyVisualRigs`. S'il manque : un avertissement unique dans la sortie et un repli provisoire (bloc de la couleur de la famille, ou Parts v1 pour la faune).
+Chaque ennemi cherche le gabarit `asset` avec `ArtLibrary.find` (`EnemyVisualRigs`, puis `ReplicatedStorage.Assets` en récursif, puis `EnemyVisualMeshes`). Depuis l'étape 4 (§11.4), il n'y a plus de repli fabriqué par script : voir §11.4.
 
 | Id | `name` (= espèce de capture) | Gabarit | Monde | Famille | Comportement |
 | --- | --- | --- | --- | --- | --- |
@@ -428,3 +428,59 @@ Mini-boss (13 à 15) et boss (16 à 19) : inchangés (A03-05 et A03-06). Le mond
 ### 11.3 Signaux visuels provisoires
 
 Les nouveaux comportements envoient sur `EnemyAttackVisual` les modes `aim` (préparation), `aura`, `explode`, `puddle` et `land`. `EnemyAttackFX` les rend aujourd'hui avec `Burst` ou `Sweep`. Il manque dans `Assets.FX.Enemies` : un cercle de mèche (Tomato), une onde d'aura (Grape), une nappe qui dure, un trou de surgissement.
+
+### 11.4 Étape 4, contract requests et perf de la horde (5 nov., branche `claude/a03-v3`)
+
+Côté technique (Ironix). Rien n'a été testé en Play : seulement compilé (`tools/check.sh`). Commits `fbf77ed` (rendu et perf), `208623d` (A03-02), `c9f8e55` (`getRunSpawned`).
+
+**Ce que les renderers clonent.** Plus aucune Part, plus de table `MODELS`, plus de champ `model` dans la config, plus d'`ART_SCALE` pour les modèles A03. Un objet manquant est signalé **une fois** dans la sortie.
+
+| Objet | Où | Lu par | Si absent |
+| --- | --- | --- | --- |
+| Modèle d'ennemi (`Config/Enemies.asset`) | `Assets.Creatures` | `EnemyRenderer` | `Assets.Creatures.Enemy_Placeholder` s'il existe, sinon rien |
+| Modèle de boss (`Config/Bosses.asset`) | `Assets.Creatures` | `BossRenderer` | ancien nom v1 `Boss_<id>`, sinon rien |
+| `EliteRing`, `EliteCrown` | `Assets.FX.Enemies` | `EnemyRenderer` | élite sans anneau ni couronne (toujours x1,3) |
+| `Impostor` | `Assets.FX.Enemies` | `EnemyRenderer` (au-delà de 150 studs, teinté à `Enemies[].color`, or pour une élite) | maille du LOD moyen |
+| `Telegraphs.Circle`, `Ring`, `Line` | `Assets.FX.Enemies` | `EnemyAttackFX` (boss et mini-boss) | **pas de télégraphe** |
+| `Projectiles.Default`, `Arrow`, `Feather`, `DirtClod`, `Book` | `Assets.FX.Enemies` | `EnemyRenderer` | `Default`, sinon **tir invisible** |
+| `Bone`, `PaperPlane` | `Assets.FX.Bosses.HungryCoffin`, `Assets.FX.Bosses.EternalHeadmistress` | `EnemyRenderer` | `Projectiles.Default` |
+| `WeakPoint`, `ArcheBeam` | `Assets.FX.Bosses` | `BossRenderer` | rien |
+
+**Contrat de forme** (complète §9.1 et §9.2) :
+- Modèle de créature : `Model` avec `PrimaryPart` = `Root`, pivot aux pieds, avant vers `-Z`, à sa taille finale. Toutes les `BasePart` sauf `Root` sont dessinées ; `LOD` (masquée) remplace le reste entre 80 et 150 studs. Attributs lus : `Height`, `Radius` (anneau d'élite à 3 × `Radius`, marqueur de capture), `Float` (soulève tout le modèle, pour les fantômes).
+- Un modèle riggé de Codex (avec des os) garde `EnemyRigMotion`, et une ancienne maille seule (v1) garde sa mise à l'échelle × 1,3 : ils marchent tant que Clément ne les a pas remplacés.
+- Télégraphe : `Model` au pivot centré au sol, pièces `Zone`, `Fill` (grandit jusqu'à l'impact) et `Safe` (anneau). Cercle et anneau : le code met les deux grands axes de chaque pièce au diamètre (un disque `Cylinder` couché marche). Ligne : X = largeur, Z = longueur, pivot au milieu. La couleur de `Zone` et `Fill` est posée par le code (`Bosses.Colors`).
+- Tir : `Model` ou `BasePart`, pivot au centre, avant vers `-Z` (le sens du vol), à sa taille finale.
+- `EliteRing` et `Impostor` : objets plats au sol ; le code les met à l'échelle sur leur plus grande largeur. `EliteCrown` : posée au-dessus de la tête. `ArcheBeam` : pivot au pied du pilier.
+
+**Contract requests de §9.3 :**
+
+| # | État |
+| --- | --- |
+| 1 | Fait : clonage par `asset`, lecture de `Float`, `Radius`, `LOD`, réplication binaire, pooling, `BulkMoveTo` et `EnemyMotion` gardés |
+| 2 | En partie : `asset` posé sur les 21 emplacements de §9.1 (mini-boss et boss par emplacement de monde : `SoucheGeante` dessine `MiniBoss_GoblinChief`, `ChameauTirelire` dessine `MiniBoss_ZombieOgre`, `PharaonGrillePain` dessine `Boss_HungryCoffin`…). Reste hors de mes fichiers : `Config/Worlds` (monde 2 cimetière, nom) et `Run.WorldChain` à 3 mondes, puis le renommage des mini-boss et boss avec A03-05 et A03-06 |
+| 3 | Déjà fait (A03-04) |
+| 4 | Fait : octet `style` par tir (kind du tireur + rang de l'attaque de boss) à la place des 3 octets de couleur ; `Enemies[].projectile`, `Bosses.List[].fxFolder`, `attack.projectile` |
+| 5 | Fait : Big Ladle (cercle de rayon 6 devant lui), Tombstone Slam (cercle de rayon 7 centré), Whistle Blast (anneau de 4 à 14, se saute), annoncés 1 s avant, données `slam*` dans `Config/Enemies` ; source de dégâts `EnemySlam` |
+| 6 | Fait : le marqueur de capture lit `Height`, `Radius` et `Float` du modèle |
+| 7 | À trancher par Clément ; `ArtLibrary.find` inchangé |
+| 8 | Pas fait : aucun bit libre dans `EnemyCodec` (gel et étourdissement gardent la même teinte givre) |
+
+**A03-02 (escalade sans plafond visible).** Le nombre ne dépasse jamais `Balance.MaxEnemies`. Avec k = densité voulue ÷ plafond : PV × k, dégâts × (1 + 0,5 × (k − 1)), part d'élites + 10 points par unité de k au-dessus de 1, bornée à 60 % (`Balance.Overflow`). À 4 joueurs, k dépasse 1 dès la minute 9 du monde (200 × 2,2 = 440 voulus).
+
+**`EnemyService.getRunSpawned()`** (A12) : tout ce qui peut donner un KO depuis le début de la run (horde, élites, mini-boss, invocations, boss). Remis à 0 au premier monde de la run, gardé après la fin pour le relevé du classement.
+
+**Perf, mesurée sur papier** (300 ennemis à moins de 80 studs d'un joueur solo, le pire cas de `mesure-horde.md`) :
+
+| Bug | Avant | Après |
+| --- | --- | --- |
+| PERF-01 EnemySnapshot | 300 enregistrements × 7 + 3 en-têtes = 2 121 octets par tick, 31,8 Ko/s | ~50 plus proches + 250 ÷ 4 + ~20 qui agissent ≈ 135 enregistrements, ~960 octets par tick, **≈ 14,5 Ko/s (− 55 %)**. À 400 : 41,5 → ≈ 16,5 Ko/s. Les morts disparaissent au tick suivant (avant : 0,47 s plus tard) |
+| PERF-03 `queryRadius` | rayon 1 : 25 cases ; rayon 6 : 25 cases | rayon 1 : 1 à 4 cases ; rayon 6 : 4 à 9 cases. 400 tirs × 6 requêtes : 60 000 → ≤ 9 600 cases par tick |
+| PERF-04 tables par tick | ~150 cases de grille + cibles + `byPlayer` + 3 buffers ≈ 160 | 0 en régime établi (cases gardées, purgées toutes les 30 s ; buffers réutilisés par taille) |
+| PERF-05 à-coups | 1er modèle d'une espèce cloné pendant l'image | ~185 modèles du monde 1 préparés à 4 par image (moins d'1 s au début du monde) ; pools des autres mondes détruits |
+| PERF-06 | ~600 à 900 événements CFrame par image | 0 (`FireCFrameNotChanged`) |
+| PERF-07 EnemyAttackVisual | ~60 octets (2 textes, 2 Vector3) vers tous les clients | 14 octets, seulement aux joueurs à moins de 90 studs (144 pour un boss) |
+| PERF-08 Blackout | 300 × 12 lampes = 3 600 tests par image | 0 à 2 lampes par ennemi (grille de 16 studs) |
+| QA-01 | 400 demandés, 300 obtenus sans message | avertissement unique dans la sortie |
+
+**À mesurer en Play** : `tools/perf/HordeStress.server.luau` estime encore EnemySnapshot avec l'ancienne cadence (outil d'A13) : lire plutôt `DataReceiveKbps` côté client. Vérifier que les ennemis du milieu de la horde (mis à jour à 3,75 Hz) restent fluides, que les morts disparaissent tout de suite, les télégraphes de mini-boss, et la mémoire après un changement de monde.

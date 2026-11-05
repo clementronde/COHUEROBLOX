@@ -374,12 +374,15 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 
 | ID | Tâche | Livrable | Dépend de | Priorité | Statut |
 | --- | --- | --- | --- | --- | --- |
-| A03-01 | Familles d'ennemis v2 : gobelins, zombies, fantômes | Config/Enemies | A01-04 | P0 — bloquant | Fait (branche claude/a03-familles-comportements, à tester en Play) : roster v2 de 16 ennemis, champ `asset` cherché dans Assets puis EnemyVisualRigs, repli bloc si absent |
-| A03-02 | Escalade d'Overtime sans plafond visible, avec le plafond technique | EnemyService | A04-02, A13-01 | P0 — bloquant | À faire |
+| A03-01 | Familles d'ennemis v2 : gobelins, zombies, fantômes | Config/Enemies | A01-04 | P0 — bloquant | Fait (branche claude/a03-familles-comportements, à tester en Play) : roster v2 de 16 ennemis, champ `asset` ; depuis claude/a03-v3, plus de repli fabriqué (Enemy_Placeholder si posé) |
+| A03-02 | Escalade d'Overtime sans plafond visible, avec le plafond technique | EnemyService | A04-02, A13-01 | P0 — bloquant | Fait (branche claude/a03-v3, 208623d, pas testé en Play) : au plafond de 300, PV x k, dégâts x (1 + 0,5 (k − 1)), élites + 10 points par k, bornée à 60 % (Balance.Overflow) |
 | A03-03 | Variantes capturables : taux d'apparition, aura, cage | EnemyService + API pour A05 | A05-01 | P0 — bloquant | Fait côté A03 (branche claude/a03-familles-comportements, à tester en Play quand A05-02 expose isSpecies et onCapturableDefeated) : taux et PV dans Run.Capturable, remote EnemyCapturable, aura FX_CaptureRing / FX_CaptureIcon |
 | A03-04 | Comportements spéciaux (shaman qui soigne, bomber qui vole l'XP, banshee qui ralentit…) | EnemyService | A03-01 | P1 — lancement | Fait (branche claude/a03-familles-comportements, à tester en Play) : Support (soin, hâte, ralenti, rassemblement), Kamikaze (mèche, explosion, vol d'XP si StatsService.takeXp), surgissement, nappe, tir en éventail ; tout en données |
 | A03-05 | Les 3 mini-boss | Config + comportement | A01-09 | P1 — lancement | À faire |
 | A03-06 | Les 3 boss simples, 2 à 3 attaques télégraphiées | BossService | A01-09 | P1 — lancement | À faire |
+| A03-07 | Rendu étape 4 : modèles et effets clonés, contract requests du dossier 13 §9.3 | EnemyRenderer, BossRenderer, EnemyAttackFX, Config | A03 créatif (modèles) | P0 — bloquant | Fait (claude/a03-v3, fbf77ed, pas testé en Play) : CR 1, 4, 5, 6 faites, 2 en partie (Worlds et WorldChain hors A03), 7 à Clément, 8 non (pas de bit libre). Attend les objets de Clément (dossier 13 §11.4) |
+| A03-08 | Perf de la horde : PERF-01, 03 à 08, QA-01 | EnemyService, EnemyCodec, renderers | A13-01 | P0 — bloquant | Fait (claude/a03-v3, fbf77ed, sur papier) : EnemySnapshot ~31,8 → ~14,5 Ko/s à 300 ; à mesurer en Play et sur téléphone |
+| A03-09 | `EnemyService.getRunSpawned()` pour le classement (A12) | EnemyService | A12-02 | P1 — lancement | Fait (claude/a03-v3, c9f8e55) |
 
 ### A05 — Compagnons et capture (vague 2)
 
