@@ -211,7 +211,7 @@ Liste des 8 classes (tuiles 4 × 2), fiche : arme de départ, passif, mouvement.
 - l'avatar tourne lentement (fixe si mouvement réduit) ; le joueur peut le faire tourner au doigt ;
 - le chapeau et les cheveux du joueur sont masqués si le réglage « Keep my hat » est sur OFF, comme en run.
 
-Maquette : image provisoire (rendu A01 du Knight au niveau 30 sur mannequin). La capture de l'avatar de Clément équipé se fera dans Studio quand COHUE sera libre (A08 y monte l'UI v3). Classe verrouillée : silhouette grise avec cadenas (jamais sur l'avatar du joueur), texte de la quête, barre de progression, « See quest ». Skins de classe dans l'onglet « Style », prix sur chaque article, jamais de stat.
+Maquette : capture Studio du 5 nov. de l'avatar de Clément équipé au niveau 30 avec `ArtLibrary.equipClassTier` (Knight dans le menu ; Knight, Archer et Mage dans [img/65-avatar-classes.png](img/65-avatar-classes.png)). Prise sur des clones temporaires dans COHUE, supprimés juste après. Classe verrouillée : silhouette grise avec cadenas (jamais sur l'avatar du joueur), texte de la quête, barre de progression, « See quest ». Skins de classe dans l'onglet « Style », prix sur chaque article, jamais de stat.
 
 ### 6.3 Critters
 
