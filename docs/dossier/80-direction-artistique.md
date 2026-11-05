@@ -1,12 +1,19 @@
 # COHUE — Direction artistique (A01)
 
-**Statut : style changé le 5 nov. 2026 (briques à tenons), à valider par Clément (porte 1).** Guide rédigé le 4 nov. 2026 par l'agent A01 (DA et modeling) et réécrit le 5 nov. après le choix de Clément. Il s'applique à tout ce qui est modélisé ou coloré dans le jeu et complète `01-decisions-v2.md` section 7.
+**Statut : style changé le 5 nov. 2026 (carte naturelle, éléments interactifs en briques à tenons), à valider par Clément (porte 1).** Guide rédigé le 4 nov. 2026 par l'agent A01 (DA et modeling) et réécrit le 5 nov. après les deux retours de Clément. Il s'applique à tout ce qui est modélisé ou coloré dans le jeu et complète `01-decisions-v2.md` section 7.
 
-COHUE est **un monde de briques à tenons, en plein soleil**. Tout est monté en briques de jouet chanfreinées, posées en quinconce, avec un tenon sur chaque dessus libre. Le sol est une grande plaque à tenons, d'une couleur par zone. Les personnages sont en briques fines, avec de gros yeux ronds. Le ciel est peint, bleu franc, avec de gros cumulus. La palette reste celle de COHUE (16 couleurs vives), et le ton reste joyeux et absurde.
+COHUE marie deux matières, **et chacune a un sens** :
+- **La carte est naturelle et peinte**, en plein soleil : herbe lisse aux fondus doux, chemins de terre, arbres en grosses boules de feuillage, rochers à facettes, forêt dense en lisière.
+- **Tout ce avec quoi on interagit est en briques de jouet à tenons** : portail, pads, stations, caisses, coffres, personnages, ennemis, équipement.
+
+Le joueur lit donc d'un coup d'œil ce qui sert : une brique veut dire « on peut s'en servir », la nature veut dire « c'est le décor ». Dans le jeu, les tenons sont posés par le plugin Studio de Clément. Le ciel est peint, bleu franc, avec de gros cumulus. La palette reste celle de COHUE (16 couleurs vives), et le ton reste joyeux et absurde.
 
 Références :
-- **Pour le style** : les exemples envoyés par Clément le 5 nov., des devlogs Roblox d'octobre 2026 (« Making a good Roblox game » de devZippy, zombies de GreenCapYT). Les captures restent chez Clément et ne sont pas copiées dans le dépôt.
+- **Pour les briques** : les exemples envoyés par Clément le 5 nov., des devlogs Roblox d'octobre 2026 (« Making a good Roblox game » de devZippy, zombies de GreenCapYT).
+- **Pour la carte naturelle** : sa capture d'un jeu de familiers (forêt peinte, herbe lisse, chemins de terre, clôtures en bois).
 - **Pour le ton** : Megabonk, Octopath Traveler et Steal an Egg, qui restent valables.
+
+Les captures restent chez Clément et ne sont pas copiées dans le dépôt.
 
 On s'en inspire sans copier aucun de leurs modèles, aucune de leurs cartes ni aucun de leurs visuels.
 
@@ -14,7 +21,7 @@ Planches de référence (dossier `assets/style/`) :
 
 | Planche | Contenu | État |
 | --- | --- | --- |
-| [06-lobby-briques.png](../../assets/style/06-lobby-briques.png) | Le lobby compact en briques à tenons (maquette Blender), ce qu'on garde des exemples | **Nouveau style (5 nov.)** |
+| [06-lobby-nature-briques.png](../../assets/style/06-lobby-nature-briques.png) | Le lobby compact : carte naturelle, stations et portail en briques (maquette Blender), la règle des deux matières | **Nouveau style (5 nov.)** |
 | [01-palette-grain.png](../../assets/style/01-palette-grain.png) | Palette COHUE 16 avec ses tons, échelle avatar / gobelins, hiérarchie de saturation | v1 voxel : palette et échelle valables, rendu à refaire |
 | [02-silhouettes-familles.png](../../assets/style/02-silhouettes-familles.png) | Gobelins, zombies et fantômes en ébauche, silhouettes à 64 px, code couleur des rôles | v1 voxel : silhouettes et rôles valables, rendu à refaire |
 | [03-diorama-lumiere.png](../../assets/style/03-diorama-lumiere.png) | Ancienne cible d'ambiance (lumière basse, ombres violettes) | **Remplacée** par la section 10 |
@@ -28,23 +35,25 @@ Captures en jeu : `assets/style/captures/`. Elles montrent toutes la v1 voxel ou
 - **4 nov.** Le guide v1 est voxel : cubes de 0,25 stud lisses, ombrage cuit par face, décor en tons d'ombre. Les 23 premiers meshes (gobelins, équipement, armes, capture) sont téléversés dans ce style.
 - **5 nov., matin.** Clément refuse le premier lobby, posé en Parts dans COHUE : « beaucoup trop AI slop ».
 - **5 nov.** Il trouve la maquette voxel du lobby compact « très cool », mais ne veut pas du voxel comme style. Ses 20 exemples montrent tous la même famille : celle que le vault appelle « Classic brick / stud », remise au goût du jour (briques modélisées, lumière franche, ciel peint).
+- **5 nov., deuxième retour.** Devant la maquette tout en briques, il précise : « j'aime que la map soit plus naturelle et que les éléments interactifs soient en briques ». Les tenons, eux, peuvent être posés avec un plugin.
 
 | Ce qui reste | Ce qui change |
 | --- | --- |
-| Palette COHUE 16 et ses tons | Le rendu : briques chanfreinées et tenons au lieu de cubes lisses |
-| La modélisation sur grille (`models.py`, `lobby.py`) : une cellule = une brique de 1 | Plus d'ombrage cuit par face : les chanfreins et la vraie lumière font le relief |
-| Proportions, silhouettes, code couleur des rôles, gags | Le décor n'est plus en tons d'ombre : sols unis aux tons de base, relief par les tenons |
+| Palette COHUE 16 et ses tons | Deux matières : carte naturelle et peinte, interactions en briques chanfreinées |
+| La modélisation sur grille (`models.py`, `lobby.py`) des éléments interactifs : une cellule = une brique de 1 | Plus d'ombrage cuit par face : les chanfreins et la vraie lumière font le relief des briques |
+| Proportions, silhouettes, code couleur des rôles, gags | Le décor n'est plus en tons d'ombre ni en cubes : herbe, terre et roche lisses, avec des fondus doux |
 | Équipement et paliers, attaches R15, `ArtLibrary` | Personnages et ennemis : gros yeux ronds blancs |
 | Le plan du lobby compact (tête de gobelin, stations) | Lumière : plein jour, ciel peint bleu franc, cumulus (fin de l'ambiance violette) |
+| | Les tenons ne sont plus modélisés : le plugin de Clément les pose dans Studio |
 
 ## 1. Ce que montrent les exemples
 
 | Élément | Dans les exemples | Règle COHUE |
 | --- | --- | --- |
-| Construction | Tout est fait de briques et de plaques, avec un chanfrein sur chaque arête et des joints décalés (château, mesas, créatures) | Briques à tenons partout (section 3) |
-| Sol | Grande plaque à tenons, une couleur unie par zone (herbe, sable, neige) | Plaque à tenons ; chemins et places en dalles lisses |
-| Relief | Falaises et mesas en strates de plaques empilées | Coupe de l'île et falaises en strates |
-| Arbres | Troncs en briques, feuillage en plaques empilées (acacias plats, boules) | Arbres en plaques ; jamais d'arbre réaliste |
+| Construction | Briques et plaques, avec un chanfrein sur chaque arête et des joints décalés (château, porte, machine, créatures) | Briques à tenons pour tout ce qui est interactif (section 3) |
+| Sol | Plaque à tenons dans les devlogs ; herbe lisse et vive, chemins de terre dans la capture du jeu de familiers | Herbe lisse en fondus doux, chemins et clairières de terre (section 3 bis) |
+| Relief | Falaises en strates ou en grandes roches | Falaises en rochers à facettes, collines douces |
+| Arbres | Feuillus peints en grosses touffes, quelques arbres d'automne | Arbres en boules de feuillage dégradées ; jamais d'arbre réaliste ni d'arbre par défaut de Roblox |
 | Personnages | Briques fines, gros yeux ronds blancs à pupille noire, bouche à dents carrées, accessoires en briques (couronne, chaîne, épaulettes) | Ennemis en briques de 0,25 avec yeux ronds |
 | Ciel | Peint : bleu franc en haut, horizon clair, gros cumulus crème, parfois un arc-en-ciel | Skybox peinte maison (A02) |
 | Accents | Neon cyan ou or sur les objets précieux (cristaux, lampadaires, machine) | Neon réservé au portail, à la capture, au butin, aux élites |
@@ -52,11 +61,11 @@ Captures en jeu : `assets/style/captures/`. Elles montrent toutes la v1 voxel ou
 
 ## 2. Les 10 règles
 
-1. **Tout est monté en briques chanfreinées**, joints décalés d'une rangée sur l'autre, en trois tailles : 0,25, 0,5 et 1 stud (section 3).
-2. **Un tenon sur chaque dessus libre**, sauf sur les dalles (chemins, places, planchers), qui restent lisses pour qu'on lise où marcher.
-3. **Seulement la palette COHUE 16** et ses tons `.l`, base, `.d`, `.dd`. Une brique a une seule couleur ; on admet ±4 % de clarté d'une brique à l'autre, mais aucun dégradé peint.
-4. **Les seules surfaces lisses** sont les yeux ronds des personnages, les effets Neon (portail, capture, butin, élites), le ciel et ses nuages, et l'eau. Tout le reste est en briques.
-5. **Les grandes surfaces sont unies** : une couleur par zone, le relief vient des tenons. Pas de mouchetis, pas de damier, pas de texture bruitée.
+1. **Ce avec quoi on interagit est en briques chanfreinées**, joints décalés d'une rangée sur l'autre, en deux tailles : 0,25 et 0,5 stud (section 3). Cela comprend le portail, les pads, les stations, les caisses et coffres, les personnages, les ennemis, l'équipement, les armes et le butin.
+2. **La carte est naturelle** : sol, collines, chemins, falaises, arbres, buissons, rochers et eau sont lisses et peints (section 3 bis). Pas de brique dans le décor, pas de nature dans les interactions.
+3. **Seulement la palette COHUE 16** et ses tons `.l`, base, `.d`, `.dd`. Une brique a une seule couleur (±4 % de clarté d'une brique à l'autre). Le décor naturel a droit à des fondus doux entre deux tons de la palette.
+4. **Les tenons sont posés dans Studio par le plugin de Clément**, sur le dessus des briques. On ne les modélise pas : les maquettes les dessinent seulement pour juger le rendu. Pas de tenon sur les dalles où l'on marche, les yeux, le Neon et le verre.
+5. **Pas de bruit** : pas de mouchetis, de damier ni de texture bruitée. Les fondus de l'herbe sont larges (une tache fait au moins 8 studs).
 6. **La famille se lit à la silhouette, le rôle à la couleur.** Le dessus de la tête porte la couleur du rôle, car la caméra est haute et voit surtout le dessus des ennemis.
 7. **Gros yeux ronds blancs** à pupille Ink : ce sont les pixels les plus clairs d'un personnage. On y lit l'humeur (colère, panique, sommeil).
 8. **Pas de Neon sur les ennemis ordinaires.** Le Neon est réservé à la capture, aux élites, aux boss et aux effets du joueur. Avec 100 ennemis, le bloom deviendrait une bouillie.
@@ -65,13 +74,12 @@ Captures en jeu : `assets/style/captures/`. Elles montrent toutes la v1 voxel ou
 
 ## 3. La brique
 
-On modélise toujours sur une grille de cellules (code Python, voir section 13). Une cellule correspond à une brique de 1 × 1, avec un tenon. `assets/voxel/brick.py` transforme la grille en briques.
+La brique est réservée aux éléments interactifs (règle 1). On les modélise toujours sur une grille de cellules (code Python, voir section 13). Une cellule correspond à une brique de 1 × 1. `assets/voxel/brick.py` transforme la grille en briques pour les maquettes.
 
 | Classe d'objet | Taille de brique | Pourquoi |
 | --- | --- | --- |
-| Personnages, créatures, équipement, armes, petits props et stations (< 15 studs) | **0,25 stud** | Une tête de gobelin fait 8 briques de large : yeux lisibles |
-| Grands props (arbres, rochers), héros de décor (portail), mini-boss, boss | 0,5 stud | Garde le nombre de briques bas sur les grandes formes |
-| Sol, falaises, tranches d'île | 1 stud | La grille des tenons du sol tombe sur celle des studs de Roblox |
+| Personnages, créatures, équipement, armes, butin, stations et caisses (< 15 studs) | **0,25 stud** | Une tête de gobelin fait 8 briques de large : yeux lisibles |
+| Grandes pièces interactives (portail, grandes machines), mini-boss, boss | 0,5 stud | Garde le nombre de briques bas sur les grandes formes |
 
 **Anatomie d'une brique** (valeurs de `brick.py`) :
 
@@ -80,13 +88,35 @@ On modélise toujours sur une grille de cellules (code Python, voir section 13).
 | Longueur | 1 à 3 cellules (sol : 6), largeur 1 | Assez court pour qu'on lise les briques, assez long pour ne pas faire de grille |
 | Pose | En X sur les couches paires, en Y sur les impaires ; joints décalés d'une rangée à l'autre | Appareil de maçonnerie : ça a l'air construit, pas quadrillé |
 | Chanfrein | 7 % de la cellule, 1 segment | Dessine le joint et accroche la lumière |
-| Tenon | Diamètre 60 % de la cellule, hauteur 18 %, 10 côtés | Signature du style |
+| Tenon | Diamètre 60 % de la cellule, hauteur 18 % (dans la maquette) | Signature du style. En jeu, posé par le plugin de Clément : on ne le modélise pas |
 | Couleur | Une par brique, ±4 % de clarté | Les briques se distinguent sans bruit |
 | Matière | Plastique de jouet (rugosité 0,42 dans Blender) | Un léger reflet sur les chanfreins |
 
-**Où les tenons s'arrêtent** : dalles de chemin et de place, yeux, Neon, eau, verre. Le contraste entre une plaque à tenons et une dalle lisse indique où l'on marche.
+**Où les tenons s'arrêtent** : dalles où l'on marche (pads, planchers des stations), yeux, Neon, verre.
 
 Les tons de matière se posent toujours à la main : une rangée `.d` au pied, une bande `.l` en haut d'un chapeau. Il n'y a plus d'ombrage cuit par face : le chanfrein et la lumière du jeu font ce travail.
+
+## 3 bis. Le décor naturel
+
+Tout ce qui n'est pas interactif est naturel et peint. Les formes viennent de `assets/voxel/nature.py`, et le terrain du lobby de `natural_island` dans `lobby.py`.
+
+| Élément | Forme | Couleurs (couleur par sommet) |
+| --- | --- | --- |
+| Herbe | Lisse, collines douces vers les bords, plate là où l'on marche | Leaf, avec de larges fondus vers Leaf.l et Leaf.d (taches de 8 studs ou plus) |
+| Chemins | Terre battue, bords doux et un peu irréguliers | Leather.d → Bark |
+| Clairières (place, parvis, sols de stations) | Terre plus claire, pierres de gué à facettes | Leather → Leather.d, pierres Stone / Stone.l |
+| Falaises et rochers | Rochers à facettes (ombrage plat), mousse sur le dessus | Stone.dd → Stone → Stone.l, mousse Leaf.d |
+| Feuillus | Tronc conique un peu tordu, 5 à 7 boules de feuillage bosselées | Dégradé vertical Leaf.dd → Leaf → Leaf.l ; un arbre sur dix environ en automne (Ember.d → Ember → Gold) |
+| Sapins | 4 cônes empilés, à facettes | Leaf.dd → Leaf.d → Leaf |
+| Buissons | 3 boules, quelques fleurs | Leaf.dd → Leaf, fleurs Cream, Grape.l ou Tomato.l |
+| Flanc de l'île | Roche qui se resserre sous l'île, ourlet d'herbe en haut | Leaf.d, Bark, Leather.d, puis bandes Stone.d / Stone.dd |
+| Forêt en lisière | Dense sur les bords, rien sur les passages ni devant les stations | Mélange feuillus, sapins, buissons |
+
+**En jeu**, deux voies sont possibles, à trancher avec A02 :
+- le Terrain de Roblox (matériaux Grass, Ground et Rock aux couleurs de la palette) avec des arbres et des rochers en MeshPart ;
+- un sol en mailles lisses, comme dans la maquette.
+
+Dans les deux cas, les arbres et les rochers sont des mailles à couleurs par sommet, sans texture.
 
 ## 4. Palette COHUE 16
 
@@ -97,9 +127,9 @@ Les tons dérivés se calculent : `.l` = base mélangée à 35 % avec `#FFF4D8` 
 | Ink | `#1C1726` | Pupilles, coutures, bombe | |
 | Plum | `#4B3866` | Ombres froides, tissu sombre, cape du Mage, bâches | |
 | Bark | `#6E4227` | Bois sombre, troncs, chaussures | |
-| Leather | `#B5713A` | Cuir, bois clair, cordes ; chemins en `.l` | |
+| Leather | `#B5713A` | Cuir, bois clair, cordes ; terre des chemins et clairières | |
 | Cream | `#FFE8B8` | Blanc des yeux, dents, papier, fantômes | |
-| Stone | `#9C9488` | Pierre, os ; dalles des places en `.l` | |
+| Stone | `#9C9488` | Pierre, os ; rochers et falaises | |
 | Steel | `#8EA6C2` | Métal, armure du Knight | |
 | Gold | `#FFC21A` | Rivets, liserés, couronne d'élite, pièces ; paille en `.d` | Accents seulement : 5 % au plus d'une pièce |
 | Ember | `#FF7A1A` | Rôle kamikaze, feu, orbe du Mage | |
@@ -108,7 +138,7 @@ Les tons dérivés se calculent : `.l` = base mélangée à 35 % avec `#FFF4D8` 
 | Grape | `#8C52E0` | Rôle soutien, magie, Mage | |
 | Royal | `#2D6BE6` | Knight | |
 | Sky | `#3FD0F5` | XP, magie froide, eau | Sur un ennemi, seulement en `.d` / `.dd` (peau des zombies) ou comme XP volée (Bomber) |
-| Leaf | `#3DBE4A` | Archer ; herbe (plaque à tenons) | |
+| Leaf | `#3DBE4A` | Archer ; herbe et feuillage | |
 | Lime | `#8FD13F` | Peau des gobelins | Réservé aux gobelins |
 
 **Hiérarchie de saturation**, du plus vif au plus calme :
@@ -116,12 +146,13 @@ Les tons dérivés se calculent : `.l` = base mélangée à 35 % avec `#FFF4D8` 
 1. Les objets à ramasser (XP cyan, pièces or) brillent en Neon : ce sont les seuls objets lisses et lumineux au sol.
 2. Le joueur et la capture : couleur de classe et rose Bubblegum.
 3. Les ennemis : peau de famille, couleur de rôle aux tons de base, yeux blancs.
-4. Le décor :
-   - grands sols aux tons de base, une couleur par zone (herbe Leaf, sable Gold.d, neige Cream) ;
-   - chemins et places en `.l` (Leather.l, Stone.l) ;
-   - tranches, dessous et strates en `.d` et `.dd`.
+4. Le décor naturel :
+   - herbe Leaf en fondus doux ;
+   - terre Leather et Leather.d ;
+   - roche Stone ;
+   - les arbres d'automne sont la seule touche chaude.
 
-**À vérifier en jeu dès le premier monde.** En v1, un sol vif noyait la horde (planche 3). Avec les tenons, le sol a désormais une texture, et les yeux blancs font ressortir les ennemis. Si la capture de horde à 20 studs montre encore des gobelins Lime fondus dans l'herbe Leaf, on repasse l'herbe en Leaf.d pour les mondes de combat. Le lobby, lui, n'a pas de horde.
+**À vérifier en jeu dès le premier monde.** En v1, un sol vif noyait la horde (planche 3). Ici, les ennemis en briques se détachent d'une herbe lisse par leur matière, leurs yeux blancs et leur couleur de rôle. Si la capture de horde à 20 studs montre encore des gobelins Lime fondus dans l'herbe Leaf, on assombrit l'herbe des arènes de combat vers Leaf.d. Le lobby, lui, n'a pas de horde.
 
 ## 5. Proportions
 
@@ -194,21 +225,21 @@ Couleurs réservées pour les 5 autres classes (A01-07) : Guardian Stone + Ember
 
 ## 9. Budgets
 
-Les briques coûtent beaucoup plus de triangles que les cubes lisses. Un tenon en géométrie fait une trentaine de triangles, et le chanfrein multiplie environ par trois les faces d'une brique. La maquette du lobby compte **1,3 million de triangles** avant chanfreins : elle sert à juger le style, pas à jouer. Roblox limite chaque maille à 20 000 triangles.
+Les briques coûtent beaucoup plus de triangles que les cubes lisses : le chanfrein multiplie environ par trois les faces d'une brique, et un tenon modélisé fait une trentaine de triangles. La maquette du lobby ne sert qu'à juger le style : ses briques ont des tenons modélisés et ne sont pas optimisées. Roblox limite chaque maille à 20 000 triangles.
 
-En jeu, on combine donc deux techniques :
+En jeu, les tenons viennent du plugin de Clément, et les mailles n'en portent pas. Pour les briques elles-mêmes, on combine deux techniques :
 
 | Technique | Comment | Pour quoi |
 | --- | --- | --- |
-| **A. Briques en géométrie** | Briques chanfreinées et tenons modélisés, comme dans la maquette | Ce qu'on voit de près et en un seul exemplaire : portail, stations du lobby, boss. Chaque maille reste sous 20 000 triangles |
-| **B. Briques en texture** | Maille fusionnée (comme en v1), avec des UV à l'échelle de la cellule et une texture répétée de joints et de tenons (`SurfaceAppearance`, normal map, ou image de tenons en superposition) | Tout ce qui est répété : ennemis de horde, équipement, armes, arbres, sols |
-| **Sol** | Grands Parts ou mailles plates, couleur unie, texture de tenons répétée (comme la plaque de base de Studio) | Plaques à tenons des mondes et du lobby |
+| **A. Briques en géométrie** | Briques chanfreinées modélisées, sans tenons (le plugin les pose) | Ce qu'on voit de près et en un seul exemplaire : portail, stations du lobby, boss. Chaque maille reste sous 20 000 triangles |
+| **B. Briques en texture** | Maille fusionnée (comme en v1), avec des UV à l'échelle de la cellule et une texture répétée de joints | Tout ce qui est répété : ennemis de horde, équipement, armes, butin |
+| **Décor naturel** | Mailles lisses à couleurs par sommet (arbres, rochers), Terrain ou maille pour le sol (section 3 bis) | Toute la carte |
 
-**La technique B n'est pas encore testée dans Studio** (A01-02 bis). Il faut vérifier trois choses avant de convertir les 23 meshes :
+**À tester dans Studio avant de convertir les 23 meshes** (A01-02 bis) :
 
-- la couleur par sommet survit-elle sous une `SurfaceAppearance` ?
-- le coût mémoire de la texture sur téléphone ;
-- la lisibilité des tenons à 20 studs.
+- ce que fait le plugin de tenons sur un MeshPart (géométrie ou texture), et ce qu'il coûte en triangles et en mémoire ;
+- la technique B : la couleur par sommet survit-elle sous une `SurfaceAppearance` ?
+- la lisibilité des briques et des tenons à 20 studs sur téléphone.
 
 | Classe | Technique | Triangles visés / plafond |
 | --- | --- | --- |
@@ -218,7 +249,7 @@ En jeu, on combine donc deux techniques :
 | Boss | A | 15 000 par maille, plusieurs mailles |
 | Pièce d'équipement, arme | B | 300 / 800 (limite Roblox des accessoires : 4 000) |
 | Marqueur de capture | lisse (Neon) | 300 / 500 |
-| Arbre | B | 600 / 1 500 |
+| Arbre, rocher (décor naturel) | Lisse | 600 / 1 500 |
 | Station du lobby | A | 20 000 par maille au plus |
 | Portail du lobby | A, en plusieurs mailles | 20 000 par maille |
 
@@ -266,12 +297,12 @@ Valeurs de départ, à régler monde par monde :
 
 La maquette du lobby (`assets/voxel/lobby.py`, fonction `painted_sky`) utilise ce dégradé. Le ciel y est affiché à pleine force, mais n'éclaire le décor qu'à 45 %. Le `ColorGradingEffect` en mode `Retro` de la place de test désature la palette : il faut l'enlever ou le tester (A02). Les captures MCP de Studio n'affichent pas le post-traitement : la lumière se valide en Play, sur téléphone.
 
-**Signature des mondes** (pour A02) : chaque tuile flotte et montre sa coupe en strates (herbe, terre Bark, Leather, plaques de pierre Stone / Stone.d) au bord de l'arène.
+**Signature des mondes** (pour A02) : chaque arène est une île flottante naturelle, bordée d'une forêt dense, avec un flanc rocheux qui se resserre sous l'île. Les éléments interactifs en briques s'y détachent.
 
 ## 11. Anti-AI-slop
 
 - Aucune sortie de Meshy, Cube ou d'un autre générateur n'est livrée telle quelle. Crédits Meshy dépensés : 0.
-- **Un seul style à l'écran** : pas de rocher réaliste, d'arbre par défaut de Roblox ou de Part grise lisse au milieu des briques. C'est exactement ce que les exemples de Clément montrent comme « avant ».
+- **Deux matières, chacune à sa place** : briques pour les interactions, nature peinte pour le décor. Pas de rocher réaliste, d'arbre par défaut de Roblox, de texture photo ni de Part grise : les exemples de Clément montrent ces mélanges comme « avant ».
 - Pas de panneau qui explique : une station se reconnaît à ses objets. Le texte est réservé à l'interface (classements, compte à rebours).
 - Pas de motif bruité : on préfère de grandes surfaces unies, dont le relief vient des tenons.
 - Composition d'abord, détail ensuite : un seul héros par vue, des chemins qui y mènent, de la densité vers les bords (note du vault « World Composition and Set Dressing »).
@@ -322,7 +353,8 @@ Les mailles actuelles restent en place tant que les remplaçantes ne sont pas li
 Le source de chaque modèle est du code Python, qui modélise sur grille : `assets/voxel/models.py` pour les personnages et les objets, `assets/voxel/lobby.py` pour le lobby. Les modèles restent ainsi relisibles, versionnés, réglables et reproductibles.
 
 ```
-models.py / lobby.py (grille) → brick.py (briques chanfreinées, tenons) → rendu Blender (maquettes, planches)
+models.py / lobby.py (grille) → brick.py (briques chanfreinées, tenons) ┐
+lobby.py / nature.py (terrain, arbres, rochers lisses)                  ┴→ rendu Blender (maquettes, planches)
 models.py (grille) → cohue_voxel.py (maille fusionnée) → build.py (GLB) → Studio : Import 3D → MeshPart
   → ReplicatedStorage.Assets → ArtLibrary
 ```
@@ -330,10 +362,10 @@ models.py (grille) → cohue_voxel.py (maille fusionnée) → build.py (GLB) →
 ### 13.1 Maquettes en briques
 
 ```bash
-"C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b --factory-startup --python assets/voxel/lobby.py -- assets/voxel/review/lobby_brick
+"C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b --factory-startup --python assets/voxel/lobby.py -- assets/voxel/review/lobby_nature
 ```
 
-`brick.to_blender` a la même signature que `cohue_voxel.to_blender`. La scène du lobby la branche à sa place : tous les modèles, avatars compris, passent en briques sans autre changement. La planche 6 se monte avec `python assets/style/compose.py lobby`.
+`brick.to_blender` a la même signature que `cohue_voxel.to_blender`. La scène du lobby la branche à sa place : tous les modèles interactifs, avatars compris, passent en briques sans autre changement. Le décor naturel est construit à part par `natural_island` et `natural_dressing`, qui s'appuient sur `nature.py`. La planche 6 se monte avec `python assets/style/compose.py lobby`.
 
 ### 13.2 Export pour Roblox (v1, à adapter à la technique B)
 
@@ -399,4 +431,4 @@ Fiches dans le dépôt : `assets/a01-meshes.csv`, les lignes gobelins de `assets
 
 ## Notes du vault utilisées
 
-`Environment Art Styles` (famille « Classic brick / stud ») · `Voxel and Blocky Modeling` et `Voxel Art - Studs Outlines and Style Kits` (kit « toy-box », tenons en texture, paramètres des tenons) · `World Composition and Set Dressing - Designed, Not Scattered` · `Lobby and Hub Design` · `Art-Direction Nitpicks - The Principles Behind Them` · `Meshing Voxels for Roblox - Greedy Meshing and Export` · `Trim Sheets Atlases and Vertex Colors` · skills `fwjelaa-blender-modeling` et `fwjelaa-asset-import` · limite Roblox de 20 000 triangles par maille (docs Roblox, octobre 2026, citées par le vault).
+`Environment Art Styles` (familles « Classic brick / stud » et « Flat stylised ») · `Voxel and Blocky Modeling` et `Voxel Art - Studs Outlines and Style Kits` (kit « toy-box », tenons en texture, paramètres des tenons) · `World Composition and Set Dressing - Designed, Not Scattered` · `Lobby and Hub Design` · `Art-Direction Nitpicks - The Principles Behind Them` · `Meshing Voxels for Roblox - Greedy Meshing and Export` · `Trim Sheets Atlases and Vertex Colors` · skills `fwjelaa-blender-modeling` et `fwjelaa-asset-import` · limite Roblox de 20 000 triangles par maille (docs Roblox, octobre 2026, citées par le vault).

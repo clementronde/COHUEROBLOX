@@ -5,13 +5,13 @@
 | Version | Où | État |
 | --- | --- | --- |
 | v1, Parts posées par un script d'édition | `Workspace.HubbubVillage` dans la place `COHUE` (1 368 objets, 0 script), `HubbubVillage_build.luau` | **Refusée par Clément** (« beaucoup trop AI slop »). À retirer de COHUE quand la v2 sera posée |
-| v2, maquette compacte | `assets/voxel/lobby.py` (modèles sur grille), `assets/voxel/brick.py` (rendu en briques), planche `assets/style/06-lobby-briques.png` | **Maquette Blender à valider.** Rien n'est encore construit dans Studio |
+| v2, maquette compacte | `assets/voxel/lobby.py` (plan, stations sur grille, terrain), `brick.py` (stations en briques), `nature.py` (décor naturel), planche `assets/style/06-lobby-nature-briques.png` | **Maquette Blender à valider.** Rien n'est encore construit dans Studio |
 
-Le style est passé du voxel aux **briques à tenons** le 5 nov. Le guide de style est `docs/dossier/80-direction-artistique.md`. Clément a trouvé la composition de la maquette « très cool ». Le style voxel a été écarté, la composition est gardée.
+Le 5 nov., Clément a trouvé la composition de la maquette voxel « très cool », mais il a écarté le voxel. D'après ses deux retours, la **carte est naturelle** (herbe lisse, chemins de terre, forêt, rochers) et **tout ce qui est interactif est en briques à tenons**. Dans Studio, les tenons seront posés par son plugin. Le guide de style est `docs/dossier/80-direction-artistique.md`.
 
 ## La maquette v2
 
-Une île flottante de 112 × 100 studs, avec sa coupe en strates. Arrivée au sud, portail au nord. Coordonnées en studs, centre de la place en (0, 2), nord = −Y dans Blender (−Z dans Roblox).
+Une île flottante naturelle de 112 × 100 studs : collines douces vers les bords, forêt dense en lisière, falaise de rochers derrière le portail, flanc rocheux sous l'île. Arrivée au sud, portail au nord. Coordonnées en studs, centre de la place en (0, 2), nord = −Y dans Blender (−Z dans Roblox).
 
 | Zone | Position | Contenu (aucun panneau écrit) |
 | --- | --- | --- |
@@ -39,20 +39,21 @@ Trajet arrivée → pad Public : 55 studs, soit 3,5 s à 16 studs/s.
 
 Le lobby est posé comme objets dans la place : rien n'est fabriqué par script au lancement. Avant la pose, il faut :
 - valider la maquette avec Clément ;
-- tester la technique des briques en texture (A01-02 bis, section 9 du guide) ;
+- tester le plugin de tenons sur une maille en briques, et la technique des briques en texture (A01-02 bis, section 9 du guide) ;
 - obtenir l'accord de Clément pour téléverser les nouvelles mailles ;
 - obtenir un créneau dans COHUE auprès de la session principale.
 
 Découpage prévu (section 9 du guide) :
-- **le sol** : Parts ou mailles plates à la couleur de chaque zone, avec une texture de tenons répétée ; dalles lisses pour les chemins et la place ;
-- **la tête et les stations** : briques en géométrie, découpées en mailles de moins de 20 000 triangles ;
-- **les arbres, les props et les avatars d'exposition** : briques en texture.
+- **le sol** : Terrain de Roblox ou maille lisse (à trancher avec A02), avec des chemins de terre et des clairières ;
+- **les arbres, les rochers et la falaise** : mailles lisses à couleurs par sommet ;
+- **la tête et les stations** : briques en géométrie, découpées en mailles de moins de 20 000 triangles, puis tenons posés par le plugin de Clément ;
+- **les avatars d'exposition et les petits objets** : briques en texture.
 
 Les points d'accroche pour A09 gardent les mêmes noms qu'en v1 : attributs `LobbyRole` (`Arrival`, `Pad` + `Mode`, `PadZone`, `PortalSwirl`, `Leaderboard`, `StatueSlot`, `QuestBoard`, `CritterPen`), `ProximityPrompt` `ClassPrompt`, `CrittersPrompt`, `ShopPrompt`, `LeaderboardsPrompt`, `QuestsPrompt`, et un `BoardGui` vide sur la stèle et le tableau des quêtes.
 
 ## Rendus
 
 ```bash
-"C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b --factory-startup --python assets/voxel/lobby.py -- assets/voxel/review/lobby_brick
+"C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b --factory-startup --python assets/voxel/lobby.py -- assets/voxel/review/lobby_nature
 python assets/style/compose.py lobby
 ```

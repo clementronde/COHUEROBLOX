@@ -137,7 +137,7 @@ def to_blender(vox, origin="bottom", name: str | None = None, collection=None, v
     me.from_pydata(verts, [], faces)
     me.update()
     attr = me.color_attributes.new("Color", "FLOAT_COLOR", "POINT")
-    attr.data.foreach_set("color", [v for c in vcols for v in c])
+    attr.data.foreach_set("color_srgb", [v for c in vcols for v in c])   # tons de palette en sRGB
     me.color_attributes.active_color = attr
     me.color_attributes.render_color_index = me.color_attributes.find("Color")
     me.materials.append(brick_material())

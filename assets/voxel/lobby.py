@@ -1,13 +1,15 @@
 """COHUE — maquette du lobby compact « Hubbub Village », refonte du 5 nov. 2026 (A01).
 
-Style : briques à tenons (brick.py), choisi par Clément le 5 nov. d'après ses exemples. La première version
-de cette maquette était rendue en voxels ; la grille de modélisation reste la même, seul le rendu change.
+Style (5 nov., deux retours de Clément) : carte naturelle (sol lisse, arbres peints, rochers à facettes,
+nature.py) et éléments interactifs en briques à tenons (brick.py). Les tenons seront posés en jeu par le
+plugin de Clément. La première version de la maquette était en voxels ; la grille de modélisation des
+éléments interactifs reste la même.
 
 Remplace le premier lobby en Parts (refusé par Clément : « beaucoup trop AI slop »). Principes :
 - un seul héros : la tête de gobelin géante en pierre, endormie, dont la bouche est le portail ;
-- tout est en briques à tenons, à trois tailles de brique (terrain 1 stud, tête 0,5, stations et props 0,25) ;
+- éléments interactifs en briques à tenons (tête 0,5, stations et props 0,25) ; décor naturel lisse ;
 - aucun panneau écrit : chaque station se lit à ses objets (blagues montrées, pas écrites) ;
-- île flottante avec coupe de terrain en strates, sol en plaque à tenons, chemins en dalles lisses.
+- île flottante naturelle : collines douces, chemins de terre, falaise de rochers, forêt en lisière.
 
 Rendus (Blender 5.2 en ligne de commande) :
     blender -b --factory-startup --python assets/voxel/lobby.py -- <dossier_de_sortie> [vue ...]
@@ -27,7 +29,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.append(HERE)
 
-from cohue_voxel import Vox  # noqa: E402
+from cohue_voxel import Vox, tone  # noqa: E402
 
 G1, G2, G4 = 1.0, 0.5, 0.25   # grains : terrain, grands props, stations et petits props
 
@@ -863,6 +865,198 @@ def islet(seed: int = 0):
 
 
 # ---------------------------------------------------------------------------------------------
+# Carte naturelle (2e retour de Clément, 5 nov.) : sol lisse, chemins de terre, forêt, falaise de rochers
+
+SE_P = 4.0   # bord de l'île : superellipse (carré aux coins très arrondis)
+
+
+def se_point(theta: float):
+    c, s_ = math.cos(theta), math.sin(theta)
+    return (HX * math.copysign(abs(c) ** (2 / SE_P), c), HY * math.copysign(abs(s_) ** (2 / SE_P), s_))
+
+
+def rho(px: float, py: float) -> float:
+    """0 au centre, 1 sur le bord de l'île."""
+    return ((abs(px) / HX) ** SE_P + (abs(py) / HY) ** SE_P) ** (1 / SE_P)
+
+
+def _ss(a, b, x):
+    t = max(0.0, min(1.0, (x - a) / (b - a)))
+    return t * t * (3 - 2 * t)
+
+
+def flat_mask(px: float, py: float) -> float:
+    """1 là où le sol reste plat (chemins, place, parvis, stations), 0 ailleurs, avec un fondu."""
+    m = 0.0
+    for x, y, r in KEEP_FLAT:
+        m = max(m, 1 - _ss(r, r + 6, math.hypot(px - x, py - y)))
+    if 8 <= py <= 48:
+        m = max(m, 1 - _ss(5, 9, abs(px - main_path_x(py))))
+    for a, b, hw in PATHS:
+        m = max(m, 1 - _ss(hw, hw + 4, seg_dist(px, py, a, b)))
+    m = max(m, 1 - _ss(PLAZA[2], PLAZA[2] + 5, math.hypot(px - PLAZA[0], py - PLAZA[1])))
+    cx, cy, rx, ry = COURT
+    m = max(m, 1 - _ss(1.0, 1.4, math.sqrt(((px - cx) / rx) ** 2 + ((py - cy) / ry) ** 2)))
+    return m
+
+
+def nat_height(px: float, py: float) -> float:
+    r = rho(px, py)
+    hills = 5.0 * _ss(0.55, 0.92, r) * (0.3 + 0.7 * vnoise(px, py, 15, 2))
+    roll = 0.7 * (vnoise(px, py, 7, 3) - 0.5)
+    return (hills + roll) * (1 - flat_mask(px, py))
+
+
+def dirt_weight(px: float, py: float):
+    """(poids de terre 0..1, poids de « clairière » pour la place et le parvis) avec des bords doux et
+    un peu irréguliers."""
+    wob = (vnoise(px, py, 2.5, 26) - 0.5) * 1.6
+    w = 0.0
+    if 8 <= py <= 48:
+        w = max(w, 1 - _ss(3.6, 5.2, abs(px - main_path_x(py)) + wob))
+    for a, b, hw in PATHS:
+        w = max(w, 1 - _ss(hw - 1.2, hw + 0.4, seg_dist(px, py, a, b) + wob))
+    clearing = 1 - _ss(PLAZA[2] - 1.5, PLAZA[2] + 0.5, math.hypot(px - PLAZA[0], py - PLAZA[1]) + wob)
+    cx, cy, rx, ry = COURT
+    clearing = max(clearing, 1 - _ss(0.85, 1.0, math.sqrt(((px - cx) / rx) ** 2 + ((py - cy) / ry) ** 2) + wob / 20))
+    for x, y, r, col in PATCHES:
+        if not col.startswith("Leaf"):
+            clearing = max(clearing, 1 - _ss(r - 1.5, r + 0.5, math.hypot(px - x, py - y) + wob))
+    return w, clearing
+
+
+def nat_color(px: float, py: float):
+    from nature import mixc
+
+    g = mixc(tone("Leaf"), tone("Leaf.l"), 0.5 * vnoise(px, py, 9, 21))
+    g = mixc(g, tone("Leaf.d"), 0.5 * _ss(0.55, 0.85, vnoise(px, py, 13, 22)))
+    w, clearing = dirt_weight(px, py)
+    path = mixc(tone("Leather.d"), tone("Bark"), 0.45 * vnoise(px, py, 5, 23))
+    floor = mixc(tone("Leather"), tone("Leather.d"), 0.6 * vnoise(px, py, 4, 24))
+    c = mixc(g, floor, clearing)
+    return mixc(c, path, w * (1 - clearing * 0.6))
+
+
+def natural_island():
+    """Dessus lisse en anneaux qui suivent le bord, flanc rocheux qui se resserre en dessous."""
+    import nature as N
+
+    R, S = 110, 380
+    edge = [se_point(j / S * math.tau) for j in range(S)]
+    verts, cols = [], []
+
+    def add(p, c):
+        verts.append(p)
+        cols.append(c)
+        return len(verts) - 1
+
+    add((0.0, 0.0, nat_height(0.0, 0.0)), nat_color(0.0, 0.0))
+    for i in range(1, R + 1):
+        r = i / R
+        for j in range(S):
+            px, py = edge[j][0] * r, edge[j][1] * r
+            add((px, py, nat_height(px, py)), nat_color(px, py))
+
+    def vid(i, j):
+        return 0 if i == 0 else 1 + (i - 1) * S + (j % S)
+
+    faces = [(0, vid(1, j), vid(1, j + 1)) for j in range(S)]
+    faces += [(vid(i, j), vid(i + 1, j), vid(i + 1, j + 1), vid(i, j + 1)) for i in range(1, R) for j in range(S)]
+    n_top = len(faces)
+    prev = [vid(R, j) for j in range(S)]
+    hb = [verts[k][2] for k in prev]
+    levels = 16
+    for k in range(1, levels + 1):
+        t = k / levels
+        ring = []
+        for j in range(S):
+            ex, ey = edge[j]
+            bump = 0.93 + 0.1 * hnoise(j // 5, k, 31)
+            shrink = 1.012 if k == 1 else (1 - t ** 1.6) * 0.96 * bump + 0.04
+            z = hb[j] * max(0.0, 1 - k / 2) - 1.0 - (k - 1) * 1.5 - 6 * t * t
+            if k == 1:
+                c = tone("Leaf.d")
+            elif k <= 3:
+                c = tone("Bark")
+            elif k <= 5:
+                c = tone("Leather.d")
+            else:
+                c = tone("Stone.dd") if k % 3 == 0 else tone("Stone.d")
+            ring.append(add((ex * shrink, ey * shrink, z), c))
+        faces += [(prev[j], ring[j], ring[(j + 1) % S], prev[(j + 1) % S]) for j in range(S)]
+        prev = ring
+    bottom = add((0.0, 0.0, verts[prev[0]][2] - 4.0), tone("Stone.dd"))
+    faces += [(prev[j], bottom, prev[(j + 1) % S]) for j in range(S)]
+    return N.mesh_object("Lobby_NaturalGround", verts, faces, cols, smooth_faces=lambda i: i < n_top)
+
+
+def natural_dressing():
+    """Falaise de rochers derrière la tête, forêt en lisière, arbres et buissons, pierres de gué."""
+    import nature as N
+
+    # falaise : gros rochers à facettes sur l'arrière, plus hauts près de la tête (ils l'encadrent)
+    for i, deg in enumerate(range(196, 346, 8)):
+        th = math.radians(deg)
+        ex, ey = se_point(th)
+        x, y = ex * 0.9, ey * 0.9
+        centre = 1 - abs(math.cos(th))
+        sx = 6 + 3 * hnoise(i, 1, 81)
+        N.rock(f"Lobby_Cliff{i}", (x, y, nat_height(x, y) - 1), (sx, 5 + 2 * hnoise(i, 2, 82), 5 + 9 * centre),
+               seed=i, rot=th + math.pi / 2)
+    # arbres et rochers placés à la main (plan de la v1)
+    for kind, x, y, p in TREES:
+        z = nat_height(x, y)
+        rot = hnoise(x, y, 61) * math.tau
+        seed = abs(x * 7 + y * 13)
+        if kind == "round":
+            N.tree(f"Lobby_Tree_{x}_{y}", (x, y, z), height=p * 1.7, seed=seed, autumn=seed % 5 == 0, rot=rot)
+        elif kind == "pine":
+            N.pine(f"Lobby_Pine_{x}_{y}", (x, y, z), height=p * 0.55, seed=seed, rot=rot)
+        elif kind == "bush":
+            N.bush(f"Lobby_Bush_{x}_{y}", (x, y, z), size=p * 0.8, seed=seed, rot=rot, flowers=seed % 2 == 0)
+        else:
+            N.rock(f"Lobby_Rock_{x}_{y}", (x, y, z), (p * 0.8, p * 0.65, p * 0.55), seed=seed, rot=rot)
+    # forêt en lisière : dense sur les bords, rien sur les passages ni devant les stations
+    n = 0
+    for ring_r in (0.86, 0.95):
+        for deg in range(0, 360, 5):
+            th = math.radians(deg + (2.5 if ring_r > 0.9 else 0))
+            ex, ey = se_point(th)
+            x = ex * ring_r + (hnoise(deg, 3, 83) - 0.5) * 3
+            y = ey * ring_r + (hnoise(deg, 4, 84) - 0.5) * 3
+            if flat_mask(x, y) > 0.02 or (abs(x) < 30 and y < -22) or (abs(x) < 14 and y > 28):
+                continue
+            if any(math.hypot(x - sx, y - sy) < r + 6 for sx, sy, r in KEEP_FLAT):
+                continue
+            pick = hnoise(deg, int(ring_r * 100), 85)
+            z = nat_height(x, y)
+            rot = pick * math.tau
+            n += 1
+            if pick < 0.55:
+                N.tree(f"Lobby_Forest{n}", (x, y, z), height=11 + 7 * hnoise(deg, 5, 86), seed=deg + n,
+                       autumn=pick < 0.08, rot=rot)
+            elif pick < 0.85:
+                N.pine(f"Lobby_ForestPine{n}", (x, y, z), height=13 + 6 * hnoise(deg, 6, 87), seed=deg, rot=rot)
+            else:
+                N.bush(f"Lobby_ForestBush{n}", (x, y, z), size=2.5 + hnoise(deg, 7, 88), seed=deg, rot=rot,
+                       flowers=True)
+    # pierres de gué sur la place et le parvis
+    for i in range(16):
+        a = i / 16 * math.tau + 0.3
+        r = 4.5 + 4.0 * hnoise(i, 8, 89)
+        N.stepping_stone(f"Lobby_Stone{i}", (PLAZA[0] + r * math.cos(a), PLAZA[1] + r * math.sin(a), 0.0),
+                         size=0.9 + 0.6 * hnoise(i, 9, 90), seed=i, rot=a)
+    for i in range(10):
+        x = -24 + i * 5.3 + (hnoise(i, 10, 91) - 0.5) * 2
+        y = -24 + (hnoise(i, 11, 92) - 0.5) * 4
+        if abs(x) < 9:
+            continue
+        N.stepping_stone(f"Lobby_CourtStone{i}", (x, y, 0.0), size=1.0 + 0.5 * hnoise(i, 12, 93), seed=20 + i)
+    for i, (x, y, z, s_) in enumerate(ISLETS):
+        N.islet(f"Lobby_Islet{i}", (x, y, z), size=6 * s_, seed=i)
+
+
+# ---------------------------------------------------------------------------------------------
 # Scène Blender : pose, personnages, caméras
 
 
@@ -918,11 +1112,7 @@ def build_scene():
     import brick
 
     cv.to_blender = brick.to_blender            # toute la scène passe en briques à tenons
-    brick.OPTIONS.update({
-        "Lobby_Ground": {"maxlen": 6, "smooth": frozenset({"Leather.l", "Leather", "Stone.l", "Stone", "Gold.d"})},
-        "Lobby_Cliff": {"maxlen": 4},
-        "Lobby_StoneHead": {"maxlen": 3},
-    })
+    brick.OPTIONS.update({"Lobby_StoneHead": {"maxlen": 3}})
     sc = BD.fresh()
     B.diorama_light(sc, sun_elev=52, sun_az=-40, strength=5.0, world="9FD3F7", world_strength=1.0)
     painted_sky(sc)
@@ -964,8 +1154,8 @@ def build_scene():
     def note(name, ob):
         stats[name] = ob["tris"]
 
-    note("ground", put(ground(), (0, 0, 0), grain=G1))
-    note("cliff", put(cliff(), (0, 0, 0), grain=G1))
+    natural_island()                            # décor naturel (nature.py), pas de briques
+    natural_dressing()
     note("head", put(stone_head(), (0, -40, 0), 180, G2))
     note("swirl", put(portal_swirl(), (0, -40, 0), 180, G2, strength=1.1))
     for name, (x, y, r, n) in PADS.items():
@@ -985,23 +1175,8 @@ def build_scene():
         r = math.radians(a)
         put(log_bench(), (cx + 4.6 * math.cos(r), cy + 4.6 * math.sin(r), 0), a + 90)
 
-    for kind, x, y, p in TREES:
-        z = ground_z(x, y)
-        rot = hnoise(x, y, 61) * 360
-        if kind == "round":
-            put(tree_round(int(p), (x + y) % 3), (x, y, z), rot, G2)
-        elif kind == "pine":
-            put(tree_pine(int(p)), (x, y, z), rot, G2)
-        elif kind == "bush":
-            put(bush(p), (x, y, z), rot, G2)
-        else:
-            put(rock(p, (x * y) % 2), (x, y, z), rot, G2)
-    for i, (x, y) in enumerate(FLOWERS):
-        put(flowers(i), (x, y, ground_z(x, y)), hnoise(x, y, 62) * 360)
     for i, (x, y, z, s) in enumerate(CUMULUS):
         cumulus((x, y, z), s, i)
-    for i, (x, y, z, s) in enumerate(ISLETS):
-        put(islet(i), (x, y, z), hnoise(i, 4, 64) * 360, G1, scale=s)
 
     # Joueurs (mannequins habillés) et gobelins
     BD.dressed("Knight", 3, 1.5, y=31.0, rot=0.0)
@@ -1135,7 +1310,7 @@ VIEWS = {  # nom : (position caméra, cible, focale, résolution)
     "arrival": ((0, 54, 11), (0, -24, 12), 18, (1600, 900)),
     "portal": ((24, 4, 9), (-3, -32, 13), 24, (1600, 900)),
     "west": ((12, 20, 14), (-32, 6, 2), 26, (1600, 900)),
-    "east": ((-10, 12, 13), (30, 12, 2), 26, (1600, 900)),
+    "east": ((-2, 6, 12), (32, 14, 2), 26, (1600, 900)),
 }
 
 
