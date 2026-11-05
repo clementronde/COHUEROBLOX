@@ -553,6 +553,22 @@ local function buildView(player: Player, data: Data): { [string]: any }
 		allTime = if type(best) == "table" then tonumber(best.ko) or 0 else 0,
 		weekEndsAt = challenge.endsAt,
 	}
+	local bestKills = math.max(tonumber(data.boards.bestKills) or 0, koRecord.allTime)
+
+	-- Classes v2 (menu Classes du lobby, dossier 65 §10) : débloquée ou non, et la quête qui la débloque.
+	-- Le texte de la quête est Config.Quests.ById[quest].name ; progress / goal comme dans `quests`.
+	local classes: { [string]: { unlocked: boolean, quest: string?, progress: number?, goal: number? } } = {}
+	for _, classId in Progression.Classes do
+		local rule = Progression.Unlocks.Class[classId]
+		local questId = rule and rule.quest
+		local def = questId and Quests.ById[questId]
+		classes[classId] = {
+			unlocked = unlockedIn(data, "Class", classId),
+			quest = questId,
+			progress = if def then math.min(tonumber(data.stats[def.stat]) or 0, def.goal) else nil,
+			goal = if def then def.goal else nil,
+		}
+	end
 
 	return {
 		silver = data.silver,
@@ -589,6 +605,8 @@ local function buildView(player: Player, data: Data): { [string]: any }
 			equipped = ProgressionService.getCompanionLoadout(player),
 		},
 		koRecord = koRecord,
+		bestKills = bestKills, -- record perso de KO en une run (HUD, dossier 60)
+		classes = classes,
 		season = seasonView,
 	}
 end
@@ -707,14 +725,18 @@ end
 ---------------------------------------------------------------------------------------------------
 local selected: { [Player]: boolean } = {}
 
--- Id de classe canonique v2. Accepte les alias v1 encore envoyés par l'UI (Cornu -> Knight, résolus
--- par Config.Classes) pendant la transition.
+-- Id de classe canonique v2 (Knight, Archer...). Accepte encore les ids v1 envoyés par l'UI (Cornu ->
+-- Knight, Progression.LegacyClassIds) ; le profil ne stocke que l'id v2.
 local function canonicalClass(classId: any): string?
 	if not validId(classId, 32) then
 		return nil
 	end
 	if CLASS_SET[classId] then
 		return classId
+	end
+	local legacy = Progression.LegacyClassIds[classId]
+	if legacy and CLASS_SET[legacy] then
+		return legacy
 	end
 	local classes = optionalConfig("Classes")
 	local def = classes and classes[classId]
@@ -1225,6 +1247,7 @@ end
 
 -- Défini dans la section Leaderboards (plus bas).
 local scoreRun: (player: Player, info: RunInfo, kills: number, ending: string) -> ()
+local weeklyRankOf: (player: Player) -> number?
 
 local function num(v: any, lo: number, hi: number): number
 	if not isFiniteNumber(v) then
@@ -1257,7 +1280,7 @@ function ProgressionService.grantRunRewards(player: Player, summary: Types.RunSu
 	local kills = math.floor(num(summary.kills, 0, 1e6))
 	local stageReached = math.floor(num(summary.stageReached, 1, 3))
 	local companionStage = math.floor(num(summary.companionStage, 1, 3))
-	local classId = if type(summary.classId) == "string" and CLASS_SET[summary.classId] then summary.classId else nil
+	local classId = canonicalClass(summary.classId)
 	local line = if type(summary.companionId) == "string" and LINE_SET[summary.companionId] then summary.companionId else nil
 	local partySize = if info then info.partySize else 1
 	local downed = info ~= nil and info.downed
@@ -1380,6 +1403,10 @@ function ProgressionService.grantRunRewards(player: Player, summary: Types.RunSu
 	end
 	out.silverEarned = silver
 	out.seasonXp = seasonXp -- champ en plus du contrat RunSummary (écran de fin)
+	-- Rang hebdo (KO en une run) lu dans le cache des tops, sans appel DataStore : nil si inconnu,
+	-- hors du top, banni ou sans relevé valide cette semaine.
+	local okRank, rank = pcall(weeklyRankOf, player)
+	out.weeklyRank = if okRank then rank else nil
 
 	-- Quests that moved during this run (completed first, then closest to their goal), max 8.
 	local data = dataService().peek(player)
@@ -1521,12 +1548,14 @@ local function onEquipCosmetic(player: Player, slot: any, cosmeticId: any)
 end
 
 local SETTINGS_BOOL = { keepHat = true, colorblind = true, reduceFlashes = true }
+local SETTINGS_VOLUME = { masterVolume = true, musicVolume = true, sfxVolume = true }
 local function onUpdateSettings(player: Player, settings: any)
 	if type(settings) ~= "table" then
 		return
 	end
 	local clean: { [string]: any } = {}
 	local count = 0
+	local onlyVolumes = true
 	for k, v in settings do
 		count += 1
 		if count > 8 or type(k) ~= "string" then
@@ -1542,15 +1571,30 @@ local function onUpdateSettings(player: Player, settings: any)
 				return
 			end
 			clean[k] = math.clamp(math.floor(v * 100 + 0.5) / 100, 0.8, 1.5)
+			onlyVolumes = false
+		elseif SETTINGS_VOLUME[k] then
+			-- Volumes du dossier 90 (SoundController) : 0..1, arrondis au centième.
+			if not isFiniteNumber(v) then
+				return
+			end
+			clean[k] = math.clamp(math.floor(v * 100 + 0.5) / 100, 0, 1)
 		else
 			return -- unknown key: reject the whole request
 		end
+		if SETTINGS_BOOL[k] then
+			onlyVolumes = false
+		end
 	end
+	if next(clean) == nil then
+		return
+	end
+	-- Volumes seuls (curseur glissé) : pas de renvoi du Profile, le client a déjà la valeur et un
+	-- renvoi en retard ramènerait le curseur en arrière.
 	withProfile(player, function(d)
 		for k, v in clean do
 			d.settings[k] = v
 		end
-	end)
+	end, onlyVolumes)
 end
 
 local function shopPrice(data: Data, offerId: string): (string?, number?, (Data) -> ())
@@ -1673,6 +1717,7 @@ for _, board in LB.Boards do
 end
 local IS_STUDIO = RunService:IsStudio()
 local boardCache: { [string]: { { userId: number, value: number } } } = {}
+local boardCacheWeek: number? = nil -- semaine du dernier relevé du tableau hebdo (nil : jamais lu)
 local memoryBoards: { [string]: { [string]: number } } = {}
 local bannedIds: { [number]: boolean } = {}
 for _, id in LB.BoardBans do
@@ -1931,6 +1976,11 @@ function scoreRun(player: Player, info: RunInfo, kills: number, ending: string)
 			return -- déjà soumis (idempotence, même après un double appel)
 		end
 		b.lastRunKey = info.runKey
+		-- Record perso (Profile.bestKills) : toutes les runs, même en quarantaine ou banni, pour que
+		-- rien ne trahisse la quarantaine à l'écran (§0.5). Jamais lu par les classements.
+		if ko > (tonumber(b.bestKills) or 0) then
+			b.bestKills = ko
+		end
 		if quarantined then
 			local rec = table.clone(record)
 			rec.reasons = reasons
@@ -2001,6 +2051,40 @@ local function pushPendingRecords(player: Player)
 	end
 end
 
+-- RunSummary.weeklyRank : rang du relevé hebdo du joueur parmi le dernier top lu (cache, jamais
+-- d'appel DataStore). Égalité = même rang. nil : top jamais lu cette semaine, pas de relevé valide,
+-- banni, ou hors du top (cache plein et score sous le dernier).
+function weeklyRankOf(player: Player): number?
+	local data = dataService().peek(player)
+	if not data or data.flags.boardBanned or bannedIds[player.UserId] then
+		return nil
+	end
+	local week = Progression.weekIndex(os.time())
+	if boardCacheWeek ~= week then
+		return nil
+	end
+	local wb = data.boards.weekBest
+	local ko = if type(wb) == "table" and wb.week == week then tonumber(wb.ko) or 0 else 0
+	if ko <= 0 then
+		return nil
+	end
+	local rows = boardCache[WEEKLY_BOARD.key] or {}
+	local above, others, lowest = 0, 0, math.huge
+	for _, row in rows do
+		if row.userId ~= player.UserId then
+			others += 1
+			lowest = math.min(lowest, row.value)
+			if row.value > ko then
+				above += 1
+			end
+		end
+	end
+	if others >= LB.TopN and ko < lowest then
+		return nil
+	end
+	return above + 1
+end
+
 -- Départ en cours de run : les KO déjà faits comptent pour le classement (§4.2, §6.4).
 local function scoreOnLeave(player: Player)
 	local info = runInfo[player]
@@ -2051,6 +2135,9 @@ local function refreshBoards()
 				end
 			end
 			boardCache[board.key] = rows
+			if board.weekly then
+				boardCacheWeek = week
+			end
 		else
 			warn(`[ProgressionService] board {board.key} read failed: {result}`)
 		end

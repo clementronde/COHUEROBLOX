@@ -31,24 +31,41 @@ local WORLD_NAMES = {
 	DunesCroustillantes = { fr = "Dunes Croustillantes", en = "Crispy Dunes" },
 	RecreFantome = { fr = "Récré Fantôme", en = "Ghost Recess" },
 }
+-- Armes v2 (shared/Config/Weapons.luau). Les quêtes v1 Q_Weapon_HacheBoomerang... sont retirées :
+-- leurs entrées de questsDone restent dans le profil, ignorées.
 local WEAPONS = {
-	"HacheBoomerang",
-	"PlumesDards",
-	"CleTourelle",
-	"GriffesEclair",
-	"PoingSeisme",
-	"NuageSpores",
-	"SouffleBraise",
-	"Meteorite",
-	"EclatsPrisme",
-	"FouetTentacule",
-	"ToupieScie",
-	"BouleBowling",
-	"CerfVolantLaser",
-	"ParapluieBouclier",
-	"BombePaillettes",
-	"PistoletBulles",
+	"Broadsword",
+	"Longbow",
+	"FireStaff",
+	"QuakeHammer",
+	"ThrowingDaggers",
+	"HolyAura",
+	"SpinningAxes",
+	"BeastWhip",
+	"LightningChain",
+	"FrostNova",
+	"Boomerang",
+	"BombBag",
+	"SpearThrow",
+	"MeteorRain",
+	"OrbitingBlades",
+	"CrossbowTurret",
 }
+local WEAPON_NAMES = {
+	FireStaff = "Fire Staff",
+	QuakeHammer = "Quake Hammer",
+	ThrowingDaggers = "Throwing Daggers",
+	HolyAura = "Holy Aura",
+	SpinningAxes = "Spinning Axes",
+	BeastWhip = "Beast Whip",
+	LightningChain = "Lightning Chain",
+	FrostNova = "Frost Nova",
+	BombBag = "Bomb Bag",
+	SpearThrow = "Spear Throw",
+	MeteorRain = "Meteor Rain",
+	OrbitingBlades = "Orbiting Blades",
+	CrossbowTurret = "Crossbow Turret",
+} :: { [string]: string }
 local FAMILIES = {
 	Swarm = { fr = "essaim", en = "swarm", goals = { 250, 1000, 5000 } },
 	Jumper = { fr = "sauteurs", en = "jumpers", goals = { 100, 500, 2000 } },
@@ -186,7 +203,8 @@ end
 
 -- Weapon (16)
 for _, w in WEAPONS do
-	q(`Q_Weapon_{w}`, "Weapon", `DamageWeapon_{w}`, 50000, { tokens = 25 }, `Infliger 50 000 dégâts avec {w}`, `Deal 50,000 damage with {w}`)
+	local name = WEAPON_NAMES[w] or w
+	q(`Q_Weapon_{w}`, "Weapon", `DamageWeapon_{w}`, 50000, { tokens = 25 }, `Infliger 50 000 dégâts avec {name}`, `Deal 50,000 damage with {name}`)
 end
 
 -- Survive (25)
