@@ -5,7 +5,8 @@
 | Version | Où | État |
 | --- | --- | --- |
 | v1, Parts posées par un script d'édition | `Workspace.HubbubVillage` dans la place `COHUE` (1 368 objets, 0 script), `HubbubVillage_build.luau` | **Refusée par Clément** (« beaucoup trop AI slop »). À retirer de COHUE quand la v2 sera posée |
-| v2, maquette compacte | `assets/voxel/lobby.py` (plan, stations sur grille, île), `brick.py` (stations en briques fines), `studs.py` (décor en gros blocs à tenons), planches `assets/style/06-lobby-tenons.png` et `07-pistes-melange-ou-tenons.png` | **Style choisi par Clément (piste B).** Rien n'est encore construit dans Studio |
+| v2, maquette compacte | `assets/voxel/lobby.py` (plan, stations sur grille, île), `brick.py` (stations en briques fines), `studs.py` (décor en gros blocs à tenons), planches `assets/style/06-lobby-tenons.png` et `07-pistes-melange-ou-tenons.png` | **Style choisi par Clément (piste B)** |
+| v2, décor dans COHUE | `Workspace.HubbubVillageB` (centre (0, 16, 1100), au-delà du bord de la dalle grise : l'île flotte vraiment), posé le 5 nov. par `HubbubVillageB_build.luau` : Ground 2 571 Parts, Cliff 146, Forest 119 modèles (673 Parts), Props 20 (mare en eau du Terrain, dalles, îlots). 3 438 Parts, 3 563 objets, 0 script | **Posé, sans tenons.** Reste : Resurface sur tout le modèle (Clément), Ctrl+S, puis la tête-portail et les stations (mailles à téléverser) |
 
 Le 5 nov., Clément a trouvé la composition de la maquette voxel « très cool », mais il a écarté le voxel. Après comparaison de deux pistes, il a choisi la piste B : **tout en tenons, avec des formes naturelles**. Le décor est en gros blocs à tenons (terrasses, falaises en blocs décalés, sapins en plaques, mare), et ce avec quoi on interagit est en petites briques fines. Dans Studio, les tenons seront posés par son plugin **Resurface**. Le guide de style est `docs/dossier/80-direction-artistique.md`.
 
@@ -49,6 +50,10 @@ Découpage prévu (section 9 du guide) :
 - **les avatars d'exposition et les petits objets** : mailles fusionnées, avec les tenons de Resurface.
 
 Les points d'accroche pour A09 gardent les mêmes noms qu'en v1 : attributs `LobbyRole` (`Arrival`, `Pad` + `Mode`, `PadZone`, `PortalSwirl`, `Leaderboard`, `StatueSlot`, `QuestBoard`, `CritterPen`), `ProximityPrompt` `ClassPrompt`, `CrittersPrompt`, `ShopPrompt`, `LeaderboardsPrompt`, `QuestsPrompt`, et un `BoardGui` vide sur la stèle et le tableau des quêtes.
+
+## Reconstruire le décor B dans COHUE
+
+`assets/lobby/HubbubVillageB_build.luau` : envoyer la section `@header` par le MCP de Studio (`execute_luau`, mode Edit), puis `@ground`, `@cliff`, `@forest` et `@props`. Relancer une section remplace sa zone. Le générateur reprend à l'identique les tirages de la maquette (hnoise, vnoise, hachage de studs.py) : la place et la maquette ont le même plan. Ce fichier n'est jamais chargé par le jeu.
 
 ## Rendus
 
