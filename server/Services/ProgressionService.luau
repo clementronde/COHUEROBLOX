@@ -18,6 +18,7 @@ local AnalyticsService = game:GetService("AnalyticsService")
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = Shared:WaitForChild("Config")
@@ -522,6 +523,14 @@ local function buildView(player: Player, data: Data): { [string]: any }
 	local challenge = ProgressionService.getWeeklyChallenge()
 	local weeklyDone = data.weekly.week == challenge.week and data.weekly.done == true
 
+	-- Record perso de KO en une run (A12-02). Jamais l'état de quarantaine : le tricheur ne voit rien.
+	local wb, best = data.boards.weekBest, data.boards.best
+	local koRecord = {
+		weekly = if type(wb) == "table" and wb.week == challenge.week then tonumber(wb.ko) or 0 else 0,
+		allTime = if type(best) == "table" then tonumber(best.ko) or 0 else 0,
+		weekEndsAt = challenge.endsAt,
+	}
+
 	return {
 		silver = data.silver,
 		questTokens = data.questTokens,
@@ -543,6 +552,7 @@ local function buildView(player: Player, data: Data): { [string]: any }
 		passes = passes,
 		vip = passes.VIP == true,
 		companionStartTech = table.clone(data.companionStartTech),
+		koRecord = koRecord,
 	}
 end
 
@@ -774,12 +784,20 @@ end
 ---------------------------------------------------------------------------------------------------
 type RunInfo = {
 	runId: number,
+	runKey: string, -- JobId:runId, clé d'idempotence du classement (boards.lastRunKey)
 	worldId: string,
 	tier: number,
 	partySize: number,
+	startedAt: number,
 	downed: boolean,
 	bossHit: boolean,
 	statsBefore: { [string]: number },
+	-- Classement (A12-02)
+	ko: number, -- dernier total de KO lu sur Bus.KOScored (source : StatsService)
+	koCounted: number, -- KO faits dans la fenêtre de score (ScoreWindowOvertimeSeconds)
+	lastDamagedAt: number, -- os.clock du dernier dégât subi (ou de la dernière inactivité)
+	noDamage: boolean, -- signal « aucun dégât en Overtime » levé
+	scored: boolean, -- score déjà soumis pour cette run
 }
 local runCounter = 0
 local runInfo: { [Player]: RunInfo } = {}
@@ -790,6 +808,16 @@ local firstKill: { [Player]: boolean } = {}
 
 local function runManager(): any?
 	return Registry.find("RunManager")
+end
+
+-- Overtime cumulé de la run (une run par serveur) : Bus.FinalWaveStarted ouvre un segment,
+-- Bus.StageStarted (monde suivant) le ferme. Sert aux signaux du classement, pas à l'affichage.
+local overtimeSince: number? = nil
+local overtimeAccum = 0
+
+local function overtimeSeconds(): number
+	local since = overtimeSince
+	return overtimeAccum + (if since then os.clock() - since else 0)
 end
 
 local function currentPhase(): string?
@@ -808,6 +836,8 @@ local function onRunStarted(players: { Player }, worldId: string, tier: number)
 		return
 	end
 	runCounter += 1
+	overtimeSince = nil
+	overtimeAccum = 0
 	local size = #players
 	for _, p in players do
 		if not isPlayer(p) then
@@ -822,6 +852,7 @@ local function onRunStarted(players: { Player }, worldId: string, tier: number)
 		end
 		runInfo[p] = {
 			runId = runCounter,
+			runKey = `{game.JobId}:{runCounter}`,
 			worldId = if type(worldId) == "string" then worldId else "?",
 			tier = if isFiniteNumber(tier) then tier else 1,
 			partySize = size,
@@ -829,6 +860,11 @@ local function onRunStarted(players: { Player }, worldId: string, tier: number)
 			downed = false,
 			bossHit = false,
 			statsBefore = before,
+			ko = 0,
+			koCounted = 0,
+			lastDamagedAt = os.clock(),
+			noDamage = false,
+			scored = false,
 		}
 		if size >= 2 then
 			withProfile(p, function(d, done)
@@ -868,6 +904,10 @@ local function onPlayerDamaged(player: Player, amount: number)
 		return
 	end
 	bufferStat(player, "DamageTaken", amount)
+	local hit = runInfo[player]
+	if hit then
+		hit.lastDamagedAt = os.clock()
+	end
 	if currentPhase() == "Boss" then
 		local info = runInfo[player]
 		if info then
@@ -938,6 +978,30 @@ local function onStageStarted()
 	for _, info in runInfo do
 		info.bossHit = false
 	end
+	local since = overtimeSince
+	if since then
+		overtimeAccum += os.clock() - since
+		overtimeSince = nil
+	end
+end
+
+local function onFinalWaveStarted()
+	if not overtimeSince then
+		overtimeSince = os.clock()
+	end
+end
+
+-- KO compté par StatsService (A04-03) : on ne recalcule rien, on garde le dernier total.
+local function onKOScored(player: Player, runKills: number)
+	local info = runInfo[player]
+	if not info or not isFiniteNumber(runKills) then
+		return
+	end
+	info.ko = runKills
+	local window = Progression.Leaderboards.ScoreWindowOvertimeSeconds
+	if window <= 0 or overtimeSeconds() <= window then
+		info.koCounted = runKills
+	end
 end
 
 local function onPlayerDowned(player: Player)
@@ -989,6 +1053,9 @@ local function onCompanionEvolved(player: Player, stage: number)
 	end)
 end
 
+-- Défini dans la section Leaderboards (plus bas).
+local scoreRun: (player: Player, info: RunInfo, kills: number, ending: string) -> ()
+
 local function num(v: any, lo: number, hi: number): number
 	if not isFiniteNumber(v) then
 		return lo
@@ -1024,6 +1091,11 @@ function ProgressionService.grantRunRewards(player: Player, summary: Types.RunSu
 	local line = if type(summary.companionId) == "string" and LINE_SET[summary.companionId] then summary.companionId else nil
 	local partySize = if info then info.partySize else 1
 	local downed = info ~= nil and info.downed
+	-- Classement (regles-v2 §4.2) : une écriture par run, par ce serveur de run, avant les gains.
+	-- Les retardataires (pas de runInfo) ne sont jamais classés (§5.5).
+	if info then
+		scoreRun(player, info, kills, if summary.cashedOut == true then "CashOut" else "End")
+	end
 
 	local cfgS = Progression.Silver
 	-- Review findings 1, 2, 5: only players who started this run get credit (late joiners and
@@ -1397,97 +1469,402 @@ local function onHatchEgg(player: Player)
 end
 
 ---------------------------------------------------------------------------------------------------
--- Leaderboards (OrderedDataStore: index, never truth; never lowered; never from Studio tests)
+-- Leaderboards v2 (A12-02) : meilleur nombre de KO en UNE run, hebdo + all-time.
+-- Règles : docs/security/regles-v2.md §4 (corrige S-06). OrderedDataStore = index, jamais la vérité :
+-- le profil garde le relevé (boards.best / boards.weekBest). Écrit une fois par run et par joueur,
+-- par le serveur de run (fin de run, Cash out ou départ en cours de run), jamais depuis Studio,
+-- jamais pour un retardataire, un banni ou une run en quarantaine. Le tricheur ne voit rien.
 ---------------------------------------------------------------------------------------------------
 local LB = Progression.Leaderboards
-local lastWritten: { [Player]: { [string]: number } } = {}
+local QC = LB.Quarantine
+local WEEKLY_BOARD, ALLTIME_BOARD = LB.Boards[1], LB.Boards[2]
+for _, board in LB.Boards do
+	if board.weekly then
+		WEEKLY_BOARD = board
+	else
+		ALLTIME_BOARD = board
+	end
+end
+local IS_STUDIO = RunService:IsStudio()
 local boardCache: { [string]: { { userId: number, value: number } } } = {}
+local memoryBoards: { [string]: { [string]: number } } = {}
+local bannedIds: { [number]: boolean } = {}
+for _, id in LB.BoardBans do
+	if type(id) == "number" then
+		bannedIds[id] = true
+	end
+end
 
-local function boardsEnabled(): boolean
+-- Repli en mémoire : Studio (jamais d'écriture réelle depuis Studio, §4.2), profil de test, ou
+-- magasin de données en mémoire. En live, une erreur reste une erreur (réessais, puis log).
+local function boardsInMemory(): boolean
 	local ds = dataService()
-	return not ds.isTestSession() and not ds.isMemoryBackend()
+	return IS_STUDIO or ds.isTestSession() or ds.isMemoryBackend()
+end
+
+local warnedMemoryBoards = false
+local function noteMemoryBoards()
+	if not warnedMemoryBoards then
+		warnedMemoryBoards = true
+		warn(
+			"[ProgressionService] Leaderboards use an IN-MEMORY store (Studio / test profile / no API access):"
+				.. " nothing is written to the real OrderedDataStores and scores vanish when the server stops."
+		)
+	end
 end
 
 local function storeName(board: { store: string, weekly: boolean }, week: number): string
 	return if board.weekly then `{board.store}_W{week}` else board.store
 end
 
-local function boardValue(data: Data, source: string, week: number): number
-	if source == "boards.kills" then
-		return if data.boards.week == week then tonumber(data.boards.kills) or 0 else 0
-	elseif source == "boards.bestFinalWave" then
-		return if data.boards.week == week then tonumber(data.boards.bestFinalWave) or 0 else 0
-	end
-	return tonumber(data.stats[source]) or 0
+local function boardKey(userId: number): string
+	return `u_{userId}`
 end
 
--- Captures values synchronously (profile may be gone after), then writes in a thread.
-local function writeBoards(player: Player)
-	if not boardsEnabled() then
-		return
+-- Garde le maximum, ne baisse jamais une valeur. Yields (réessais). true si écrit ou déjà >= value.
+local function boardUpdate(name: string, userId: number, value: number): boolean
+	local key = boardKey(userId)
+	if boardsInMemory() then
+		noteMemoryBoards()
+		local t = memoryBoards[name]
+		if not t then
+			t = {}
+			memoryBoards[name] = t
+		end
+		if (t[key] or 0) < value then
+			t[key] = value
+		end
+		return true
 	end
-	local data = dataService().peek(player)
-	if not data or data.flags.boardBanned then
-		return
-	end
-	local week = Progression.weekIndex(os.time())
-	local userId = player.UserId
-	local mine = lastWritten[player]
-	if not mine then
-		mine = {}
-		lastWritten[player] = mine
-	end
-	local jobs: { { name: string, value: number } } = {}
-	for _, board in LB.Boards do
-		local value = math.floor(boardValue(data, board.source, week))
-		local name = storeName(board, week)
-		if value > 0 and mine[name] ~= value then
-			table.insert(jobs, { name = name, value = value })
+	for attempt = 1, LB.WriteAttempts do
+		local ok, err = pcall(function()
+			DataStoreService:GetOrderedDataStore(name):UpdateAsync(key, function(old: any): any
+				if type(old) == "number" and old >= value then
+					return nil -- score monotone dans sa période
+				end
+				return value
+			end)
+		end)
+		if ok then
+			return true
+		end
+		warn(`[ProgressionService] board {name} write failed ({attempt}/{LB.WriteAttempts}): {err}`)
+		if attempt < LB.WriteAttempts then
+			task.wait(attempt * 2 * (0.5 + math.random()))
 		end
 	end
-	if #jobs == 0 then
+	return false
+end
+
+local function boardRemove(name: string, userId: number)
+	local key = boardKey(userId)
+	if boardsInMemory() then
+		local t = memoryBoards[name]
+		if t then
+			t[key] = nil
+		end
 		return
 	end
-	task.spawn(function()
-		for _, job in jobs do
-			local ok, err = pcall(function()
-				local store = DataStoreService:GetOrderedDataStore(job.name)
-				store:UpdateAsync(`u_{userId}`, function(old: any): any
-					if type(old) == "number" and old >= job.value then
-						return nil -- never lower a monotonic score
-					end
-					return job.value
-				end)
-			end)
-			if ok then
-				mine[job.name] = job.value
-			else
-				warn(`[ProgressionService] board {job.name} write failed: {err}`)
+	for attempt = 1, LB.WriteAttempts do
+		local ok, err = pcall(function()
+			DataStoreService:GetOrderedDataStore(name):RemoveAsync(key)
+		end)
+		if ok then
+			return
+		end
+		warn(`[ProgressionService] board {name} remove failed ({attempt}/{LB.WriteAttempts}): {err}`)
+		if attempt < LB.WriteAttempts then
+			task.wait(attempt * 2)
+		end
+	end
+end
+
+local function boardRead(name: string): { { userId: number, value: number } }
+	local rows: { { userId: number, value: number } } = {}
+	if boardsInMemory() then
+		for key, value in memoryBoards[name] or {} do
+			local userId = tonumber(string.match(key, "^u_(%d+)$"))
+			if userId then
+				table.insert(rows, { userId = userId, value = value })
 			end
+		end
+		table.sort(rows, function(a, b)
+			return a.value > b.value
+		end)
+		while #rows > LB.TopN do
+			table.remove(rows)
+		end
+		return rows
+	end
+	local page = DataStoreService:GetOrderedDataStore(name):GetSortedAsync(false, LB.TopN):GetCurrentPage()
+	for _, entry in page do
+		local userId = tonumber(string.match(entry.key, "^u_(%d+)$"))
+		if userId and type(entry.value) == "number" then
+			table.insert(rows, { userId = userId, value = entry.value })
+		end
+	end
+	return rows
+end
+
+local function safeCall(service: any, fnName: string, ...: any): any
+	if service and type(service[fnName]) == "function" then
+		local ok, result = pcall(service[fnName], ...)
+		if ok then
+			return result
+		end
+	end
+	return nil
+end
+
+-- Petit résumé du build pour le relevé (purge par filtre plus tard) : "<arme>:<niveau>", 4 max.
+local function buildDigest(player: Player): { string }
+	local out: { string } = {}
+	local build = safeCall(Registry.find("StatsService"), "getBuild", player)
+	if type(build) == "table" and type(build.weapons) == "table" then
+		for _, w in build.weapons do
+			if #out >= 4 then
+				break
+			end
+			if type(w) == "table" and validId(w.id, 32) and isFiniteNumber(w.level) then
+				table.insert(out, `{w.id}:{math.floor(w.level)}`)
+			end
+		end
+	end
+	return out
+end
+
+-- Pousse le relevé du profil vers les tableaux (écriture déjà validée par un serveur de run).
+-- Marque `written` si le joueur est toujours là ; sinon on repoussera au prochain chargement.
+local function pushRecords(player: Player, week: number, pushWeek: boolean, pushAll: boolean, ko: number)
+	local userId = player.UserId
+	task.spawn(function()
+		local okWeek = not pushWeek or boardUpdate(storeName(WEEKLY_BOARD, week), userId, ko)
+		local okAll = not pushAll or boardUpdate(storeName(ALLTIME_BOARD, week), userId, ko)
+		if player.Parent then
+			dataService().mutate(player, function(d)
+				local b = d.boards
+				if pushWeek and okWeek and type(b.weekBest) == "table" and b.weekBest.week == week then
+					b.weekBest.written = true
+				end
+				if pushAll and okAll and type(b.best) == "table" then
+					b.best.written = true
+				end
+			end)
 		end
 	end)
 end
 
-local function refreshBoards()
-	if not boardsEnabled() then
+local function countRecent(list: { any }, now: number, windowSeconds: number): number
+	local n = 0
+	for _, rec in list do
+		if type(rec) == "table" and isFiniteNumber(rec.at) and now - rec.at <= windowSeconds then
+			n += 1
+		end
+	end
+	return n
+end
+
+-- Soumet le score d'une run (synchrone pour le profil ; les écritures de tableau partent en tâche).
+-- ending : "End" | "CashOut" | "Left". kills : total serveur de la run (StatsService).
+function scoreRun(player: Player, info: RunInfo, kills: number, ending: string)
+	if info.scored then
 		return
 	end
-	local week = Progression.weekIndex(os.time())
-	for _, board in LB.Boards do
-		local ok, result = pcall(function()
-			local store = DataStoreService:GetOrderedDataStore(storeName(board, week))
-			local page = store:GetSortedAsync(false, LB.TopN):GetCurrentPage()
-			local rows = {}
-			for _, entry in page do
-				local userId = tonumber(string.match(entry.key, "^u_(%d+)$"))
-				if userId and type(entry.value) == "number" then
-					table.insert(rows, { userId = userId, value = entry.value })
+	info.scored = true
+	local userId = player.UserId
+	local ko = math.floor(num(kills, 0, LB.MaxValue))
+	if LB.ScoreWindowOvertimeSeconds > 0 then
+		ko = math.min(ko, math.floor(num(info.koCounted, 0, LB.MaxValue)))
+	end
+	local duration = math.max(1, os.clock() - info.startedAt)
+	local reasons: { string } = {}
+	local logs: { string } = {}
+
+	-- §2.3 : on juge les conditions qui ont produit le score, pas le nombre seul.
+	local strikes = safeCall(Registry.find("MovementGuard"), "getRunStrikes", player)
+	strikes = if isFiniteNumber(strikes) then strikes else 0
+	if strikes >= QC.MaxStrikes then
+		table.insert(reasons, "Strikes")
+	end
+	local invuln = safeCall(runManager(), "getInvulnerableSeconds", player)
+	if isFiniteNumber(invuln) and duration >= QC.MinRunSecondsForShare and invuln / duration > QC.MaxInvulnShare then
+		table.insert(reasons, "Invulnerable")
+	end
+	if info.noDamage then
+		table.insert(if QC.NoDamageEnforce then reasons else logs, "NoDamageOvertime")
+	end
+	local perMinute = ko / (duration / 60)
+	if QC.KoPerMinuteCap > 0 then
+		if perMinute > QC.KoPerMinuteCap then
+			table.insert(reasons, "KoRate")
+		end
+	elseif perMinute > QC.KoPerMinuteLog then
+		table.insert(logs, "KoRate")
+	end
+	-- §2.2 invariants (si EnemyService expose le nombre d'ennemis apparus : contract request A03/A04).
+	local spawned = safeCall(Registry.find("EnemyService"), "getRunSpawned")
+	if isFiniteNumber(spawned) then
+		local sum = 0
+		local all = safeCall(Registry.find("StatsService"), "getRunKills")
+		if type(all) == "table" then
+			for _, n in all do
+				if isFiniteNumber(n) then
+					sum += n
 				end
 			end
-			return rows
+		end
+		if ko > spawned or sum > spawned then
+			warn(`[ProgressionService] KO invariant broken for {userId}: ko={ko} sum={sum} spawned={spawned}`)
+			table.insert(reasons, "Invariant")
+		end
+	end
+	if #logs > 0 then
+		warn(`[ProgressionService] board signal (log only) {userId}: {table.concat(logs, ",")} ko={ko} kpm={math.floor(perMinute)}`)
+	end
+
+	local now = os.time()
+	local week = Progression.weekIndex(now)
+	local record = {
+		ko = ko,
+		runKey = info.runKey,
+		seconds = math.floor(duration),
+		overtimeSeconds = math.floor(overtimeSeconds()),
+		partySize = info.partySize,
+		strikes = strikes,
+		worldId = info.worldId,
+		tier = info.tier,
+		ending = ending,
+		build = buildDigest(player),
+		at = now,
+	}
+	local quarantined = #reasons > 0
+	local banNow, pushWeek, pushAll = false, false, false
+	withProfile(player, function(d)
+		local b = d.boards
+		if b.lastRunKey == info.runKey then
+			return -- déjà soumis (idempotence, même après un double appel)
+		end
+		b.lastRunKey = info.runKey
+		if quarantined then
+			local rec = table.clone(record)
+			rec.reasons = reasons
+			table.insert(b.quarantined, rec)
+			while #b.quarantined > QC.KeepRecords do
+				table.remove(b.quarantined, 1)
+			end
+			if not d.flags.boardBanned and countRecent(b.quarantined, now, QC.BanWindowDays * 86400) >= QC.BanCount then
+				d.flags.boardBanned = true
+				banNow = true
+			end
+			return
+		end
+		if d.flags.boardBanned or bannedIds[userId] or ko <= 0 then
+			return
+		end
+		local wb = b.weekBest
+		if type(wb) ~= "table" or wb.week ~= week or ko > (tonumber(wb.ko) or 0) then
+			local rec = table.clone(record)
+			rec.week = week
+			rec.written = false
+			b.weekBest = rec
+			pushWeek = true
+		end
+		if type(b.best) ~= "table" or ko > (tonumber(b.best.ko) or 0) then
+			local rec = table.clone(record)
+			rec.build = table.clone(record.build)
+			rec.written = false
+			b.best = rec
+			pushAll = true
+		end
+	end, true)
+
+	if quarantined then
+		-- Log serveur seulement ; l'écran de fin reste normal (§0.5).
+		warn(`[ProgressionService] run quarantined for {userId}: {table.concat(reasons, ",")} ko={ko}`)
+	end
+	if banNow then
+		warn(`[ProgressionService] {userId} removed from leaderboards (3 quarantined runs in 7 days)`)
+		task.spawn(function()
+			for _, board in LB.Boards do
+				boardRemove(storeName(board, week), userId)
+			end
 		end)
+	end
+	if pushWeek or pushAll then
+		pushRecords(player, week, pushWeek, pushAll, ko)
+		dataService().saveSoon(player)
+	end
+end
+
+-- Au chargement : repousse un relevé validé dont l'écriture de tableau a échoué (idempotent, max).
+local function pushPendingRecords(player: Player)
+	local data = dataService().peek(player)
+	if not data or data.flags.boardBanned or bannedIds[player.UserId] then
+		return
+	end
+	local b = data.boards
+	local week = Progression.weekIndex(os.time())
+	local wb, best = b.weekBest, b.best
+	local pushWeek = type(wb) == "table" and wb.week == week and wb.written == false and isFiniteNumber(wb.ko) and wb.ko > 0
+	local pushAll = type(best) == "table" and best.written == false and isFiniteNumber(best.ko) and best.ko > 0
+	if pushWeek then
+		pushRecords(player, week, true, false, math.floor(wb.ko))
+	end
+	if pushAll then
+		pushRecords(player, week, false, true, math.floor(best.ko))
+	end
+end
+
+-- Départ en cours de run : les KO déjà faits comptent pour le classement (§4.2, §6.4).
+local function scoreOnLeave(player: Player)
+	local info = runInfo[player]
+	if not info or info.scored then
+		return
+	end
+	local phase = currentPhase()
+	if phase == "Loadout" or phase == "Ended" then
+		return
+	end
+	local kills = safeCall(Registry.find("StatsService"), "getKills", player)
+	scoreRun(player, info, math.max(info.ko, if isFiniteNumber(kills) then kills else 0), "Left")
+end
+
+-- Signal « aucun dégât en Overtime » (§2.3), 1 Hz. Un joueur inactif (à terre, fantôme) remet le
+-- compteur à zéro : il ne peut pas être touché, ce n'est pas suspect.
+local function checkNoDamage()
+	local ot = overtimeSeconds()
+	if ot < QC.NoDamageAfterOvertime then
+		return
+	end
+	local now = os.clock()
+	local thresholdAt = now - (ot - QC.NoDamageAfterOvertime)
+	local run = runManager()
+	for player, info in runInfo do
+		if info.noDamage then
+			continue
+		end
+		if safeCall(run, "isActive", player) ~= true then
+			info.lastDamagedAt = now
+			continue
+		end
+		if now - math.max(info.lastDamagedAt, thresholdAt) >= QC.NoDamageSeconds then
+			info.noDamage = true
+		end
+	end
+end
+
+local function refreshBoards()
+	local week = Progression.weekIndex(os.time())
+	for _, board in LB.Boards do
+		local ok, result = pcall(boardRead, storeName(board, week))
 		if ok then
-			boardCache[board.key] = result
+			local rows = {}
+			for _, row in result do
+				if not bannedIds[row.userId] then -- §4.4 : bannis filtrés à la lecture aussi
+					table.insert(rows, row)
+				end
+			end
+			boardCache[board.key] = rows
 		else
 			warn(`[ProgressionService] board {board.key} read failed: {result}`)
 		end
@@ -1528,6 +1905,7 @@ local function onProfileLoaded(player: Player)
 		end
 	end)
 	markDirty(player)
+	pushPendingRecords(player)
 	if next(boardCache) then
 		Net.event("Leaderboards"):FireClient(player, boardCache)
 	end
@@ -1535,7 +1913,7 @@ end
 
 local function beforeRelease(player: Player)
 	flushPending(player)
-	writeBoards(player)
+	scoreOnLeave(player) -- profil encore modifiable : le relevé part dans la sauvegarde finale
 	local started = joinedAt[player]
 	if started then
 		ProgressionService.logCustom(player, "SessionMinutes", math.floor((os.clock() - started) / 60), nil)
@@ -1572,7 +1950,6 @@ local function onPlayerRemoving(player: Player)
 		joinedAt[player] = nil
 		firstKill[player] = nil
 		onboardingMax[player] = nil
-		lastWritten[player] = nil
 	end)
 end
 
@@ -1596,6 +1973,8 @@ function ProgressionService.init()
 	Bus.PlayerRevived:connect(onPlayerRevived)
 	Bus.ShrineCompleted:connect(onShrineCompleted)
 	Bus.CompanionEvolved:connect(onCompanionEvolved)
+	Bus.FinalWaveStarted:connect(onFinalWaveStarted)
+	Bus.KOScored:connect(onKOScored)
 
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
@@ -1619,6 +1998,7 @@ function ProgressionService.start()
 				for p in pending do
 					flushPending(p)
 				end
+				checkNoDamage()
 			end
 			for p in dirty do
 				dirty[p] = nil
@@ -1637,17 +2017,7 @@ function ProgressionService.start()
 			end
 		end
 	end)
-	-- Leaderboards: write every 120 s (only changed values), read every 120 s + jitter
-	task.spawn(function()
-		task.wait(math.random() * LB.WriteSeconds)
-		while true do
-			for _, p in Players:GetPlayers() do
-				writeBoards(p)
-				task.wait(0.5) -- spread the ordered write budget
-			end
-			task.wait(LB.WriteSeconds)
-		end
-	end)
+	-- Leaderboards: written once per run (scoreRun) ; tops read every 120 s + jitter
 	task.spawn(function()
 		task.wait(5 + math.random() * LB.RefreshJitter)
 		while true do

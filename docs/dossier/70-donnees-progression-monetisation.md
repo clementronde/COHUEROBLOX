@@ -46,7 +46,7 @@ Le **Profil** (`Data`), valeurs par défaut d'un nouveau joueur (nouvelle table 
 | `settings` | `{ keepHat, colorblind, reduceFlashes: boolean, textScale: number }` | `false, false, false, 1` | Réglages |
 | `loadout` | `{ classId, companionId }` | `Cornu`, `Braise` | Dernier choix |
 | `weekly` | `{ week, done, bestSeconds, everDone }` | `-1, false, 0, false` | Défi hebdo (section 10) |
-| `boards` | `{ week, kills, bestFinalWave }` | `-1, 0, 0` | Compteurs de la semaine pour les classements |
+| `boards` | `{ week, kills, bestFinalWave, lastRunKey, best, weekBest, quarantined }` | `-1, 0, 0, "", {}, {}, {}` | Relevés du classement KO en une run (section 13) ; `kills`/`bestFinalWave` : compteurs v1 conservés |
 | `receipts` | `{[PurchaseId]: number}` | `{}` | Marqueurs de reçus traités (même document que l'objet accordé) |
 | `receiptOrder` | `{string}` | `{}` | Ordre d'arrivée, pour garder les 100 plus récents |
 | `purchaseLog` | `{{k, r, t}}` | `{}` | Journal d'achats (clé produit, Robux payés, date), 50 derniers |
@@ -242,16 +242,38 @@ Récompenses typiques : 10 → 100 jetons selon le palier, argent sur certains p
 **Clés automatiques** (`Config.Quests.AutoKeys` + préfixes ; le domaine data écoute le Bus et le `RunSummary` ; **ne pas appeler**) :
 `Kills`, `KillsElite`, `KillsFamily_<Swarm|Jumper|Shooter|Armored>` (Bus.EnemyKilled + `Config.Enemies[kind].family`, agrégés par seconde), `DamageTaken` (PlayerDamaged), `Revives` (PlayerRevived, sauveteur), `ShrinesCompleted`, `ShrinesCoop` (ShrineCompleted, à ≥ 2 pour Coop), `BossesDefeated`, `BossesDefeated_<monde>`, `StagesCleared`, `FullBuildStageClears` (BossDefeated + `StatsService.getBuild`), `BossNoDamage` (phase `Boss` sans PlayerDamaged), `Companion_<lignée>_Stage3` (CompanionEvolved stade 3), `CoopRuns` (RunStarted à ≥ 2), puis en fin de run (`grantRunRewards`) : `RunsPlayed`, `Wins`, `WinsTier3`, `Win_<monde>_T<n>`, `WinNoDown`, `CoopFullWins`, `FinalWaveSecondsTotal`, `BestFinalWave` (record), `BestRunLevel` (record), `DamageDealt`, `DamageWeapon_<arme>`, `Class_<classe>_Wins`, `Class_<classe>_BestLevel` (record), `Bond_<lignée>` (record du niveau de Lien).
 
-## 13. Classements (OrderedDataStore)
+## 13. Classements v2 : KO en une run (A12-02, `regles-v2.md` §4)
 
-| Tableau | Store | Valeur |
+Le modèle v1 (somme des KO de la semaine et record de Vague Finale, écrits toutes les 120 s par n'importe quel serveur) est **retiré**. Il reste un seul score : le **plus grand nombre de KO en une run**.
+
+| Tableau (clé `Leaderboards`) | OrderedDataStore | Valeur |
 | --- | --- | --- |
-| Kills à vie | `LB_Kills_AllTime_v1` | `stats.Kills` |
-| Kills semaine | `LB_Kills_v1_W<week>` (nouveau store chaque semaine) | `boards.kills` |
-| Vague Finale record à vie | `LB_FinalWave_AllTime_v1` | `stats.BestFinalWave` (s) |
-| Vague Finale record semaine | `LB_FinalWave_v1_W<week>` | `boards.bestFinalWave` |
+| `KoRunWeekly` | `LB_KoRun_W<week>` (`week = Progression.weekIndex`, reset lundi 00:00 UTC par le nom, sans suppression) | Meilleure run de la semaine |
+| `KoRunAllTime` | `LB_KoRun_AllTime_v1` | Meilleure run à vie |
 
-Le profil est la vérité, le tableau un index. Écriture toutes les 120 s (+ au départ), uniquement profils chargés, uniquement si changé, valeur entière > 0, `UpdateAsync` qui **ne baisse jamais** (score monotone dans sa période), clé `u_<UserId>`, jamais depuis Studio ni avec un `TestProfileKey`, jamais si `flags.boardBanned`. Lecture : top 50 par tableau, cache par serveur, rafraîchi toutes les 120 s + gigue 0-30 s, envoyé aux clients par `Leaderboards` ; noms via `UserService` non utilisé (le client affiche les noms avec `Players:GetNameFromUserIdAsync` — domaine ui). Mode Survie : tableaux à ajouter quand le mode existe.
+**Écriture** (`ProgressionService.scoreRun`) : une fois par run et par joueur, par le serveur de run, au moment où la run se termine pour lui : `grantRunRewards` (fin de run, Cash out) ou départ en cours de run (hook de libération, profil encore modifiable). La valeur est le total serveur de `StatsService.getKills` (A04-03, aussi relayé par `Bus.KOScored`), jamais une valeur du client. Clé `u_<UserId>`, entier 0 → 10 000 000, `UpdateAsync` qui garde le maximum. Ne sont jamais classés : les retardataires (pas dans `Bus.RunStarted`), les profils `flags.boardBanned`, les userIds de `Progression.Leaderboards.BoardBans`, une run en quarantaine.
+
+**Profil = vérité** : le même `mutate` écrit `boards.lastRunKey` (idempotence `JobId:runId`) et, si la run bat le record, `boards.weekBest` / `boards.best` = `{ ko, runKey, seconds, overtimeSeconds, partySize, strikes, worldId, tier, ending, build = {"<arme>:<niveau>"}, at, written, week? }`. `written = false` tant que l'écriture du tableau n'a pas réussi (3 essais) ; au chargement suivant, le relevé est repoussé (idempotent puisque max).
+
+**Quarantaine** (§2.3, §4.5 ; seuils dans `Progression.Leaderboards.Quarantine`) :
+
+| Signal | Source | Effet |
+| --- | --- | --- |
+| Strikes de mouvement ≥ 3 dans la run | `MovementGuard.getRunStrikes` | Quarantaine |
+| Invulnérable > 30 % d'une run d'au moins 60 s | `RunManager.getInvulnerableSeconds` | Quarantaine |
+| 3 min sans dégât en étant actif, après +03:00 d'Overtime | `Bus.PlayerDamaged`, `Bus.FinalWaveStarted`, `RunManager.isActive` | Log seul (`NoDamageEnforce = false`) tant que non mesuré |
+| KO par minute | durée serveur | `KoPerMinuteCap = 0` (non mesuré) : log au-delà de 600/min |
+| KO > ennemis apparus, somme des KO > ennemis apparus | `EnemyService.getRunSpawned` (**contract request**, lu s'il existe) | Quarantaine + log d'erreur |
+
+Run en quarantaine : rien n'est écrit au tableau, le relevé (avec `reasons`) va dans `boards.quarantined` (20 derniers), log serveur, écran de fin normal. **3 quarantaines en 7 jours** → `flags.boardBanned = true` et `RemoveAsync` sur les deux tableaux. Ban manuel : `BoardBans` (filtré à l'écriture **et** à la lecture).
+
+**Fenêtre de score** (§4.3.1, décision de Clément en attente) : `ScoreWindowOvertimeSeconds` (0 = désactivé). Si > 0, seuls les KO faits avant ce cumul d'Overtime comptent. Les tableaux par taille de groupe (§4.3.2) ne sont pas créés ; `partySize` est gardé dans chaque relevé pour les faire plus tard.
+
+**Lecture** : `GetSortedAsync(false, 100)` par tableau, toutes les 120 s + gigue 0-30 s, bannis filtrés, cache serveur, envoyé à tous par `Leaderboards` = `{ KoRunWeekly = {{ userId, value }}, KoRunAllTime = {...} }` et à chaque arrivée. Le client calcule la fin de semaine avec `Progression.weekEndsAt` ; le profil donne `koRecord = { weekly, allTime, weekEndsAt }`. Les noms sont affichés par le client (domaine ui).
+
+**Studio** : toujours un **magasin en mémoire** (même logique, avertissement clair dans la console), jamais d'écriture réelle depuis Studio, avec ou sans accès API. Les scores disparaissent à l'arrêt du serveur.
+
+**Budget ordonné** (4 joueurs) : au plus 2 `UpdateAsync` par joueur et par run (≈ 8 par run de 15 min) contre 50/min ; lecture 2 pages / 120 s.
 
 ## 14. Analytics (KPI 14.1)
 
@@ -302,7 +324,7 @@ Budget MemoryStore : 1 000 + 120 × CCU unités/min ; ≈ 3 unités par run (éc
 | `HatchEgg` | C→S | `()` | 1/s |
 | `RequestPurchase` | C→S | `(productKey: string)` | 1/s |
 | `EggHatched` | S→C | `{ line: string?, tokens: number? }` | — |
-| `Leaderboards` | S→C | `{ [board] = {{ userId, value }} }` | toutes les 120 s |
+| `Leaderboards` | S→C | `{ KoRunWeekly, KoRunAllTime = {{ userId, value }} }` (section 13) | toutes les 120 s |
 | `MatchRequest` | C→S | `(worldId: string, tier: number)` | 1/s |
 | `MatchState` | S→C | `{ state: "Idle"|"Preparing"|"Teleporting"|"Failed", reason: LocalizedText? }` | — |
 | `DataNotice` | S→C | `{ kind: "Waiting"|"Lost"|"Saved"|"QuestDone", text: LocalizedText, questId: string? }` | — |

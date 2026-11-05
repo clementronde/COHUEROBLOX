@@ -220,7 +220,18 @@ local function newProfile(): { [string]: any }
 		settings = { keepHat = false, colorblind = false, reduceFlashes = false, textScale = 1 },
 		loadout = { classId = Progression.DefaultLoadout.classId, companionId = Progression.DefaultLoadout.companionId },
 		weekly = { week = -1, done = false, bestSeconds = 0, everDone = false },
-		boards = { week = -1, kills = 0, bestFinalWave = 0 },
+		-- kills / bestFinalWave : compteurs v1 (plus écrits au classement). best / weekBest : relevé
+		-- de la meilleure run (KO en une run, regles-v2 §4.2) ; quarantined : 20 derniers relevés
+		-- refusés (§4.5) ; lastRunKey : idempotence « une écriture par run ».
+		boards = {
+			week = -1,
+			kills = 0,
+			bestFinalWave = 0,
+			lastRunKey = "",
+			best = {},
+			weekBest = {},
+			quarantined = {},
+		},
 		receipts = {},
 		receiptOrder = {},
 		purchaseLog = {},
@@ -450,7 +461,10 @@ local function saveWithRetries(player: Player, release: boolean, attempts: numbe
 		end
 	end
 	inFlight -= 1
-	lastSaveAt[player] = os.clock()
+	-- S-15 : une sauvegarde qui finit après onPlayerRemoving ne recrée pas l'entrée du joueur parti.
+	if sessions[player] == session then
+		lastSaveAt[player] = os.clock()
+	end
 	if result == "lost" then
 		notify(
 			player,
