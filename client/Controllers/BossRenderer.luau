@@ -121,7 +121,8 @@ local function buildBoss(bossId: string)
 	local template = ArtLibrary.find(name)
 	if not template then
 		-- Ancien nom v1 (Boss_<id>), tant que Clément n'a pas posé le modèle v2.
-		template = ArtLibrary.find("Boss_" .. bossId)
+		name = "Boss_" .. bossId
+		template = ArtLibrary.find(name)
 	end
 	if not template then
 		warnOnce(name, `[BossRenderer] modèle manquant : Assets.Creatures.{name} (dossier 13 §9.1) ; boss non dessiné`)
@@ -138,7 +139,8 @@ local function buildBoss(bossId: string)
 		end
 		return
 	end
-	local mesh = ArtLibrary.clonePart(template.Name, BOSS_MESH_HEIGHT)
+	-- Le nom de recherche, pas template.Name : un ancien modèle (EnemyVisualMeshes) ne se retrouve qu'avec le préfixe Boss_.
+	local mesh = ArtLibrary.clonePart(name, BOSS_MESH_HEIGHT)
 	if mesh then
 		mesh.CFrame = HIDDEN
 		mesh.Parent = container
