@@ -26,9 +26,9 @@ Sémantique (Types.StatName) : stats « pourcent » = bonus additifs, multiplica
 | Luck | 0 | 100 (effet rareté) | CardService, LootService |
 | XpGain | 0 | — | LootService (avant addXp) |
 | Magnet | 0 | — | LootService (studs ajoutés au rayon) |
-| MaxHp | 100 | — | RunManager |
+| MaxHp | 140 (A04-12) | — | RunManager |
 | Armor | 0 | — | RunManager (courbe conseillée `Armor/(Armor+50)`) |
-| Regen | 0 | — | RunManager (PV/s) |
+| Regen | 0,5 (A04-12) | — | RunManager (PV/s) |
 | MoveSpeed | 0 | 1 | domaine avatar |
 | Dodge | 0 | 0,6 | RunManager |
 | Thorns | 0 | 1 | PassiveService (renvoi des coups de mêlée) |
@@ -61,7 +61,7 @@ Paramètres envoyés à `EnemyService.applyStatus` (le domaine run les interprè
 
 ## 3. XP et niveaux
 
-- XP pour passer du niveau L à L+1 : `floor(6 + 4·L + 0,35·L²)` → L1 : 10, L5 : 34, L10 : 81, L20 : 226, L30 : 441. Cumul jusqu'au niveau 30 ≈ 4 900 XP (≈ une run réussie, le trait grandit à 10/20/30).
+- XP pour passer du niveau L à L+1 : `floor(6 + 4·L + 0,6·L²)` (A04-12, était 0,35) → L1 : 10, L5 : 41, L10 : 106, L20 : 326, L30 : 666. Cumul jusqu'au niveau 30 ≈ 7 000 XP (≈ une run réussie, le trait grandit à 10/20/30).
 - Niveau max 99. `addXp(player, n)` prend `n` tel quel : **LootService** applique déjà `× (1 + XpGain)` et le **partage coop** (§5.2 : 50 % aux coéquipiers actifs à ≤ 40 studs) avant d'appeler `addXp` pour chacun. Les autres sources (fusion Prisme du Savant) appellent `addXp` directement.
 - Plusieurs niveaux d'un coup : chaque niveau tire `Bus.PlayerLeveledUp` ; CardService les met en file.
 
@@ -112,7 +112,7 @@ Toutes tirent seules côté serveur à 15 Hz (`Balance.SimHz`). Projectiles = do
 | --- | --- | --- | --- | --- | --- |
 | 1 | `Broadsword` | Broadsword / Épée large | Cône 140° devant soi (vers l'ennemi le plus proche), rayon 8, recul 4 ; un coup sur deux part derrière (`swingBack`) | 16 dég, cd 1,1 s | Taille, Dégâts |
 | 2 | `Longbow` | Longbow / Arc long | Flèches auto vers l'ennemi le plus proche (portée 55), perce 3 | 12 dég, cd 1,0, 80 studs/s | Quantité, Vit. d'attaque |
-| 3 | `FireStaff` | Fire Staff / Bâton de feu | Boule de feu qui explose au premier ennemi (rayon 5 × Taille) ou en fin de course, + brûlure 4 dps 2 s | 14 dég, cd 1,4, 42 studs/s | Taille, Dégâts |
+| 3 | `FireStaff` | Fire Staff / Bâton de feu | Boule de feu qui explose au premier ennemi (rayon 5 × Taille) ou en fin de course, + brûlure 4 dps 2 s | 13 dég, cd 1,0 (A04-12), 42 studs/s | Taille, Dégâts |
 | 4 | `QuakeHammer` | Quake Hammer / Marteau séisme | Onde circulaire rayon 9, recul 8, +1 % dégâts par point d'armure ; étourdit 0,3 s au niv. 8 | 22 dég, cd 2,4 | Taille, Armure |
 | 5 | `ThrowingDaggers` | Throwing Daggers / Dagues de lancer | Éventail de 3 dagues (14°), perce 1 | 7 dég, cd 0,9 | Quantité, Vit. d'attaque |
 | 6 | `HolyAura` | Holy Aura / Aura sacrée | Anneau permanent rayon 6 autour du joueur, tic toutes les 0,5 s ; soigne les alliés si porté par un Cleric | 5 dég/tic | Taille, Dégâts |
@@ -153,7 +153,7 @@ Valeurs **par niveau** (cumul linéaire), sauf Projectiles. Id = nom anglais ; n
 | `Luck` | Luck Rune / Rune de chance | +3 Luck | +24 |
 | `Wisdom` | Wisdom Rune / Rune de sagesse | +10 % XpGain | +80 % |
 | `Magnet` | Magnet Rune / Rune aimant | +3 Magnet | +24 studs |
-| `Vitality` | Vitality Rune / Rune de vitalité | +15 MaxHp, +0,1 Regen | +120 PV, +0,8/s |
+| `Vitality` | Vitality Rune / Rune de vitalité | +15 MaxHp, +0,2 Regen (A04-12) | +120 PV, +1,6/s |
 | `Armor` | Armor Rune / Rune d'armure | +3 Armor | +24 |
 | `Agility` | Agility Rune / Rune d'agilité | +4 % MoveSpeed, +2 % Dodge | +32 %, +16 % |
 | `Cursed` | Cursed Rune / Rune maudite | +10 % Difficulty, +12 % LootBonus, +5 % XpGain, +5 % Damage | ×5 |
@@ -215,7 +215,7 @@ Décisions v2 section 3. L'avatar Roblox reste intact ; la classe ajoute un **é
 
 | Id | EN / FR | Arme de départ | Passif (id = classe) | Règle exacte (`Weapons.Passives`) | Mouvement (`Config/Classes`, lu par A06) | Déblocage |
 | --- | --- | --- | --- | --- | --- | --- |
-| `Knight` | Knight / Chevalier | Broadsword | Valor | +1 % dégâts par ennemi à ≤ 10 studs (max +30 %, seau additif, compté à 15 Hz) ; pare un coup toutes les 8 s (`PassiveService.tryBlock`, avant esquive et armure) | normal | Gratuit |
+| `Knight` | Knight / Chevalier | Broadsword | Valor | +1 % dégâts par ennemi à ≤ 10 studs (max +30 %, seau additif, compté à 15 Hz) ; pare un coup toutes les 15 s (A04-12, était 8 ; `PassiveService.tryBlock`, avant esquive et armure) | normal | Gratuit |
 | `Archer` | Archer / Archère | Longbow | Eagle Eye | +25 % de chance de critique sur les ennemis à ≥ 20 studs du joueur | saut haut (`jumpHeight` 10) | Gratuit |
 | `Mage` | Mage / Mage | Fire Staff | Arcane Surge | +2 % Taille par niveau ; toutes les 5 offres, au moins une carte Rare ou mieux | plané court (`glide`, `glideSeconds` 1,2) | Gratuit |
 | `Guardian` | Guardian / Gardien | Quake Hammer | Bulwark | +3 armure par niveau ; renvoie 30 % des dégâts de **mêlée** aux 3 ennemis les plus proches (≤ 6 studs) ; immunisé au recul (`knockbackImmune`) | lent (14), atterrissage lourd (`heavyLanding`) | Quête |

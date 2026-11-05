@@ -150,7 +150,9 @@ local defs: { WeaponDef } = {
 		name = { en = "Fire Staff", fr = "Fire Staff" },
 		desc = { en = "Fireball that explodes in an area", fr = "Fireball that explodes in an area" },
 		scaling = { "Size", "Damage" },
-		base = { damage = 14, cooldown = 1.4, radius = 1.0, amount = 1, speed = 42, life = 1.3, pierce = 1, angle = 12, range = 45, volleys = 1, volleyDelay = 0.2, popRadius = 5, endBlast = 1, statusDps = 4, statusDuration = 2 },
+		-- A04-12 : 14 dég / 1,4 s -> 13 dég / 1,0 s. Le tir lent laissait la foule au contact : le Mage
+		-- était la classe gratuite la plus fragile du modèle (3 % de victoires, contre 28 % au Knight).
+		base = { damage = 13, cooldown = 1.0, radius = 1.0, amount = 1, speed = 42, life = 1.3, pierce = 1, angle = 12, range = 45, volleys = 1, volleyDelay = 0.2, popRadius = 5, endBlast = 1, statusDps = 4, statusDuration = 2 },
 		levels = {
 			{ damage = 4 },
 			{ popRadiusPct = 0.20 },
@@ -444,11 +446,13 @@ end
 Weapons.Passives = {
 	Knight = {
 		name = { en = "Valor", fr = "Valor" },
-		desc = { en = "+1% damage per enemy within 10 studs (max +30%). Blocks one hit every 8 s.", fr = "+1% damage per enemy within 10 studs (max +30%). Blocks one hit every 8 s." },
+		desc = { en = "+1% damage per enemy within 10 studs (max +30%). Blocks one hit every 15 s.", fr = "+1% damage per enemy within 10 studs (max +30%). Blocks one hit every 15 s." },
 		nearRadius = 10,
 		damagePerEnemy = 0.01,
 		maxNearBonus = 0.30,
-		parryEvery = 8,
+		-- A04-12 : 8 -> 15 s. La parade bloque un coup entier (contact cumulé, mini-boss, boss) : à un coup
+		-- toutes les 5 à 15 s, elle en bloquait 40 à 60 % et le Knight gagnait 25 points de plus que les autres.
+		parryEvery = 15,
 	},
 	Archer = {
 		name = { en = "Eagle Eye", fr = "Eagle Eye" },

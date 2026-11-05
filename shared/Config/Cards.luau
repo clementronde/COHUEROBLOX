@@ -40,7 +40,10 @@ local Cards = {
 		-- xp to go from level L to L+1 = floor(Base + Linear * L + Quad * L^2)
 		Base = 6,
 		Linear = 4,
-		Quad = 0.35,
+		-- A04-12 : 0,35 -> 0,6. Les kills suivent l'arrivée des ennemis, pas les dégâts : le joueur moyen
+		-- montait au niveau ~40 en 10 min (40 pauses de carte par joueur, lourd en coop). Avec 0,6 : ~35,
+		-- les premiers niveaux ne bougent pas (niveau 2 à ~8 s, niveau 10 à ~1:30).
+		Quad = 0.6,
 		-- LootService already applies XpGain and the 50 % / 40 studs coop share before calling
 		-- StatsService.addXp, so addXp takes the amount as final.
 	},
