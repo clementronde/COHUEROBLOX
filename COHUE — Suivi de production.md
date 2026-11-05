@@ -349,12 +349,12 @@ Chaque espèce de base a aussi une variante capturable (aura et icône) : enviro
 
 | ID | Tâche | Livrable | Dépend de | Priorité | Statut |
 | --- | --- | --- | --- | --- | --- |
-| A11-01 | Audit complet du code existant (/audit, anti-exploit-review, agent red-team) | `docs/security/audit-v1.md`, failles classées |  | P0 — bloquant | À valider |
-| A11-02 | Corriger les failles critiques des fichiers que personne d'autre ne touche en vague 1 (DataService, MonetizationService, LootService, ShrineService, Net) | Branche de correctifs | A11-01 | P0 — bloquant | À valider |
+| A11-01 | Audit complet du code existant (/audit, anti-exploit-review, agent red-team) | `docs/security/audit-v1.md`, failles classées ; statut réel au 5 nov. (13 corrigées ou fermées, S-06 / S-10 / S-15 chez A12) |  | P0 — bloquant | À valider |
+| A11-02 | Corriger les failles critiques des fichiers que personne d'autre ne touche en vague 1 (DataService, MonetizationService, LootService, ShrineService, Net) | Branche `claude/a11-failles` : S-11 (`Net`), S-16 nouvelle (réapparition après reset, `RunManager`) ; S-05, S-07, S-09, S-12 déjà fermées par A04 | A11-01 | P0 — bloquant | À valider |
 | A11-03 | Lister les failles des fichiers des autres agents pour le chef de projet | Liste dans le rapport | A11-01 | P0 — bloquant | À valider |
 | A11-04 | Règles anti-triche des nouveaux systèmes : KO, capture, Overtime, classement hebdo | Note | A04-02 | P0 — bloquant | À valider |
-| A11-05 | Revue de sécurité de chaque branche avant fusion | Verdict par branche | Fin de chaque vague | P0 — bloquant | En cours |
-| A11-06 | Tests d'exploits en Play : vitesse, téléportation, spam de remotes | Rapport | A06-05 | P1 — lancement | À faire |
+| A11-05 | Revue de sécurité de chaque branche avant fusion | Verdict par branche : `docs/security/revues-vague2.md` (A03, A05, A10, A12, A14 fusionnables ; A02, A06, A13 pas encore poussés) | Fin de chaque vague | P0 — bloquant | En cours |
+| A11-06 | Tests d'exploits en Play : vitesse, téléportation, spam de remotes | Scripts prêts : `docs/security/tests-exploits.md` (T0-T8, à lancer par le chef de projet) ; rapport après le Play | A06-05 | P1 — lancement | En cours |
 
 ### A02 — Mondes et level design (vague 2)
 
