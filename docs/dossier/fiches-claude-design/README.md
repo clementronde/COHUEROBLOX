@@ -4,6 +4,15 @@ Clément fait les modèles lui-même avec Claude Design. A03 écrit une fiche pr
 
 **Style retenu par Clément le 5 nov. 2026 : celui de son fantôme** (« On va refaire tous les models dans le style de ce ghost »). Il remplace les tenons de la planche concept d'A03 ; la planche ne sert plus que de référence pour les formes et les gags.
 
+## Où Clément range les modèles
+
+Dans `C:\Users\Charment\COHUE\assets\claude-design\<NomDeContrat>\`, un dossier par modèle, avec tout ce que Claude Design donne :
+- le `.glb` ;
+- le `README.md` de handoff ;
+- le script `*Controller.server.lua`.
+
+A03 y lit les fichiers directement : plus besoin de les envoyer. Les versions corrigées pour COHUE restent dans `assets/a03/<modèle>/`.
+
 ## Conventions communes (celles du fantôme)
 
 | Règle | Détail |
