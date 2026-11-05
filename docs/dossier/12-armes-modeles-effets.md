@@ -553,7 +553,7 @@ Commités :
 3. Lancer `assets/a14/install/A14_weapons_install.luau` (par `execute_luau`). Il range chaque modèle dans `ReplicatedStorage.Assets.Weapons.<Nom>` : `Body` et `Neon` (matériau Neon), pivot au point de prise, attributs `Kind`, `WeaponId`, `Dominant`, `A14`. Il affiche les MeshId et signale ce qui manque. Les anciens `Weapon_*` de A01 ne sont pas touchés.
 4. Ctrl+S par Clément.
 
-## 14. Étape 4 : effets et WeaponFX (5 nov. 2026, en cours)
+## 14. Étape 4 : effets et WeaponFX (5 nov. 2026, testés en Play dans COHUE)
 
 **Préparé sans Studio** (à tester en Play dès que COHUE est libre) :
 - `A14_Weapons.glb` contient aussi les formes lisses des effets : `FX_Ring`, `FX_RingThick`, `FX_RingDashed`, `FX_Disc`, et le croissant du coup de taille en 9 segments de 20° (`FX_ArcHalo1..9`, `FX_ArcCore1..9`), toutes à un rayon de 1 stud.
@@ -579,10 +579,28 @@ Commités :
   - Un modèle manquant est signalé une fois dans la sortie, sans repli en Parts.
   - Il accroche aussi l'arme de départ de la classe (attribut `ClassId`) à la main de chaque joueur, 1,4 fois plus grande. L'arc se tient à gauche. L'orientation est réglable par l'attribut `HoldCFrame` du modèle.
 
+**Dans COHUE (5 nov.)** :
+- Clément a fait l'Import 3D de `A14_Weapons.glb` (86 mailles téléversées).
+- Les deux scripts d'installation ont tourné :
+  - 35 modèles A14 dans `Assets.Weapons` ;
+  - `Assets.FX` contient Weapons (16), Special (9), Shared, Enemies (5) et Shapes (22) ;
+  - le Model `Scene` laissé par l'import est supprimé.
+- L'Import 3D range chaque maille dans un Model `<Nom>_Node` dont le pivot est le point de prise. Le script des armes copie ce pivot dans `PivotOffset`.
+- `WeaponFX` et `EnemyAttackFX` sont poussés avec `UpdateSourceAsync`, car studio-load ne marche plus. Les anciennes versions sont gardées dans `ServerStorage.A14_Backup`. Le générateur est `assets/a14/make_push.py`.
+- Test en Play :
+  - en vraie partie, avec le Knight, la Broadsword et la Meteor Rain ;
+  - avec des évènements `WeaponFx` envoyés à la main, pour les 16 armes.
+- Tout s'affiche, et la console ne montre ni erreur ni alerte de `WeaponFX` ou d'`EnemyAttackFX`.
+- Les couleurs par sommet s'affichent bien sur les MeshParts (bleu royal, or, contour noir).
+- Arme tenue : l'angle par défaut plantait la lame dans le sol. Il vaut maintenant 70° autour de X : lame vers le haut, face du sprite vers la caméra.
+
 **Reste** :
-- import, installation et Play dans COHUE ;
-- réglage des orientations (pièces en vol, arme en main) ;
+- réglages fins et contrôle qualité :
+  - les étincelles (texture « sparkles ») sont des losanges nets de près ;
+  - les explosions se lisent surtout comme des disques orange ;
+  - le croissant montre ses joints entre segments ;
+  - la lueur dépend du Bloom de la place ;
 - fusions et paliers (contract request A04 pour les ids visuels et les niveaux) ;
 - effets des ennemis : `EnemyAttackFX` est converti. Il clone `Assets.FX.Enemies.Sweep`, `Burst`, `Shot`, `Land` et `Boss`, posés par `A14_fx_install.luau`. Ces effets sont mats, à la couleur du profil de l'ennemi, avec la même interface pour `EnemyRenderer`. Restent les tirs ennemis (`EnemyRenderer`) et les télégraphes des boss (`BossRenderer`), dans des fichiers de A03, à convertir avec lui ;
-- contrôle qualité.
+- contrôle qualité (`fwjelaa:quality-score`, seuil 8,5, relecteurs à l'aveugle).
 
