@@ -49,7 +49,7 @@ Le plan du 4 nov. ([img/65-lobby-plan.svg](img/65-lobby-plan.svg)) est remplacé
 
 ## 2. Le HUD du hub : PLAY et la barre du bas
 
-Maquette de structure : écran 0 du [Figma](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b), capture [img/65-hud-play.png](img/65-hud-play.png). **Le visuel de référence est celui de A08** (v3 « briques », validé par Clément le 5 nov.) : écrans LB01 (lobby) et LB02 (choix du mode) de la page « Lobby v3 — barre et Play » du [Figma A08](https://www.figma.com/design/0Yq5m1skq5dzgOQXZ9bG6D), composants `Lobby/PlayButton`, `Lobby/BarButton`, `Lobby/ModeChoice`, `Lobby/Currency`. A09 fixe la liste des boutons, les pastilles et le flux ; l'écran 0 d'A09 sera refait avec ces composants dès que la bibliothèque v3 est publiée. Positions sur la référence téléphone 844 × 390 (pixels logiques, `60-ui-ux.md`).
+Maquette de structure : écran 0 du [Figma](https://www.figma.com/design/cdIWE7AH9ScXZ0uzzLyv4b), capture [img/65-hud-play.png](img/65-hud-play.png). **Le visuel de référence est celui de A08** (v3 « briques », validé par Clément le 5 nov.) : écrans LB01 (lobby) et LB02 (choix du mode) de la page « Lobby v3 — barre et Play » du [Figma A08](https://www.figma.com/design/0Yq5m1skq5dzgOQXZ9bG6D), composants `Lobby/PlayButton`, `Lobby/BarButton`, `Lobby/ModeChoice`, `Lobby/Currency`. A09 fixe la liste des boutons, les pastilles et le flux. L'écran 0 d'A09 est refait avec ces composants (bibliothèque v3 publiée par Clément le 5 nov.) : 7 boutons dans l'ordre d'A09, pastilles seulement sur Pets, Upgrades et Quests. Le 8e bouton Ranks attend la réponse de Clément ; l'icône trophée existe déjà (`BrickIcon/trophy`), il manquerait une variante `Item=Ranks` à A08. Positions sur la référence téléphone 844 × 390 (pixels logiques, `60-ui-ux.md`).
 
 | Élément | Place | Taille | Règle |
 | --- | --- | --- | --- |
@@ -156,7 +156,7 @@ Maquettes Figma : **[COHUE — Menus & Lobby (A09)](https://www.figma.com/design
 
 Planche des 8 écrans habillés (4 nov.) : [img/65-maquettes-v2.png](img/65-maquettes-v2.png).
 
-**Style UI en cours de refonte** : Clément a trouvé l'UI de run « en tenons » encore trop AI slop le 5 nov. A08 repart des briques et montre d'abord 1 ou 2 écrans concept. Les écrans du lobby suivront automatiquement les composants de la bibliothèque A08 ; les 3 nouveaux menus (§6.9 à 6.11) seront maquettés après ce concept, pour ne pas dessiner deux fois.
+**Style UI : v3 « briques » de A08** (validé par Clément le 5 nov. pour le lobby ; la v2 glossy puis « studs » a été jugée AI slop). Les 8 écrans du 4 nov. sont encore en v2. **Un menu concept en v3 est fait : Classes** (cadre « 2 · Classes — concept v3 » de la page 02, composants `Window` Plum, `Tile`, `Tag`, `Button`, `BrickIcon/*` de A08). Il est à valider par Clément avant de passer les 7 autres menus et de maquetter les 3 nouveaux (§6.9 à 6.11). Archer n'a pas encore d'icône d'arc (sprite d'arme attendu d'A14).
 
 Règles communes :
 
