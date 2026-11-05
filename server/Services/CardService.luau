@@ -617,8 +617,20 @@ function CardService.start()
 		end
 		acc = 0
 		local now = os.clock()
+		-- S-19 : une offre ouverte en solo (sans limite) passe au délai coop dès qu'un 2e joueur est
+		-- dans la run, sinon le retardataire reste figé tant que le premier ne choisit pas.
+		local run = Registry.find("RunManager")
+		local coop = run ~= nil and run.getRunPlayers ~= nil and #run.getRunPlayers() > 1
 		for player, d in data do
 			local offer = d.offer
+			if offer and coop and offer.expiresAt == math.huge then
+				local seconds = RunConfig.LevelUpPause.CoopSeconds
+				offer.expiresAt = now + seconds
+				sendOffer(player, offer)
+				if run and run.setChoosing then
+					pcall(run.setChoosing, player, true, seconds) -- renvoie endsIn à tous les joueurs
+				end
+			end
 			if offer then
 				if now >= offer.expiresAt then
 					-- Pause (coop) : la 1re carte, celle que la fenêtre sélectionne par défaut
