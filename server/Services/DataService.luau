@@ -217,6 +217,7 @@ local function newProfile(): { [string]: any }
 		eggsHatched = 0,
 		cosmetics = {},
 		equipped = {},
+		seasons = {}, -- [seasonId] = XP de saison (A12-04) ; paliers et récompenses dérivés
 		settings = { keepHat = false, colorblind = false, reduceFlashes = false, textScale = 1 },
 		loadout = { classId = Progression.DefaultLoadout.classId, companionId = Progression.DefaultLoadout.companionId },
 		weekly = { week = -1, done = false, bestSeconds = 0, everDone = false },

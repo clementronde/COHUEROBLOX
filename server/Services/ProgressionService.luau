@@ -25,6 +25,7 @@ local Config = Shared:WaitForChild("Config")
 local Progression = require(Config:WaitForChild("Progression"))
 local Quests = require(Config:WaitForChild("Quests"))
 local Cosmetics = require(Config:WaitForChild("Cosmetics"))
+local Products = require(Config:WaitForChild("Products"))
 local Net = require(Shared:WaitForChild("Net"))
 local Registry = require(Shared:WaitForChild("Registry"))
 local Signal = require(Shared:WaitForChild("Signal"))
@@ -319,7 +320,25 @@ local function ownsCosmetic(player: Player, data: Data, id: string): boolean
 	if def.source == "Pass" then
 		return def.pass ~= nil and ownsPass(player, def.pass)
 	end
+	if def.source == "Season" then
+		-- Dérivé (jamais stocké) : palier atteint, et pass de la saison pour la piste premium.
+		local season = def.season and Products.Seasons.List[def.season]
+		if not season or not def.tier then
+			return false
+		end
+		local xp = type(data.seasons) == "table" and tonumber(data.seasons[season.id]) or 0
+		if (xp or 0) < def.tier * season.xpPerTier then
+			return false
+		end
+		return def.track == "Free" or ownsPass(player, season.pass)
+	end
 	return type(data.cosmetics) == "table" and data.cosmetics[id] == true
+end
+
+-- XP de saison d'une run (A12-04) : gagnée en jouant, jamais achetée.
+local function seasonXpFor(kills: number, worldsCleared: number): number
+	local x = Products.Seasons.Xp
+	return math.min(x.Cap, x.Base + math.floor(kills / x.KoPerXp) + x.PerWorld * worldsCleared)
 end
 
 local function grantCosmetic(data: Data, id: string)
@@ -511,13 +530,26 @@ local function buildView(player: Player, data: Data): { [string]: any }
 	end
 
 	local passes: { [string]: boolean } = {}
-	local products = optionalConfig("Products")
-	if products and type(products.Passes) == "table" then
-		for key in products.Passes do
-			if ownsPass(player, key) then
-				passes[key] = true
-			end
+	for key in Products.Passes do
+		if ownsPass(player, key) then
+			passes[key] = true
 		end
+	end
+
+	-- Pass saisonnier : saison en cours (ou nil), XP, palier, piste premium possédée.
+	local seasonView = nil
+	local active = Products.activeSeason(os.time())
+	if active then
+		local xp = tonumber(data.seasons[active.id]) or 0
+		seasonView = {
+			id = active.id,
+			xp = xp,
+			tier = math.min(active.tiers, math.floor(xp / active.xpPerTier)),
+			tiers = active.tiers,
+			xpPerTier = active.xpPerTier,
+			premium = passes[active.pass] == true,
+			endsAt = active.endsAt,
+		}
 	end
 
 	local challenge = ProgressionService.getWeeklyChallenge()
@@ -553,6 +585,7 @@ local function buildView(player: Player, data: Data): { [string]: any }
 		vip = passes.VIP == true,
 		companionStartTech = table.clone(data.companionStartTech),
 		koRecord = koRecord,
+		season = seasonView,
 	}
 end
 
@@ -1128,10 +1161,18 @@ function ProgressionService.grantRunRewards(player: Player, summary: Types.RunSu
 
 	local challenge = ProgressionService.getWeeklyChallenge()
 	local weeklyNow = false
+	-- Pass saisonnier (A12-04) : XP gagnée en jouant, bornée par la saison.
+	local season = Products.activeSeason(os.time())
+	local worldsCleared = math.floor(num((summary :: any).worldsCleared, 0, 3))
+	local seasonXp = if season and (played or victory) then seasonXpFor(kills, worldsCleared) else 0
 	local ok = withProfile(player, function(d, done)
 		rollWeek(d)
 		d.silver += silver
 		d.silverEarnedTotal += silver
+		if season and seasonXp > 0 then
+			local current = tonumber(d.seasons[season.id]) or 0
+			d.seasons[season.id] = math.min(season.tiers * season.xpPerTier, current + seasonXp)
+		end
 		if played or victory then
 			applyStat(d, "RunsPlayed", 1, done)
 		end
@@ -1201,6 +1242,7 @@ function ProgressionService.grantRunRewards(player: Player, summary: Types.RunSu
 		rewardedRun[player] = runId
 	end
 	out.silverEarned = silver
+	out.seasonXp = seasonXp -- champ en plus du contrat RunSummary (écran de fin)
 
 	-- Quests that moved during this run (completed first, then closest to their goal), max 8.
 	local data = dataService().peek(player)
@@ -1255,7 +1297,17 @@ local function onSelectLoadout(player: Player, classId: any, companionId: any)
 	end
 end
 
-local SIMPLE_SLOTS = { Title = true, Emote = true, Footstep = true, Aura = true }
+-- Pose / Tint : un cosmétique sans classId (premium, saison) va sur toutes les classes (A12-04).
+local SIMPLE_SLOTS = {
+	Title = true,
+	Emote = true,
+	Footstep = true,
+	Aura = true,
+	Trail = true,
+	KoEffect = true,
+	CompanionHat = true,
+	CompanionColor = true,
+}
 local CLASS_SLOTS = { Tint = true, Pose = true }
 local LINE_SLOTS = { CompanionTint = true, CompanionPose = true }
 
@@ -1317,9 +1369,6 @@ local function onEquipCosmetic(player: Player, slot: any, cosmeticId: any)
 			return
 		end
 		if CLASS_SLOTS[base] and def.classId ~= nil and def.classId ~= arg then
-			return
-		end
-		if base == "Pose" and def.classId == nil then
 			return
 		end
 		if LINE_SLOTS[base] and def.line ~= arg then
