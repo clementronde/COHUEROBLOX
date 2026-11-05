@@ -1183,6 +1183,21 @@ local function onFinalWaveStarted()
 	end
 end
 
+-- S-17 (A11) : le gel du passage de niveau (sans limite en solo) ne compte ni dans la durée de run
+-- (KO par minute, part d'invulnérabilité, durée minimale des gains) ni dans l'Overtime sans dégât.
+local function onRunFrozen(frozen: any, pausedSeconds: any)
+	if frozen == true or not isFiniteNumber(pausedSeconds) or pausedSeconds <= 0 then
+		return
+	end
+	for _, info in runInfo do
+		info.startedAt += pausedSeconds
+		info.lastDamagedAt += pausedSeconds
+	end
+	if overtimeSince then
+		overtimeSince += pausedSeconds
+	end
+end
+
 -- KO compté par StatsService (A04-03) : on ne recalcule rien, on garde le dernier total.
 local function onKOScored(player: Player, runKills: number)
 	local info = runInfo[player]
@@ -2109,6 +2124,9 @@ local function checkNoDamage()
 	local now = os.clock()
 	local thresholdAt = now - (ot - QC.NoDamageAfterOvertime)
 	local run = runManager()
+	if safeCall(run, "isFrozen") == true then
+		return -- S-17 : aucun coup n'existe pendant le gel ; onRunFrozen décale les horloges à la reprise
+	end
 	for player, info in runInfo do
 		if info.noDamage then
 			continue
@@ -2248,6 +2266,7 @@ function ProgressionService.init()
 	Bus.CompanionEvolved:connect(onCompanionEvolved)
 	Bus.FinalWaveStarted:connect(onFinalWaveStarted)
 	Bus.KOScored:connect(onKOScored)
+	Bus.RunFrozen:connect(onRunFrozen)
 
 	Players.PlayerAdded:Connect(onPlayerAdded)
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
