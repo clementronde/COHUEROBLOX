@@ -1,6 +1,6 @@
 # 12 — Armes : modèles et effets (A14)
 
-Domaine **armes, modèles et effets**. Agent A14, branche `claude/a14-armes-5c1460`. État au 5 nov. 2026, **étape 1 : inventaire** (porte 1, à valider par Clément).
+Domaine **armes, modèles et effets**. Agent A14, branche `claude/a14-armes-5c1460`. État au 5 nov. 2026, **étape 1 : inventaire**, validé par Clément (porte 1, section 11).
 
 Sources lues : `01-decisions-v2.md` (sections 3, 4, 6, 12), `10-combat-armes-grimoires-objets.md` (sections 5, 6, 8, 10), `20-run-mondes-boss.md` (section 4), `80-direction-artistique.md`, `shared/Config/{Weapons,Grimoires,Classes,Items,Enemies,Bosses}.luau`, `shared/WeaponFxCodec.luau`, `server/Services/{WeaponService,PassiveService}.luau`, `client/Controllers/{WeaponFX,EnemyAttackFX,EnemyRenderer,BossRenderer}.luau`. La config fait foi en cas d'écart avec ce document.
 
@@ -23,9 +23,9 @@ Pour chaque attaque, on décrit quatre moments : le **départ** (l'arme tire), l
 | Autres effets dessinés par `WeaponFX` | 9 visuels spéciaux (parade, soin, fantôme, sifflet…) et le télégraphe rouge, tous en Parts fabriquées par script | 10 effets (section 4) |
 | `assets/fx/` | Anneau et icône de capture (A01) | Rien de A14 |
 
-**Fusions.** Aucune n'existe dans la config (`Weapons.FusionEnabled = false`, A04-09 attend Clément). La section 3 propose une fusion par arme, à trancher.
+**Fusions.** Aucune n'existe encore dans la config (`Weapons.FusionEnabled = false`). Clément a validé le 5 nov. la liste de la section 3 : A14 fait les 16 modèles et leurs effets, A04 (A04-09) écrit les règles et les chiffres.
 
-**Ennemis et boss.** Leurs attaques visibles (section 7) sont fabriquées par `EnemyAttackFX`, `EnemyRenderer` et `BossRenderer`. La décision v2 §12 les range avec les effets d'armes (agent VFX). Le brief les attribue à A03. **À trancher par Clément** (question de la porte 1).
+**Ennemis et boss.** Leurs attaques visibles (section 7) sont fabriquées par `EnemyAttackFX`, `EnemyRenderer` et `BossRenderer`. Clément les a confiées à A14 le 5 nov. (porte 1).
 
 ---
 
@@ -67,7 +67,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | Revers (niv. 4) | 2e coup, 0,18 s après, derrière le joueur (`swingBack`) | — | même croissant, à l'opposé | idem |
 | Niveaux | niv. 3 et 8 : rayon +15 % · niv. 7 : angle +40° (180°) | | le croissant suit rayon et angle | |
 | Niveau 8 | | | liseré Gold sur le croissant (palier, section 10) | |
-| Fusion | proposition « Royal Greatsword » (section 3) | | | |
+| Fusion | « Royal Greatsword » (section 3) | | | |
 
 - **Existe** : `Weapon_Broadsword` (v1 voxel, pommeau en canard). Effet : plaque plate grise fabriquée par script.
 - **À faire** : modèle tenu en briques ; effet `Swing` (croissant) ; effet `Impact` ; accent Gold du niveau 8 ; fusion.
@@ -95,7 +95,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | Boule de feu | 42 studs/s, explose au 1er ennemi ou en fin de course (1,3 s), 14 dégâts, 1,4 s | flash Ember au cristal du bâton | cube Neon Ember entouré de flammes (particules), petite lumière en qualité Haute | explosion de rayon 5 : anneau au sol, cubes de braise qui retombent |
 | Brûlure | 4 dégâts/s pendant 2 s | | | flammèches au sol dans la zone pendant 2 s (limite 4 de la section 1) |
 | Niveaux | niv. 3 : explosion +20 % · niv. 4 : 2 boules · niv. 5 : brûlure +3/s · niv. 8 : explosion +25 % | | | l'explosion suit le rayon |
-| Fusion | proposition « Sun Staff » | | | |
+| Fusion | « Sun Staff » | | | |
 
 - **Existe** : `Weapon_FireStaff` (v1, une guimauve grille sous la flamme). Effet : boule orange et anneau plat orange fabriqués par script.
 - **À faire** : modèle tenu ; effets `Cast`, `Fireball`, `Explosion`, `Burn` ; fusion.
@@ -109,7 +109,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | Onde de choc | cercle de rayon 9 autour du joueur, recul 8, 22 dégâts (+1 %/armure), 2,4 s | poussière sous le marteau tenu | anneau de dalles Stone et Leather qui se soulèvent vers l'extérieur | cailloux projetés au bord de l'onde |
 | Niveaux | niv. 3 et 7 : rayon +15 % · niv. 5 : 2e onde 0,3 s après | | | |
 | Niveau 8 | étourdit 0,3 s | | | étoiles au-dessus de la zone (teinte givre de `EnemyRenderer` aujourd'hui, limite 4) |
-| Fusion | proposition « Mountain Maul » | | | |
+| Fusion | « Mountain Maul » | | | |
 
 - **Existe** : `Weapon_QuakeHammer` (v1, pansement en croix). Effet : disque plat marron fabriqué par script.
 - **À faire** : modèle tenu ; effets `Slam`, `Shockwave`, `Stun` ; fusion.
@@ -122,7 +122,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | --- | --- | --- | --- | --- |
 | Éventail de dagues | 3 dagues sur 14°, 65 studs/s, portée 35, perce 1, 7 dégâts, 0,9 s | petit éclat Plum devant le joueur | dague (pièce, ruban rouge) et traînée fine Plum | tintement d'étincelles en fin de course |
 | Niveaux | niv. 2, 5 : +1 dague · niv. 8 : +2 (7 dagues) · niv. 4 : perce +1 | | | |
-| Fusion | proposition « Dagger Flurry » | | | |
+| Fusion | « Dagger Flurry » | | | |
 
 - **Existe** : `Weapon_ThrowingDagger` (v1, ruban rouge au pommeau). Effet : bâtonnet gris fabriqué par script.
 - **À faire** : modèle tenu (ceinture de dagues ?) ; pièce `Dagger` ; effets `Trail`, `Impact` ; fusion.
@@ -136,7 +136,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | Aura | anneau permanent de rayon 6 qui suit le joueur, tic toutes les 0,5 s, 5 dégâts | la clochette tenue sonne | disque au sol en dalles Cream et Gold translucides, bord Neon Gold, qui pulse au rythme des tics | petites étincelles dorées dans la zone |
 | Soin du Cleric (Blessing) | 1,5 PV par tic aux joueurs dans l'aura | | | visuel spécial `Blessing` (section 4) |
 | Niveaux | niv. 3, 6 : rayon +15 % · niv. 8 : +20 % · niv. 4 : tic −15 % | | le disque suit le rayon | |
-| Fusion | proposition « Grand Chime » | | | |
+| Fusion | « Grand Chime » | | | |
 
 - **Existe** : `Weapon_HolyBell` (v1, clochette de cantine en porcelaine). Effet : disque plat doré transparent fabriqué par script.
 - **À faire** : modèle tenu ; effets `Aura` (disque et bord), `Pulse` ; fusion.
@@ -151,7 +151,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | Haches en orbite | 2 haches, rayon d'orbite 6, pendant 3,5 s, recul 5, 10 dégâts, recharge 5 s | les haches apparaissent avec un pop de copeaux | hache (pièce, smiley gravé) qui tourne sur elle-même, traînée en qualité Haute | éclats de bois sur la trajectoire |
 | Niveaux | niv. 2, 6, 8 : +1 hache (5) · niv. 4, 8 : +1 s · niv. 5 : rayon +15 % · niv. 7 : rotation +25 % | | | |
 | Fin | les haches s'en vont au bout de la durée | | | pop de disparition |
-| Fusion | proposition « Axe Tornado » | | | |
+| Fusion | « Axe Tornado » | | | |
 
 - **Existe** : `Weapon_SpinningAxe` (v1, smiley gravé sur le fer). Effet : plaques marron fabriquées par script.
 - **À faire** : modèle tenu ; pièce `Axe` ; effets `Spawn`, `Trail`, `Despawn` ; fusion.
@@ -164,7 +164,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | --- | --- | --- | --- | --- |
 | Claque à 360° | cercle de rayon 8,5, recul 6, 15 dégâts, 1,7 s | le fouet tenu se déroule | lanière de briques Leather qui fait un tour complet en 0,2 s, pompon de cirque au bout | étoile « crack » Ember au bout de la lanière |
 | Niveaux | niv. 3, 6 : rayon +15 % · niv. 8 : +20 % · niv. 4 : 2e claque 0,25 s après | | | |
-| Fusion | proposition « Ringmaster Lash » | | | |
+| Fusion | « Ringmaster Lash » | | | |
 
 - **Existe** : `Weapon_BeastWhip` (v1, fouet enroulé à pompon). Effet : disque plat brique fabriqué par script.
 - **À faire** : modèle tenu ; effets `Lash` (tour de lanière), `Crack` ; fusion.
@@ -177,7 +177,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | --- | --- | --- | --- | --- |
 | Éclair qui rebondit | frappe l'ennemi le plus proche (≤ 30 studs) puis rebondit 2 fois (≤ 12 studs), 11 dégâts, 1,3 s | le porteur (à créer) crépite | arc en zigzag Neon Sky (Beam), 0,15 s par segment | étoile électrique au bout de chaque segment |
 | Niveaux | niv. 2, 5 : +1 rebond · niv. 8 : +2 (6 rebonds) · niv. 4 : 2 chaînes · stat Bounces (Trombone tordu) jusqu'à +10 | | un segment de plus par rebond | |
-| Fusion | proposition « Thunder Web » | | | |
+| Fusion | « Thunder Web » | | | |
 
 - **Existe** : rien comme modèle. Effet : barre bleu clair étirée fabriquée par script.
 - **À faire** : modèle porteur (proposition : paratonnerre de poche, à juger sur la planche) ; effets `Bolt`, `Spark` ; fusion.
@@ -191,7 +191,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | Onde de givre | cercle de rayon 10, ralentit de 50 % pendant 1 s, 10 dégâts, 3 s | le porteur souffle du froid | anneau de cristaux Sky qui sort, givre au sol | flocons ; le sol reste givré 1 s (durée du ralenti) |
 | Gel | niv. 4 : 0,4 s · niv. 8 : 0,8 s | | | teinte givre de `EnemyRenderer` (existe, A03) |
 | Niveaux | niv. 3, 7 : rayon +15 % | | | |
-| Fusion | proposition « Blizzard Globe » | | | |
+| Fusion | « Blizzard Globe » | | | |
 
 - **Existe** : rien comme modèle. Effet : disque plat bleu glace fabriqué par script. Teinte givre des ennemis arrêtés (A03).
 - **À faire** : modèle porteur (proposition : boule à neige) ; effets `Nova`, `Frost` (sol givré) ; fusion.
@@ -204,7 +204,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | --- | --- | --- | --- | --- |
 | Aller-retour | part 0,55 s vers l'ennemi le plus proche, revient vers le joueur, transperce tout, 13 dégâts, 1,5 s | — | boomerang (pièce) qui tourne, traînée Gold ; le client imite le retour vers le tireur | pop quand le joueur le rattrape |
 | Niveaux | niv. 2, 5, 8 : +1 boomerang (4) · niv. 4 : taille +15 % | | | |
-| Fusion | proposition « Comeback Rang » | | | |
+| Fusion | « Comeback Rang » | | | |
 
 - **Existe** : rien comme modèle. Effet : plaque orange qui tourne, fabriquée par script.
 - **À faire** : modèle tenu (le boomerang lui-même) ; pièce `Boomerang` ; effets `Trail`, `Catch` ; fusion.
@@ -217,7 +217,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | --- | --- | --- | --- | --- |
 | Bombe | sur un ennemi à ≤ 25 studs, explose après 0,8 s, rayon 6, recul 6, 24 dégâts, 2,6 s | la bombe sort du sac | bombe Ink à mèche (pièce) qui vole en cloche pendant 0,8 s (le point de départ manque, limite 3) ; télégraphe au sol, toujours dessiné | explosion : anneau, nuage de briques, débris |
 | Niveaux | niv. 4, 7 : +1 bombe (3) · niv. 3 : rayon +15 % · niv. 8 : +20 % | | | l'explosion suit le rayon |
-| Fusion | proposition « Cluster Sack » (mini-bombes : le moteur `cluster` et le visuel `MiniBomb` existent) | | | |
+| Fusion | « Cluster Sack » (mini-bombes : le moteur `cluster` et le visuel `MiniBomb` existent) | | | |
 
 - **Existe** : rien comme modèle. Effets : anneau orange plat et télégraphe rouge, fabriqués par script.
 - **À faire** : modèle tenu (sac) ; pièce `Bomb` ; effets `Telegraph`, `Explosion` ; fusion.
@@ -230,7 +230,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | --- | --- | --- | --- | --- |
 | Lance | 75 studs/s, portée 50, traverse tout, recul 3, 20 dégâts, 1,8 s | — | lance (pièce, 4 studs) et traînée Leather | en fin de course, la lance se plante dans le sol puis disparaît |
 | Niveaux | niv. 3, 7 : +1 lance · niv. 4 : taille +20 % · niv. 8 : +30 % | | | |
-| Fusion | proposition « Comet Javelin » | | | |
+| Fusion | « Comet Javelin » | | | |
 
 - **Existe** : rien comme modèle. Effet : barre de 4 studs fabriquée par script.
 - **À faire** : modèle tenu ; pièce `Spear` ; effets `Trail`, `Stuck` ; fusion.
@@ -244,7 +244,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | Météores | 2 météores sur des ennemis au hasard (≤ 35 studs), 0,9 s de télégraphe, rayon 7, 40 dégâts, 3,2 s ; +1 % de météore par point de Chance | — | télégraphe au sol (toujours dessiné) ; rocher de briques en feu qui tombe du ciel pendant ces 0,9 s (calcul client) | cratère, éclats, flammes |
 | Brûlure | 3 dégâts/s pendant 2 s | | | flammes au sol dans la zone pendant 2 s |
 | Niveaux | niv. 3, 7 : +1 météore (4) · niv. 4 : rayon +15 % · niv. 8 : +20 % | | | |
-| Fusion | proposition « Star Shower » | | | |
+| Fusion | « Star Shower » | | | |
 
 - **Existe** : rien comme modèle. Effets : anneau rouge plat et télégraphe rouge, fabriqués par script.
 - **À faire** : modèle porteur (à juger sur la planche) ; pièce `Meteor` ; effets `Telegraph`, `Fall`, `Impact`, `Burn` ; fusion.
@@ -258,7 +258,7 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | --- | --- | --- | --- | --- |
 | Lames en orbite | 3 petites lames permanentes, orbite serrée (rayon 3,5), 6 dégâts toutes les 0,35 s par ennemi | apparition à l'équipement | lame (pièce, disque de scie en briques Steel) qui tourne, traînée légère en qualité Haute | étincelles sur l'orbite |
 | Niveaux | niv. 2, 5 : +1 lame · niv. 8 : +2 (7 lames) · niv. 4 : rotation +20 % · niv. 7 : rayon +15 % | | | |
-| Fusion | proposition « Buzzsaw Halo » | | | |
+| Fusion | « Buzzsaw Halo » | | | |
 
 - **Existe** : rien comme modèle. Effet : disques gris fabriqués par script.
 - **À faire** : modèle tenu ; pièce `Blade` ; effets `Trail`, `Spark` ; fusion.
@@ -272,16 +272,16 @@ Niveaux : la config a 7 deltas par arme (niveaux 2 à 8). Ne sont listés que ce
 | Pose de la tourelle | arbalète fixe à 3 studs du joueur, pendant 8 s, recharge 6 s | la tourelle tombe et se déplie avec de la poussière | tourelle (pièce) qui pivote vers sa cible | la tourelle se replie et disparaît |
 | Carreaux | toutes les 0,8 s, portée 38, 70 studs/s, perce 2, 8 dégâts | petit recul de l'arbalète | carreau (pièce) et traînée courte | éclats en fin de course |
 | Niveaux | niv. 3 : +2 s · niv. 4 : cadence −15 % · niv. 5, 8 : +1 tourelle (3) · niv. 7 : +1 carreau (la stat Amount ajoute aussi des carreaux) | | | |
-| Fusion | proposition « Siege Ballista » | | | |
+| Fusion | « Siege Ballista » | | | |
 
 - **Existe** : rien comme modèle. Effet : bloc marron fabriqué par script. **Bug visuel** : les carreaux utilisent le même style que la tourelle, donc chaque carreau est dessiné comme un bloc de 1,6 × 2,2 × 1,6 studs. Je le corrige côté client (style par type d'évènement), sans toucher au serveur.
 - **À faire** : pièces `Turret` et `Bolt` ; effets `Deploy`, `Trail`, `Impact`, `Despawn` ; fusion.
 
 ---
 
-## 3. Fusions (proposition A14, à trancher par Clément et A04-09)
+## 3. Fusions (liste validée par Clément le 5 nov.)
 
-Règle du moteur (`Config/Weapons`) : une arme au niveau 8 + une Rune précise au niveau 5 donnent une version ultime au niveau 9 (carte Legendary). Le moteur existe, mais aucune fusion v2 n'est écrite et `FusionEnabled = false`. Les chiffres de jeu restent à A04. Je ne propose ici que des **noms et un visuel**, pour savoir quoi modéliser.
+Règle du moteur (`Config/Weapons`) : une arme au niveau 8 + une Rune précise au niveau 5 donnent une version ultime au niveau 9 (carte Legendary). Le moteur existe, mais aucune fusion v2 n'est écrite et `FusionEnabled = false`. Cette liste fixe les **noms, les paires et le visuel** ; les chiffres de jeu restent à A04 (A04-09).
 
 Chaque Rune vient d'une stat qui fait briller l'arme (colonne « Brille avec » du dossier 10). Wisdom et Cursed ne servent à aucune fusion.
 
@@ -361,13 +361,15 @@ Ce qui reste visible côté Runes : l'**éclair de fusion** (section 3) et les i
 | Barbarian | Spinning Axes | Rage | aucun aujourd'hui | — |
 | Tamer | Beast Whip | Pack Leader | compagnons | A05 |
 
-**Arme tenue en main.** Aucun code n'attache aujourd'hui de modèle d'arme au personnage : les 8 MeshParts v1 ne servent à rien en jeu. La DA (§8) dit pourtant qu'« avant le niveau 10, l'arme de départ suffit à reconnaître la classe ». Je propose que le client accroche l'arme de départ de la classe (attribut `ClassId`, déjà posé par le serveur) à la main droite de chaque joueur. Les armes du pool commun n'ont pas de place sur le corps : leur modèle sert aux pièces en jeu et aux icônes. Question à Clément (section 11).
+**Arme tenue en main (validé par Clément le 5 nov.).** Aucun code n'attache aujourd'hui de modèle d'arme au personnage : les 8 MeshParts v1 ne servent à rien en jeu. La DA (§8) dit pourtant qu'« avant le niveau 10, l'arme de départ suffit à reconnaître la classe ». Le client accroche donc l'arme de départ de la classe (attribut `ClassId`, déjà posé sur le Player par `TraitService`) à la main droite de chaque joueur. Les armes du pool commun n'ont pas de place sur le corps : leur modèle sert aux pièces en jeu et aux icônes.
 
 ---
 
-## 7. Attaques des ennemis et des boss (périmètre à trancher)
+## 7. Attaques des ennemis et des boss (A14, décision de Clément du 5 nov.)
 
 Aujourd'hui, tout est fabriqué par script : éclats de `EnemyAttackFX` (Parts Neon en pool), projectiles ennemis en boules (`EnemyRenderer`), télégraphes des boss (`BossRenderer`).
+
+**Partage avec A03.** A14 fait les objets (`Assets.FX.Enemies.<Famille>.<Rôle>`, `Assets.FX.Bosses.<Boss>.<Attaque>`) et convertit `EnemyAttackFX`. Les projectiles ennemis et les télégraphes vivent dans `EnemyRenderer` et `BossRenderer`, les fichiers de A03 : je les convertis seulement avec l'accord du coordinateur, un agent à la fois sur ces fichiers (contract request, section 10).
 
 **Rosters en transition.** `Config/Enemies` contient encore les ennemis v1 (glands, momies, craies…). Les décisions v2 veulent des gobelins, des zombies et des fantômes, et le monde 2 devient un cimetière. Les attaques ci-dessous sont celles du code actuel.
 
@@ -425,7 +427,7 @@ Noms proposés : `Assets.Weapons.<Id>` pour le modèle tenu, `Assets.Weapons.<Fu
 | | **Armes** | **16** | **10 pièces** | | **41** |
 | | Fusions | 16 | variantes des pièces | éclair de fusion commun + effets recolorés ou remplacés | 1 + ≈ 16 |
 | | Autres (section 4) | — | Ghost | Parry, Blessing, Ghost, Whistle, Megaphone, Thorns, Shadowstep, ChainBolt, MiniBomb, Telegraph | 10 |
-| | Ennemis et boss (section 7) | — | si inclus : objets d'attaque | 4 familles + 8 attaques de boss actives | 12 (si inclus) |
+| | Ennemis et boss (section 7) | — | objets d'attaque (projectiles, glands, avions en papier…) | 4 familles + 8 attaques de boss actives | 12 |
 
 Le niveau 8 ne demande pas d'objet en plus : les accents Gold sont des pièces masquées dans le modèle ou l'effet, que le code rend visibles (le code a le droit de changer la visibilité, décisions v2 §12).
 
@@ -447,10 +449,10 @@ Le niveau 8 ne demande pas d'objet en plus : les accents Gold sont des pièces m
 **Couleurs**, d'après la DA §4 et §6 :
 - les effets du joueur brillent (Neon), ceux des ennemis restent Tomato sans Neon ;
 - Bubblegum est réservé à la capture : `MiniBomb` (rose aujourd'hui) change de couleur ;
-- **télégraphes** : aujourd'hui, le cercle de la bombe et du météore du joueur est rouge, comme le danger d'un boss. Je propose de le passer en Ember ou Gold, pointillé, et de garder le rouge pour les ennemis ;
+- **télégraphes** (validé par Clément le 5 nov.) : le cercle de la bombe et du météore du joueur passe du rouge à Ember ou Gold, en pointillé. Le rouge reste au danger des ennemis ;
 - Meteor Rain passe de son rouge-Tomato à Ember.
 
-**Couleur par arme ou par classe.** La DA §6 dit « tirs du joueur aux couleurs de la classe ». Or les 16 armes sont équipables par toutes les classes. Je propose une couleur par **arme** (feu Ember, givre Sky, éclair Sky, sacré Gold…), plus lisible quand on porte 4 armes. Question à Clément.
+**Une couleur par arme** (validé par Clément le 5 nov.). La DA §6 disait « tirs du joueur aux couleurs de la classe ». Mais les 16 armes sont équipables par toutes les classes : chaque arme a donc sa couleur (feu Ember, givre et éclair Sky, sacré Gold…), plus lisible quand on porte 4 armes. Contract request à A01 pour mettre la DA §6 à jour.
 
 ---
 
@@ -462,7 +464,9 @@ Je ne touche pas aux fichiers de ces agents. Chaque demande est petite et sans r
 | --- | --- | --- |
 | A04 (`WeaponService`) | Mettre le FxSlot du tireur dans le champ `a` des évènements Zone (aujourd'hui 0) | la bombe part de la main du joueur ; effets de fusion et de palier par joueur |
 | A04 | Donner au client le niveau de chaque arme de chaque joueur, par exemple un attribut Player `WeaponLevels` (« index:niveau » séparés par des virgules), mis à jour à chaque carte | palier visuel du niveau 8, fusion (niveau 9) |
-| A04 (A04-09) | Quand les fusions seront tranchées : noms définitifs et règles | modèles et effets de fusion |
+| A04 (A04-09) | Clément a validé les 16 fusions de la section 3 (noms et paires) : écrire leurs règles et chiffres, puis `FusionEnabled = true` | modèles et effets de fusion |
+| A03 | Convertir en objets A14 les projectiles ennemis (`EnemyRenderer`) et les télégraphes des boss (`BossRenderer`) : soit A14 le fait avec l'accord du coordinateur, soit A03 branche les objets que A14 pose | Clément a confié les effets des ennemis et des boss à A14 |
+| A01 | DA §6 : « une couleur par arme » au lieu de « aux couleurs de la classe » ; télégraphes du joueur en Ember ou Gold | décision de Clément du 5 nov. |
 | A04 (option) | Envoyer les coups critiques (un bit dans un évènement existant) | effet de critique pour l'Archer et la Crit Rune |
 | A03 (option) | Distinguer gel et étourdissement (aujourd'hui un seul bit « arrêté », teinte givre) | le Quake Hammer et le Megaphone étourdissent, ils ne gèlent pas |
 | A08 | Les icônes d'armes des cartes et du HUD peuvent être rendues à partir de mes modèles (ViewportFrame) | une seule source pour l'arme |
@@ -472,12 +476,14 @@ Ce que je corrige moi-même dans `WeaponFX` (client, mon domaine, étape 4) : le
 
 ---
 
-## 11. Questions pour Clément (porte 1)
+## 11. Porte 1 : décisions de Clément (5 nov. 2026)
 
-1. **Liste validée ?** Les 16 armes, leurs attaques et leurs effets (sections 2 et 8).
-2. **Ennemis et boss** : leurs effets d'attaque (section 7, 12 effets) font-ils partie de mon travail, ou restent-ils à A03 ?
-3. **Fusions** : les veux-tu ? Si oui, la liste de la section 3 te va-t-elle comme point de départ pour A04 ?
-4. **Arme tenue** : le joueur porte-t-il son arme de départ en main ?
-5. **Couleurs** : une couleur par arme plutôt que par classe ? Télégraphes du joueur en Ember ou Gold plutôt qu'en rouge ?
+| Question | Réponse |
+| --- | --- |
+| Liste des 16 armes, attaques et effets (sections 2 et 8) | Validée |
+| Effets des attaques des ennemis et des boss (section 7) | A14 les fait |
+| Fusions | Oui, la liste de la section 3 |
+| Arme de départ tenue en main | Oui |
+| Couleurs | Une couleur par arme ; télégraphes du joueur en Ember ou Gold, le rouge reste aux ennemis |
 
-Après la porte 1 : planche concept (étape 2) avec 3 ou 4 armes et 2 ou 3 effets en rendu, avant de tout modéliser.
+Suite : planche concept (étape 2), avec 3 ou 4 armes et 2 ou 3 effets en rendu, avant de tout modéliser (porte 2).
