@@ -1,6 +1,6 @@
 # 13 — Ennemis et boss : modèles et rendu (A03)
 
-**Statut : étape 1, inventaire. Porte 1 : en attente de la validation de Clément.**
+**Statut : porte 1 validée par Clément le 5 nov. 2026 (« Yes, approved », roster et 4 recommandations de la section 8). Étape 2 en cours : planche concept.**
 
 Rédigé le 5 nov. 2026 par l'agent A03 (ennemis et boss). Sources :
 - `01-decisions-v2.md`, sections 6, 7 et 12 ;
