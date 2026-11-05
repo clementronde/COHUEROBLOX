@@ -111,6 +111,8 @@ local columns: { { any } } = {
 
 -- Ids des entités externes (boss) : peu nombreuses, testées à part par queryRadius (PERF-03).
 local externalIds: { number } = {}
+-- Ennemis apparus depuis le début de la run (A12, classement : KO <= apparus). Boss et invocations compris.
+local runSpawned = 0
 -- Ids retirés depuis le dernier envoi (morts, nettoyage) : le client les efface tout de suite.
 local removedQueue: { number } = {}
 local removedN = 0
@@ -279,6 +281,7 @@ local function insertEnemy(kind: number, x: number, z: number, hp: number, dmg: 
 	end
 	x, z = clampToMap(x, z)
 	count += 1
+	runSpawned += 1
 	if isExternal then
 		table.insert(externalIds, id)
 	end
@@ -1492,6 +1495,13 @@ function EnemyService.getCount(): number
 	return count
 end
 
+-- Ennemis apparus depuis le début de la run (tout ce qui peut donner un KO : horde, élites,
+-- mini-boss, invocations, boss). Remis à 0 au premier monde de la run (beginStage, stage 1), gardé
+-- après la fin de la run pour le relevé du classement (A12, dossier 70 §13 : KO <= apparus).
+function EnemyService.getRunSpawned(): number
+	return runSpawned
+end
+
 -- Au plafond technique, retire l'ennemi ordinaire (ni élite, ni boss) le plus loin de tout joueur,
 -- sans butin ni KO, pour laisser passer une apparition voulue (mini-boss, invocation, autel).
 local function makeRoom(): boolean
@@ -1633,6 +1643,9 @@ end
 -- Stage director (RunManager).
 function EnemyService.beginStage(worldId: string, tier: number, stage: number)
 	EnemyService.clearAll()
+	if stage <= 1 then
+		runSpawned = 0 -- nouvelle run
+	end
 	local layout = Heightmap.getLayout()
 	halfSize = if layout then layout.size / 2 else 1e6
 	director.active = true
