@@ -100,7 +100,7 @@ def place(fn, loc, rot_z=0.0, scale=1.0, elite=False):
     o = K._origin(vox)
     cell = meta["cell"]
     for (x, y, z) in meta.get("glints", []):
-        g = bpy.data.objects.new("Glint", A14._sphere_mesh("Glint", cell * 0.42, 4, 2))
+        g = bpy.data.objects.new("Glint", A14._sphere_mesh("Glint", meta.get("glint_r", cell * 0.42), 4, 2))
         bpy.context.scene.collection.objects.link(g)
         g.data.materials.append(A14._solid_glow("FFFFFF", 3.0))
         g.scale = (1, 0.4, 1)
