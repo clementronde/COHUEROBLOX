@@ -266,6 +266,16 @@ recipes = [
     ("Dégât", "0 s, puis 0,32 s (+0,22 s)", "Quad Out", "La barre tombe tout de suite, un reste crème fond derrière, la barre tremble de 4 px, le cœur se serre.", "Deux Frames de remplissage"),
     ("Niveau gagné (HUD)", "0,38 s", "Quad Out", "Le badge s'écrase puis rebondit, le chiffre tombe, 14 tenons bleus jaillissent, trois clics montants.", "Size du badge ; particules = 14 Frames recyclées"),
     ("Capture prête", "0,26 s, puis 1,2 s en boucle", "Back Out, puis Linear", "La tuile monte en grandissant, un anneau rose s'élargit et s'efface en boucle.", "Anneau = ImageLabel à part (Size + ImageTransparency)"),
+    ("Tuile en recharge", "durée de la recharge, puis 0,15 s", "Linear, puis Back Out", "Un voile sombre descend avec les secondes ; prête, la tuile grossit à 110 % avec un clic.", "Frame voile, Size.Y tweené ; TextLabel des secondes"),
+    ("Overtime", "0,2 s / 0,25 s", "Quad Out / Back Out", "Le chrono passe au rouge et grossit à 115 % ; l'annonce tombe de 20 px et tremble 3 fois de 2 px. Aucun flash plein écran.", "Tremblement coupé par « animations réduites »"),
+    ("Arrivée du boss", "0,3 s puis 0,6 s", "Back Out, puis Quad Out", "La plaque du boss glisse sous le chrono, sa barre se remplit de 0 à 100 % ; la flèche de bord rebondit de 4 px chaque seconde.", "Tween de Size.X de la barre"),
+    ("Capture : en cours, ratée, réussie", "0,2 s / 2 s / 0,2 s", "Back Out / Linear / Quad Out", "Le panneau saute ; la barre rose avance ; raté : secousse de 4 px et barre rouge ; réussi : barre verte, 12 tenons roses, la cage saute à 120 %.", "Barre = Size.X ; couleurs par tween de BackgroundColor3"),
+    ("À terre", "0,3 s / 0,25 s", "Quad Out / Back Out", "Bord rouge à l'écran, le panneau tombe, les tuiles passent au gris en 0,15 s, les armes disparaissent ; relevé : le panneau saute et s'efface en 0,2 s.", "Vignette = ImageLabel plein écran (transparence 0,85)"),
+    ("Anneau de relève", "3 s", "Linear", "L'anneau vert autour du portrait se remplit ; à 100 % le portrait rebondit.", "UIGradient en rotation sur un anneau"),
+    ("Roue de ping", "0,12 s, décalage 0,02 s", "Back Out", "La roue passe de 60 % à 100 %, les briques arrivent une à une ; la brique visée grossit à 110 %.", "UIScale sur la roue, puis sur chaque brique"),
+    ("Ping posé", "0,25 s puis 4 s", "Back Out, puis Linear", "Le repère tombe de 40 px et rebondit ; la ligne du fil glisse de la gauche puis s'efface après 4 s.", "BillboardGui pour le repère"),
+    ("Fenêtre d'attente (coop)", "0,25 s", "Back Out", "La fenêtre « X LEVELED UP! » saute au centre, sa barre se vide en même temps que celle du joueur qui choisit.", "Même tween que la fenêtre de niveau"),
+    ("Fin de run", "0,30 s, puis 0,6 s, puis 0,4 s décalées de 0,08 s", "Back Out, Cubic Out, Quad Out", "La fenêtre tombe, les KO défilent, les barres de dégâts se remplissent une à une, les récompenses sautent une par une, puis les boutons montent.", "Comme Victory ; Size.X des barres"),
 ]
 rec_html = "".join(f"<tr><td>{a}</td><td class=\"num\">{b}</td><td><code>{c}</code></td><td>{d}</td><td>{e}</td></tr>" for a, b, c, d, e in recipes)
 
