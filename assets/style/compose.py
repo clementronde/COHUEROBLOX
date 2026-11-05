@@ -260,33 +260,32 @@ def board_equipment():
 
 
 def board_lobby_bricks():
-    """Planche 6 : le lobby compact en briques à tenons (rendus de assets/voxel/lobby.py)."""
-    src = os.path.join(ROOT, "assets", "voxel", "review", "lobby_nature")
+    """Planche 6 : le lobby compact tout en tenons, piste B retenue (rendus de assets/voxel/lobby.py)."""
+    src = os.path.join(ROOT, "assets", "voxel", "review", "lobby_studs")
     W, H = 2400, 1680
     im, d = canvas(W, H)
-    header(d, "Carte naturelle, interactions en briques",
-           "Choix de Clément le 5 nov. 2026 : le décor est naturel et peint (nature.py), tout ce avec quoi on "
-           "interagit est en briques à tenons (brick.py). Maquette Blender du lobby compact.", W)
+    header(d, "Tout en tenons : le lobby en maquette",
+           "Style choisi par Clément le 5 nov. 2026 (piste B). Décor en gros blocs à tenons (studs.py), "
+           "interactions en petites briques fines (brick.py). Maquette Blender.", W)
     paste_fit(im, os.path.join(src, "lobby_arrival.png"), (60, 200, 1460, 990), align="left")
     d.text((60, 1000), "Ce que voit le joueur à l'arrivée : la tête de gobelin (le portail) au bout de l'avenue.",
            font=BODY, fill=INK)
     paste_fit(im, os.path.join(src, "lobby_overview.png"), (1500, 200, W - 60, 790))
-    d.text((1500, 800), "Vue d'ensemble : forêt en lisière, chemins de terre, stations en briques", font=SMALL, fill=MUTED)
+    d.text((1500, 800), "Vue d'ensemble : terrasses, forêt de sapins, falaise en blocs", font=SMALL, fill=MUTED)
     paste_fit(im, os.path.join(src, "lobby_portal.png"), (1500, 840, W - 60, 1320))
-    d.text((1500, 1330), "Le portail de près : briques chanfreinées devant la falaise naturelle", font=SMALL, fill=MUTED)
+    d.text((1500, 1330), "Le portail en briques fines devant la falaise en gros blocs", font=SMALL, fill=MUTED)
     paste_fit(im, os.path.join(src, "lobby_west.png"), (60, 1050, 740, 1440), align="left")
     paste_fit(im, os.path.join(src, "lobby_east.png"), (770, 1050, 1450, 1440), align="left")
-    d.text((60, 1450), "Tour du Mage, cour du Knight, enclos · Pas de tir, boutique de Gob, feu de camp",
+    d.text((60, 1450), "Tour du Mage, cour du Knight, enclos · Pas de tir, boutique de Gob, mare",
            font=SMALL, fill=MUTED)
     y = 1510
     d.text((60, y), "La règle", font=H2, fill=INK)
-    rules = ("Briques à tenons pour ce avec quoi on interagit : portail, pads, stations, caisses, personnages, "
-             "ennemis, équipement · décor naturel et peint : herbe lisse en fondus doux, chemins de terre, arbres "
-             "en boules de feuillage, rochers à facettes, forêt dense en lisière · tenons posés en jeu par le "
-             "plugin Resurface · ciel bleu franc et cumulus · Neon seulement sur ce qui compte. Une brique veut dire : on "
-             "peut s'en servir ; la nature, c'est le décor.")
+    rules = ("Une seule matière, le plastique à tenons · le naturel vient des formes : terrasses, blocs décalés, "
+             "plaques inclinées, eau · décor en gros blocs (Parts + Resurface), interactions en petites briques "
+             "fines, saturées, avec un peu de Neon · tenons posés en jeu par Resurface · ciel bleu franc et "
+             "cumulus · jamais de forme lisse ni d'arbre réaliste.")
     wrap(d, (60, y + 50), rules, BODY, INK, W - 120)
-    im.save(os.path.join(HERE, "06-lobby-nature-briques.png"), optimize=True)
+    im.save(os.path.join(HERE, "06-lobby-tenons.png"), optimize=True)
 
 
 def board_lobby_compare():

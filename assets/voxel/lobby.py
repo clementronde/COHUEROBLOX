@@ -1,15 +1,15 @@
 """COHUE — maquette du lobby compact « Hubbub Village », refonte du 5 nov. 2026 (A01).
 
-Style (5 nov., deux retours de Clément) : carte naturelle (sol lisse, arbres peints, rochers à facettes,
-nature.py) et éléments interactifs en briques à tenons (brick.py). Les tenons seront posés en jeu par le
-plugin Resurface. La première version de la maquette était en voxels ; la grille de modélisation des
-éléments interactifs reste la même.
+Style retenu par Clément le 5 nov. (piste B) : tout en tenons, formes naturelles. Le décor est en gros
+blocs à tenons (studs.py : terrasses, falaises en blocs décalés, sapins en plaques, eau), les éléments
+interactifs en petites briques fines (brick.py). Les tenons sont une texture, comme le plugin Resurface
+les pose en jeu. La piste A (décor naturel lisse, nature.py) reste disponible avec --nature pour comparer.
 
 Remplace le premier lobby en Parts (refusé par Clément : « beaucoup trop AI slop »). Principes :
 - un seul héros : la tête de gobelin géante en pierre, endormie, dont la bouche est le portail ;
-- éléments interactifs en briques à tenons (tête 0,5, stations et props 0,25) ; décor naturel lisse ;
+- éléments interactifs en petites briques (tête 0,5, stations et props 0,25) ; décor en gros blocs ;
 - aucun panneau écrit : chaque station se lit à ses objets (blagues montrées, pas écrites) ;
-- île flottante naturelle : collines douces, chemins de terre, falaise de rochers, forêt en lisière.
+- île flottante en terrasses : chemins de terre, falaise en blocs décalés, forêt de sapins, mare.
 
 Rendus (Blender 5.2 en ligne de commande) :
     blender -b --factory-startup --python assets/voxel/lobby.py -- <dossier_de_sortie> [vue ...]
@@ -1233,8 +1233,8 @@ CLOUDS = [(-66, -20, -26, 1.0), (64, 30, -30, 1.0), (10, 66, -34, 1.0), (-46, 60
 ISLETS = [(-96, -58, -8, 1.6), (94, 72, -16, 1.4), (118, -24, 2, 1.2), (-110, 40, -20, 1.3)]
 
 
-def build_scene(style: str = "nature"):
-    """style = "nature" (carte naturelle peinte) ou "studs" (tout en tenons, formes naturelles)."""
+def build_scene(style: str = "studs"):
+    """style = "studs" (tout en tenons, retenu) ou "nature" (piste A : décor naturel lisse)."""
     import bpy
 
     import boards as BD
@@ -1456,7 +1456,7 @@ VIEWS = {  # nom : (position caméra, cible, focale, résolution)
 }
 
 
-def render_views(outdir, names=None, style="nature"):
+def render_views(outdir, names=None, style="studs"):
     import build as B
 
     sc, stats = build_scene(style)
@@ -1474,7 +1474,7 @@ def render_views(outdir, names=None, style="nature"):
 
 if __name__ == "__main__":
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
-    style = "studs" if "--studs" in argv else "nature"
-    argv = [a for a in argv if a != "--studs"]
+    style = "nature" if "--nature" in argv else "studs"
+    argv = [a for a in argv if a not in ("--studs", "--nature")]
     out = os.path.abspath(argv[0]) if argv else os.path.join(HERE, "review", "lobby")
     print(render_views(out, argv[1:] or None, style))
