@@ -13,7 +13,31 @@ Objectif : un écran lisible au milieu de 200 ennemis sur un téléphone de 6 po
 
 **Fichier Figma** : [COHUE — UI Design System & Run Screens](https://www.figma.com/design/0Yq5m1skq5dzgOQXZ9bG6D). Pages : Cover, Foundations, Icons, Components, Run — Phone landscape (L01-L11), Run — Phone portrait (P01-P11), Run — PC (C01-C11). Statut : **à valider par Clément** (A08-03). Rien n'est intégré dans Roblox avant son accord.
 
-### 0.1 Le style
+### 0.0 Virage « studs » et UI en dur (5 nov. 2026)
+
+Clément a demandé deux changements après la v1 vernie :
+
+1. **DA en studs.** Tout bloc coloré porte une texture de tenons, dans l'esprit des packs d'UI Roblox « stud ». La texture vient de `kek_stud.png` (pack KekUIEssentials fourni par Clément). Le pack ne contient pas de fichier de licence : Clément confirme le droit d'usage.
+2. **UI en dur.** Les `ScreenGui` seront montés comme instances dans le place COHUE, pas générés par le code au lancement. Les scripts de `client/Controllers/UI/*` se brancheront sur des instances nommées et ne feront que cloner ou mettre à jour.
+
+Ordre retenu par Clément : d'abord Figma en studs, il valide, puis montage dans Studio.
+
+Règles du style studs (elles remplacent la brillance et les reflets de 0.1) :
+
+| Élément | Règle |
+| --- | --- |
+| Texture | Tuile transparente de 128 px (2 × 2 studs) tirée de `kek_stud.png` : clair → blanc translucide, sombre → noir translucide. Affichée à 12 px par stud. Fichier versionné : `docs/dossier/ui-assets/stud_tile_128.png`, refait par `make_stud_tile.py` (Python, PIL). |
+| Styles Figma | `Studs/On color` (60 %) sur les faces colorées ; `Studs/On dark` (28 %) sur les plaques sombres désactivées. |
+| Où | Boutons, barres de titre, badges de niveau, barres de vie, bouclier, capture, relève et boss, bandeaux de rareté des cartes, annonces, marqueurs et roue de ping. **Jamais** sur les corps de texte sombres, ni sur les touches clavier (`KeyHint`). La barre d'XP (10 px) reste sans studs. |
+| Forme | Bloc à contour encre 3 px, lèvre 6 px, biseau clair de 3 px en haut (`Bevel/Stud top`). Plus de bande brillante ni de reflets carrés. Rayons : 8 (boutons L), 7 (M), 12 (fenêtres), 7 (pastilles, qui ne sont plus en pilule). |
+| Boutons tactiles | Jump, Slide, Ping, Capture deviennent des **carrés arrondis** à studs, libellé dessous. Anneau doré « Ready » conservé. |
+| Fenêtres | Nouveau composant `WindowHeader` (6 tons : Play, Go, Premium, Danger, Info, Neutral) : barre colorée à studs, titre blanc en Luckiest Guy contour encre, croix rouge carrée `CloseButton` de 44 px en option. Il se pose sur un corps sombre, chevauchement de 10 px. Utilisé par Victory (Premium, titre centré), À terre (Danger « DOWNED! », Neutral « GHOST MODE ») et Fin de run (Play « RUN OVER »). Aucune de ces trois fenêtres n'a de croix : elles ne se ferment pas. |
+
+Côté Roblox (montage en dur, après validation) : la tuile est envoyée sur le compte de Clément (accord donné : « Je crée et j'upload »), puis posée comme `ImageLabel` `ScaleType = Tile`, `TileSize = 24 × 24`, `ImageTransparency = 0.4` au-dessus de la face. Les coins passent par `UICorner`, le contour par `UIStroke` de 3 px encre.
+
+Captures v2 studs : planches L01-L11, P01-P11, C01-C11 et règles, envoyées à Clément le 5 nov. 2026.
+
+### 0.1 Le style (v1 vernie, remplacé par 0.0 pour la brillance et les reflets)
 
 Chaque élément pressable ou important ressemble à un **bloc de jouet verni** :
 
