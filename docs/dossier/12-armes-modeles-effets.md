@@ -541,7 +541,7 @@ Commités :
 | Fusions (16) | RoyalGreatsword, StormBow, SunStaff, MountainMaul, DaggerFlurry, GrandChime, AxeTornado, RingmasterLash, ThunderWeb, BlizzardGlobe, ComebackRang, ClusterSack, CometJavelin, StarShower, BuzzsawHalo, SiegeBallista |
 | Pièces (3 en plus) | Bomb, Arrow, Bolt ; la dague, la hache, le boomerang, la lance, le météore et la lame reprennent le modèle de leur arme |
 
-**Import dans COHUE** (téléversement sur le compte de Clément, avec son accord ; passage dans Studio annoncé au coordinateur) :
+**Import dans COHUE** (téléversement sur le compte de Clément : **accord donné le 5 nov.** pour les 86 mailles ; passage dans Studio quand le coordinateur libère la place, après A08) :
 1. Régénérer si besoin : `blender -b --factory-startup --python assets/a14/export.py -- glb,pack assets/a14/out`, puis `python assets/a14/make_install.py`.
 2. Dans Studio, place COHUE, faire **un seul Import 3D** de `assets/a14/out/A14_Weapons.glb` (86 mailles : 35 corps, 29 parties Neon et 22 formes d'effets). Réglages :
    - Scale Unit = Studs ;
